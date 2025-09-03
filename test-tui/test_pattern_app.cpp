@@ -546,8 +546,21 @@ TDeskTop* TTestPatternApp::initDeskTop(TRect r)
     r.b.y--;
     // Create desktop with standard constructor
     TDeskTop* desktop = new TDeskTop(r);
-    // Insert our custom wallpaper as the background
-    desktop->insert(new TWallpaperView(r));
+    
+    // Remove the default background if it exists
+    if (desktop->background != 0)
+    {
+        desktop->remove(desktop->background);
+        destroy(desktop->background);
+        desktop->background = 0;
+    }
+    
+    // Insert our custom wallpaper as the new background
+    // Use desktop->getExtent() to match the desktop's internal coordinate system
+    TWallpaperView* wallpaper = new TWallpaperView(desktop->getExtent());
+    desktop->insert(wallpaper);
+    desktop->background = wallpaper;
+    
     return desktop;
 }
 
