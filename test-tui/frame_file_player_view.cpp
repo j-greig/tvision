@@ -269,6 +269,10 @@ void TTextFileView::setLimit()
 
 void TTextFileView::draw()
 {
+    if (!needsRedraw) {
+        return; // Skip unnecessary redraws during window dragging
+    }
+    
     TDrawBuffer buf;
     int viewHeight = size.y;
     int viewWidth = size.x - 1; // Leave space for scrollbar
@@ -277,15 +281,13 @@ void TTextFileView::draw()
         int lineIndex = topLine + y;
         
         if (lineIndex < (int)lines.size()) {
-            // Display line, truncate if too long
+            // Display line using efficient moveCStr with maxWidth to avoid substr allocation
             const std::string& line = lines[lineIndex];
-            int len = std::min((int)line.length(), viewWidth);
+            TAttrPair attrs{TColorAttr{0x07}, TColorAttr{0x07}};
             
-            if (len > 0) {
-                buf.moveStr(0, line.substr(0, len).c_str(), TColorAttr{0x07});
-            }
-            if (viewWidth > len) {
-                buf.moveChar(len, ' ', TColorAttr{0x07}, viewWidth - len);
+            ushort written = buf.moveCStr(0, line.c_str(), attrs, viewWidth);
+            if (written < viewWidth) {
+                buf.moveChar(written, ' ', TColorAttr{0x07}, viewWidth - written);
             }
         } else {
             // Empty line
@@ -294,6 +296,8 @@ void TTextFileView::draw()
         
         writeLine(0, y, viewWidth, 1, buf);
     }
+    
+    needsRedraw = false;
 }
 
 void TTextFileView::handleEvent(TEvent &ev)
@@ -305,6 +309,7 @@ void TTextFileView::handleEvent(TEvent &ev)
             case kbUp:
                 if (topLine > 0) {
                     topLine--;
+                    needsRedraw = true;
                     setLimit();
                     drawView();
                 }
@@ -314,6 +319,7 @@ void TTextFileView::handleEvent(TEvent &ev)
             case kbDown:
                 if (topLine + size.y < (int)lines.size()) {
                     topLine++;
+                    needsRedraw = true;
                     setLimit();
                     drawView();
                 }
@@ -322,6 +328,7 @@ void TTextFileView::handleEvent(TEvent &ev)
                 
             case kbPgUp:
                 topLine = std::max(0, topLine - size.y);
+                needsRedraw = true;
                 setLimit();
                 drawView();
                 clearEvent(ev);
@@ -330,6 +337,7 @@ void TTextFileView::handleEvent(TEvent &ev)
             case kbPgDn:
                 topLine = std::min((int)lines.size() - size.y, topLine + size.y);
                 if (topLine < 0) topLine = 0;
+                needsRedraw = true;
                 setLimit();
                 drawView();
                 clearEvent(ev);
@@ -337,6 +345,7 @@ void TTextFileView::handleEvent(TEvent &ev)
                 
             case kbHome:
                 topLine = 0;
+                needsRedraw = true;
                 setLimit();
                 drawView();
                 clearEvent(ev);
@@ -344,6 +353,7 @@ void TTextFileView::handleEvent(TEvent &ev)
                 
             case kbEnd:
                 topLine = std::max(0, (int)lines.size() - size.y);
+                needsRedraw = true;
                 setLimit();
                 drawView();
                 clearEvent(ev);
@@ -352,9 +362,17 @@ void TTextFileView::handleEvent(TEvent &ev)
     } else if (ev.what == evBroadcast && ev.message.command == cmScrollBarChanged) {
         if (ev.message.infoPtr == vScrollBar) {
             topLine = vScrollBar->value;
+            needsRedraw = true;
             drawView();
         }
     }
+}
+
+void TTextFileView::changeBounds(const TRect& bounds)
+{
+    TGroup::changeBounds(bounds);
+    needsRedraw = true;  // Trigger redraw when window is resized
+    setLimit();          // Update scrollbar limits
 }
 
 // Helper function to detect if file contains frame delimiters

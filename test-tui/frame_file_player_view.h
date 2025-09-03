@@ -75,6 +75,7 @@ public:
     // TView overrides  
     virtual void draw() override;
     virtual void handleEvent(TEvent &ev) override;
+    virtual void changeBounds(const TRect& bounds) override;
 
     bool ok() const { return loadOk; }
     const std::string &error() const { return errorMsg; }
@@ -85,6 +86,7 @@ private:
     bool loadOk {false};
     std::string errorMsg;
     TScrollBar *vScrollBar;
+    bool needsRedraw {true};
 
     void loadFile(const std::string &path);
     void setLimit();
