@@ -816,6 +816,7 @@ CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.o
  /Users/james/Repos/tvision/include/tvision/colors.h
  /Users/james/Repos/tvision/include/tvision/compat/borland/_defs.h
  /Users/james/Repos/tvision/include/tvision/compat/borland/iosfwd.h
+ /Users/james/Repos/tvision/include/tvision/compat/windows/windows.h
  /Users/james/Repos/tvision/include/tvision/config.h
  /Users/james/Repos/tvision/include/tvision/drawbuf.h
  /Users/james/Repos/tvision/include/tvision/objects.h

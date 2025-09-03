@@ -19,10 +19,13 @@
 #define FRAME_FILE_PLAYER_VIEW_H
 
 #define Uses_TView
+#define Uses_TGroup
 #define Uses_TRect
 #define Uses_TDrawBuffer
 #define Uses_TEvent
 #define Uses_TColorAttr
+#define Uses_TScrollBar
+#define Uses_TKeys
 #include <tvision/tv.h>
 
 #include <string>
@@ -61,5 +64,33 @@ private:
     static size_t nextLineStart(const std::string &s, size_t pos);
     static size_t findLineEnd(const std::string &s, size_t pos, size_t limit);
 };
+
+// Simple text file viewer with vertical scrollbar
+class TTextFileView : public TGroup
+{
+public:
+    explicit TTextFileView(const TRect &bounds, const std::string &path);
+    virtual ~TTextFileView();
+
+    // TView overrides  
+    virtual void draw() override;
+    virtual void handleEvent(TEvent &ev) override;
+
+    bool ok() const { return loadOk; }
+    const std::string &error() const { return errorMsg; }
+
+private:
+    std::vector<std::string> lines;
+    int topLine {0};
+    bool loadOk {false};
+    std::string errorMsg;
+    TScrollBar *vScrollBar;
+
+    void loadFile(const std::string &path);
+    void setLimit();
+};
+
+// Helper function to detect if file contains frame delimiters
+bool hasFrameDelimiters(const std::string& filePath);
 
 #endif // FRAME_FILE_PLAYER_VIEW_H

@@ -253,9 +253,16 @@ public:
         TRect interior = getExtent();
         interior.grow(-1, -1);
         
-        // Insert the frame animation view - FPS from file header takes precedence
-        FrameFilePlayerView* animView = new FrameFilePlayerView(interior, filePath);
-        insert(animView);
+        // Check if file has frame delimiters to decide which view to use
+        if (hasFrameDelimiters(filePath)) {
+            // Animation file - use frame player
+            FrameFilePlayerView* animView = new FrameFilePlayerView(interior, filePath);
+            insert(animView);
+        } else {
+            // Regular text file - use scrollable text viewer
+            TTextFileView* textView = new TTextFileView(interior, filePath);
+            insert(textView);
+        }
     }
 };
 

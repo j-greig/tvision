@@ -815,6 +815,7 @@ CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.o: /Users/james/Repos/tvi
   /Users/james/Repos/tvision/include/tvision/colors.h \
   /Users/james/Repos/tvision/include/tvision/compat/borland/_defs.h \
   /Users/james/Repos/tvision/include/tvision/compat/borland/iosfwd.h \
+  /Users/james/Repos/tvision/include/tvision/compat/windows/windows.h \
   /Users/james/Repos/tvision/include/tvision/config.h \
   /Users/james/Repos/tvision/include/tvision/drawbuf.h \
   /Users/james/Repos/tvision/include/tvision/objects.h \
@@ -3939,8 +3940,6 @@ CMakeFiles/test_pattern.dir/wallpaper.cpp.o: /Users/james/Repos/tvision/test-tui
 
 /Users/james/Repos/tvision/include/tvision/dialogs.h:
 
-/Users/james/Repos/tvision/include/tvision/compat/windows/windows.h:
-
 /Users/james/Repos/tvision/include/tvision/compat/borland/dir.h:
 
 /Users/james/Repos/tvision/include/tvision/app.h:
@@ -3984,6 +3983,8 @@ CMakeFiles/test_pattern.dir/wallpaper.cpp.o: /Users/james/Repos/tvision/test-tui
 /Users/james/Repos/tvision/include/tvision/stddlg.h:
 
 /Users/james/Repos/tvision/include/tvision/scrncell.h:
+
+/Users/james/Repos/tvision/include/tvision/compat/windows/windows.h:
 
 /Users/james/Repos/tvision/include/tvision/compat/borland/iosfwd.h:
 

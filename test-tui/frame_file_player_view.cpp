@@ -219,3 +219,159 @@ void FrameFilePlayerView::setState(ushort aState, Boolean enable) {
         }
     }
 }
+
+// TTextFileView implementation
+TTextFileView::TTextFileView(const TRect &bounds, const std::string &path) : TGroup(bounds)
+{
+    growMode = gfGrowHiX | gfGrowHiY;
+    options |= ofSelectable;
+    
+    // Create vertical scrollbar on right edge
+    TRect r = getExtent();
+    r.a.x = r.b.x - 1;
+    vScrollBar = new TScrollBar(r);
+    insert(vScrollBar);
+    
+    loadFile(path);
+    setLimit();
+}
+
+TTextFileView::~TTextFileView()
+{
+    // ScrollBar will be destroyed by TView destructor
+}
+
+void TTextFileView::loadFile(const std::string &path)
+{
+    std::ifstream file(path);
+    if (!file) {
+        loadOk = false;
+        errorMsg = "Failed to open file: " + path;
+        return;
+    }
+    
+    lines.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+    }
+    
+    loadOk = true;
+}
+
+void TTextFileView::setLimit()
+{
+    if (vScrollBar) {
+        int maxLines = std::max(0, (int)lines.size() - size.y);
+        vScrollBar->setParams(topLine, 0, maxLines, size.y - 1, 1);
+    }
+}
+
+void TTextFileView::draw()
+{
+    TDrawBuffer buf;
+    int viewHeight = size.y;
+    int viewWidth = size.x - 1; // Leave space for scrollbar
+    
+    for (int y = 0; y < viewHeight; y++) {
+        int lineIndex = topLine + y;
+        
+        if (lineIndex < (int)lines.size()) {
+            // Display line, truncate if too long
+            const std::string& line = lines[lineIndex];
+            int len = std::min((int)line.length(), viewWidth);
+            
+            if (len > 0) {
+                buf.moveStr(0, line.substr(0, len).c_str(), TColorAttr{0x07});
+            }
+            if (viewWidth > len) {
+                buf.moveChar(len, ' ', TColorAttr{0x07}, viewWidth - len);
+            }
+        } else {
+            // Empty line
+            buf.moveChar(0, ' ', TColorAttr{0x07}, viewWidth);
+        }
+        
+        writeLine(0, y, viewWidth, 1, buf);
+    }
+}
+
+void TTextFileView::handleEvent(TEvent &ev)
+{
+    TGroup::handleEvent(ev);
+    
+    if (ev.what == evKeyDown) {
+        switch (ev.keyDown.keyCode) {
+            case kbUp:
+                if (topLine > 0) {
+                    topLine--;
+                    setLimit();
+                    drawView();
+                }
+                clearEvent(ev);
+                break;
+                
+            case kbDown:
+                if (topLine + size.y < (int)lines.size()) {
+                    topLine++;
+                    setLimit();
+                    drawView();
+                }
+                clearEvent(ev);
+                break;
+                
+            case kbPgUp:
+                topLine = std::max(0, topLine - size.y);
+                setLimit();
+                drawView();
+                clearEvent(ev);
+                break;
+                
+            case kbPgDn:
+                topLine = std::min((int)lines.size() - size.y, topLine + size.y);
+                if (topLine < 0) topLine = 0;
+                setLimit();
+                drawView();
+                clearEvent(ev);
+                break;
+                
+            case kbHome:
+                topLine = 0;
+                setLimit();
+                drawView();
+                clearEvent(ev);
+                break;
+                
+            case kbEnd:
+                topLine = std::max(0, (int)lines.size() - size.y);
+                setLimit();
+                drawView();
+                clearEvent(ev);
+                break;
+        }
+    } else if (ev.what == evBroadcast && ev.message.command == cmScrollBarChanged) {
+        if (ev.message.infoPtr == vScrollBar) {
+            topLine = vScrollBar->value;
+            drawView();
+        }
+    }
+}
+
+// Helper function to detect if file contains frame delimiters
+bool hasFrameDelimiters(const std::string& filePath)
+{
+    std::ifstream file(filePath);
+    if (!file) return false;
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Remove trailing \r if present (CRLF handling)
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line == "----") {
+            return true;
+        }
+    }
+    return false;
+}
