@@ -22,7 +22,12 @@ endif()
 
 # Add executables
 add_executable(simple_tui simple_tui.cpp)
-add_executable(test_pattern test_pattern_app.cpp test_pattern.cpp gradient.cpp wallpaper.cpp)
+add_executable(test_pattern 
+    test_pattern_app.cpp 
+    test_pattern.cpp 
+    gradient.cpp 
+    wallpaper.cpp
+)
 
 # Link libraries for simple_tui
 target_link_libraries(simple_tui 
@@ -30,13 +35,32 @@ target_link_libraries(simple_tui
     ${NCURSES_LIB}
 )
 
+# Find threading library for animations
+find_package(Threads REQUIRED)
+
 # Link libraries for test_pattern
 target_link_libraries(test_pattern
     ${TVISION_DIR}/build/libtvision.a
     ${NCURSES_LIB}
+    Threads::Threads
 )
 
 # Set output directory
 set_target_properties(simple_tui test_pattern PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+# Frame-file animation player (MVP)
+add_executable(frame_file_player
+    frame_file_player_main.cpp
+    frame_file_player_view.cpp
+)
+
+target_link_libraries(frame_file_player
+    ${TVISION_DIR}/build/libtvision.a
+    ${NCURSES_LIB}
+)
+
+set_target_properties(frame_file_player PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

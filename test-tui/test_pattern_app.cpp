@@ -411,6 +411,7 @@ void TTestPatternApp::setPatternMode(bool continuous)
     messageBox(msg.str().c_str(), mfInformation | mfOKButton);
 }
 
+
 void TTestPatternApp::takeScreenshot()
 {
     // Create screenshots directory if it doesn't exist
@@ -568,6 +569,8 @@ TDeskTop* TTestPatternApp::initDeskTop(TRect r)
 void TTestPatternApp::idle()
 {
     TApplication::idle();
+    
+    // No animated views anymore
 }
 
 int main()
