@@ -1,0 +1,4 @@
+/Users/james/Repos/tvision/test-tui/build/CMakeFiles/simple_tui.dir
+/Users/james/Repos/tvision/test-tui/build/CMakeFiles/test_pattern.dir
+/Users/james/Repos/tvision/test-tui/build/CMakeFiles/edit_cache.dir
+/Users/james/Repos/tvision/test-tui/build/CMakeFiles/rebuild_cache.dir

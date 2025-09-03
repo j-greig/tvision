@@ -11,6 +11,10 @@
 !source/**/
 !test/
 !test/**/
+!test-tui/
+!test-tui/**/
+!prds/
+!prds/**/
 !.github/
 !.github/**/
 
