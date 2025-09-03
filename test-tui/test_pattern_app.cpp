@@ -27,9 +27,12 @@
 #define Uses_TView
 #define Uses_TDrawBuffer
 #define Uses_MsgBox
+#define Uses_cmTile
+#define Uses_cmCascade
 #include <tvision/tv.h>
 
 #include "test_pattern.h"
+#include "gradient.h"
 #include <sstream>
 #include <string>
 #include <cstdlib>
@@ -39,15 +42,22 @@
 // Configuration - Toggle pattern display mode
 // true  = Continuous mode (pattern flows like text, wraps at line ends creating diagonals)
 // false = Tiled mode (pattern resets at start of each line, crops at edges)
-const bool USE_CONTINUOUS_PATTERN = true;
+bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
 
 // Command constants
 const ushort cmNewWindow = 100;
 const ushort cmScreenshot = 101;
+const ushort cmNewGradientH = 102;
+const ushort cmNewGradientV = 103;
+const ushort cmNewGradientR = 104;
+const ushort cmNewGradientD = 105;
+const ushort cmPatternContinuous = 106;
+const ushort cmPatternTiled = 107;
 
 // Forward declarations
 class TTestPatternView;
 class TTestPatternWindow;
+class TGradientWindow;
 class TTestPatternApp;
 class TCustomMenuBar;
 
@@ -166,6 +176,8 @@ public:
         TWindow(bounds, aTitle, wnNoNumber),
         TWindowInit(&TTestPatternWindow::initFrame)
     {
+        options |= ofTileable;  // Enable cascade/tile functionality
+        
         // Get the interior bounds (excluding frame)
         TRect interior = getExtent();
         interior.grow(-1, -1);
@@ -173,6 +185,52 @@ public:
         // Insert the test pattern view
         TTestPatternView* patternView = new TTestPatternView(interior);
         insert(patternView);
+    }
+};
+
+/*---------------------------------------------------------*/
+/* TGradientWindow - Window containing gradient           */
+/*---------------------------------------------------------*/
+class TGradientWindow : public TWindow
+{
+public:
+    enum GradientType {
+        gtHorizontal,
+        gtVertical,
+        gtRadial,
+        gtDiagonal
+    };
+    
+    TGradientWindow(const TRect& bounds, const char* aTitle, GradientType type) :
+        TWindow(bounds, aTitle, wnNoNumber),
+        TWindowInit(&TGradientWindow::initFrame)
+    {
+        options |= ofTileable;  // Enable cascade/tile functionality
+        
+        // Get the interior bounds (excluding frame)
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+        
+        // Insert the appropriate gradient view
+        TGradientView* gradientView = nullptr;
+        switch (type)
+        {
+            case gtHorizontal:
+                gradientView = new THorizontalGradientView(interior);
+                break;
+            case gtVertical:
+                gradientView = new TVerticalGradientView(interior);
+                break;
+            case gtRadial:
+                gradientView = new TRadialGradientView(interior);
+                break;
+            case gtDiagonal:
+                gradientView = new TDiagonalGradientView(interior);
+                break;
+        }
+        
+        if (gradientView)
+            insert(gradientView);
     }
 };
 
@@ -190,10 +248,12 @@ public:
     
 private:
     void newTestWindow();
+    void newGradientWindow(TGradientWindow::GradientType type);
     void cascade();
     void tile();
     void closeAll();
     void takeScreenshot();
+    void setPatternMode(bool continuous);
     
     int windowNumber;
     static const int maxWindows = 99;
@@ -219,6 +279,30 @@ void TTestPatternApp::handleEvent(TEvent& event)
         {
             case cmNewWindow:
                 newTestWindow();
+                clearEvent(event);
+                break;
+            case cmNewGradientH:
+                newGradientWindow(TGradientWindow::gtHorizontal);
+                clearEvent(event);
+                break;
+            case cmNewGradientV:
+                newGradientWindow(TGradientWindow::gtVertical);
+                clearEvent(event);
+                break;
+            case cmNewGradientR:
+                newGradientWindow(TGradientWindow::gtRadial);
+                clearEvent(event);
+                break;
+            case cmNewGradientD:
+                newGradientWindow(TGradientWindow::gtDiagonal);
+                clearEvent(event);
+                break;
+            case cmPatternContinuous:
+                setPatternMode(true);
+                clearEvent(event);
+                break;
+            case cmPatternTiled:
+                setPatternMode(false);
                 clearEvent(event);
                 break;
             case cmScreenshot:
@@ -278,6 +362,53 @@ void TTestPatternApp::closeAll()
 {
     // Close all windows on desktop
     message(deskTop, evCommand, cmCloseAll, 0);
+}
+
+void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    
+    switch (type)
+    {
+        case TGradientWindow::gtHorizontal:
+            title << "Horizontal Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtVertical:
+            title << "Vertical Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtRadial:
+            title << "Radial Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtDiagonal:
+            title << "Diagonal Gradient " << windowNumber;
+            break;
+    }
+    
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        50 + offset * 2,          // right
+        15 + offset               // bottom
+    );
+    
+    // Create and insert window
+    TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+    deskTop->insert(window);
+}
+
+void TTestPatternApp::setPatternMode(bool continuous)
+{
+    USE_CONTINUOUS_PATTERN = continuous;
+    
+    // Show confirmation message
+    std::string mode = continuous ? "Continuous (Diagonal)" : "Tiled (Cropped)";
+    std::stringstream msg;
+    msg << "Pattern mode set to: " << mode;
+    messageBox(msg.str().c_str(), mfInformation | mfOKButton);
 }
 
 void TTestPatternApp::takeScreenshot()
@@ -365,6 +496,13 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
     return new TCustomMenuBar(r,
         *new TSubMenu("~F~ile", kbAltF) +
             *new TMenuItem("~N~ew Test Window", cmNewWindow, kbCtrlN) +
+            (TMenuItem&) (
+                *new TSubMenu("New ~G~radient", kbNoKey) +
+                    *new TMenuItem("~H~orizontal", cmNewGradientH, kbNoKey) +
+                    *new TMenuItem("~V~ertical", cmNewGradientV, kbNoKey) +
+                    *new TMenuItem("~R~adial", cmNewGradientR, kbNoKey) +
+                    *new TMenuItem("~D~iagonal", cmNewGradientD, kbNoKey)
+            ) +
             newLine() +
             *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
             newLine() +
@@ -373,6 +511,11 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
             newLine() +
             *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
+        *new TSubMenu("~P~attern", kbAltP) +
+            *new TMenuItem(USE_CONTINUOUS_PATTERN ? "\x04 Continuous (Diagonal)" : "  Continuous (Diagonal)", 
+                          cmPatternContinuous, kbNoKey) +
+            *new TMenuItem(!USE_CONTINUOUS_PATTERN ? "\x04 Tiled (Cropped)" : "  Tiled (Cropped)", 
+                          cmPatternTiled, kbNoKey) +
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~M~ove", cmResize, kbCtrlF5) +
             *new TMenuItem("~Z~oom", cmZoom, kbF5) +
@@ -392,7 +535,7 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
             *new TStatusItem("~F5~ Zoom", kbF5, cmZoom) +
             *new TStatusItem("~F6~ Next", kbF6, cmNext) +
             *new TStatusItem("~Alt-F3~ Close", kbAltF3, cmClose) +
-            *new TStatusItem("~F10~ Menu", kbF10, cmMenu)
+            *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
             *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu)
     );
 }

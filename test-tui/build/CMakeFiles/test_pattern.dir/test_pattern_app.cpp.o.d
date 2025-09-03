@@ -835,6 +835,7 @@ CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o: \
   /Users/james/Repos/tvision/test-tui/../include/tvision/menus.h \
   /Users/james/Repos/tvision/test-tui/../include/tvision/app.h \
   /Users/james/Repos/tvision/test-tui/test_pattern.h \
+  /Users/james/Repos/tvision/test-tui/gradient.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/istream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ostream \
