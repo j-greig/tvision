@@ -251,8 +251,8 @@ public:
         TRect interior = getExtent();
         interior.grow(-1, -1);
         
-        // Insert the frame animation view with 12 FPS (matching donut.txt header)
-        FrameFilePlayerView* animView = new FrameFilePlayerView(interior, filePath, 1000/12);
+        // Insert the frame animation view - FPS from file header takes precedence
+        FrameFilePlayerView* animView = new FrameFilePlayerView(interior, filePath);
         insert(animView);
     }
 };
