@@ -427,10 +427,10 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     switch (type)
     {
         case TGradientWindow::gtHorizontal:
-            title << "Horizontal Gradient " << windowNumber;
+            title << "Vertical Gradient " << windowNumber;  // THorizontalGradientView actually shows vertical color change
             break;
         case TGradientWindow::gtVertical:
-            title << "Vertical Gradient " << windowNumber;
+            title << "Horizontal Gradient " << windowNumber;  // TVerticalGradientView actually shows horizontal color change
             break;
         case TGradientWindow::gtRadial:
             title << "Radial Gradient " << windowNumber;
@@ -740,9 +740,12 @@ std::string TTestPatternApp::buildWorkspaceJson()
     json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
     json += "  \"windows\": [\n";
 
-    // Collect windows in current z-order
+    // Collect windows in current z-order (child list is circular)
     int idx = 0;
-    for (TView *v = deskTop->first(); v; v = v->next) {
+    TView *vStart = deskTop->first();
+    if (vStart) {
+    TView *v = vStart;
+    do {
         TWindow *w = dynamic_cast<TWindow*>(v);
         if (!w) continue; // Skip non-window views (e.g., wallpaper)
 
@@ -754,9 +757,12 @@ std::string TTestPatternApp::buildWorkspaceJson()
             type = "test_pattern";
             props = "{}"; // Pattern mode is global in MVP
         } else {
-            // Try to detect gradient by scanning child views
+            // Try to detect gradient by scanning child views (circular list)
             bool isGradient = false;
-            for (TView *c = w->first(); c; c = c->next) {
+            TView *cStart = w->first();
+            if (cStart) {
+            TView *c = cStart;
+            do {
                 if (dynamic_cast<THorizontalGradientView*>(c)) {
                     type = "gradient"; props = "{\\\"gradientType\\\": \\\"horizontal\\\"}"; isGradient = true; break;
                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
@@ -766,6 +772,8 @@ std::string TTestPatternApp::buildWorkspaceJson()
                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
                     type = "gradient"; props = "{\\\"gradientType\\\": \\\"diagonal\\\"}"; isGradient = true; break;
                 }
+                c = c->next;
+            } while (c != cStart);
             }
             if (!isGradient) {
                 // Unknown window type: keep as 'custom' with empty props
@@ -790,6 +798,8 @@ std::string TTestPatternApp::buildWorkspaceJson()
         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
         json += "      \"props\": " + props + "\n";
         json += "    }";
+        v = v->next;
+    } while (v != vStart);
     }
 
     json += "\n  ]\n}";
