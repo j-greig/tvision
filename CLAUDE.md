@@ -111,6 +111,26 @@ cmake --build ./build
 - xsel/xclip (X11 clipboard)
 - wl-clipboard (Wayland clipboard)
 
+## Test Applications (test-tui/)
+
+The **test-tui/** directory contains experimental TUI applications for testing and development:
+
+### Available Applications
+- **test_pattern** - Multi-window test pattern generator with gradients, wallpaper, screenshot capability
+- **simple_tui** - Basic TUI demonstrating fundamental TV usage patterns
+- **frame_file_player** - Timer-based ASCII animation player (loads frame files, no threads)
+
+### Build Test Apps
+```bash
+cd test-tui
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+
+# Run applications (examples)
+./build/test_pattern                              # Pattern generator
+./build/frame_file_player --file frames_demo.txt # Animation player
+```
+
 ## Common Development Tasks
 
 ### Adding a New View Class
@@ -126,8 +146,17 @@ cmake --build ./build && ./build/tvdemo
 
 # Test the editor for text handling
 ./build/tvedit test.txt
+
+# Test with experimental apps
+cd test-tui && cmake --build ./build && ./build/test_pattern
 ```
+
+### Animation Development
+- **Frame files**: Use `----` delimiter lines, optional `FPS=NN` header
+- **Timer-based**: Use `TTimerId setTimer(timeout, period)` and `cmTimerExpired` events
+- **No threads**: Keep animations on main UI thread via TV timer system
 
 ### Debugging
 - Use `TVISION_MAX_FPS=-1` for immediate screen updates (useful for debugging)
 - Event viewer in tvdemo helps debug input events
+- Claude should never attempt to run tvision apps using bash as it borks the REPL - only humans should run the apps. Claude should ask the human to run if required and tell the human how. eg "cd test-tui && ./build/simple_tui"
