@@ -184,6 +184,7 @@ frame_file_player_view.o: frame_file_player_view.cpp.o
 
 # target to build an object file
 frame_file_player_view.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/frame_file_player_view.cpp.o
 .PHONY : frame_file_player_view.cpp.o
 
@@ -192,6 +193,7 @@ frame_file_player_view.i: frame_file_player_view.cpp.i
 
 # target to preprocess a source file
 frame_file_player_view.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/frame_file_player_view.cpp.i
 .PHONY : frame_file_player_view.cpp.i
 
@@ -200,6 +202,7 @@ frame_file_player_view.s: frame_file_player_view.cpp.s
 
 # target to generate assembly for a file
 frame_file_player_view.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/frame_file_player_view.cpp.s
 .PHONY : frame_file_player_view.cpp.s
 

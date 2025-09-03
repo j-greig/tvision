@@ -34,6 +34,7 @@
 #include "test_pattern.h"
 #include "gradient.h"
 #include "wallpaper.h"
+#include "frame_file_player_view.h"
 #include <sstream>
 #include <string>
 #include <cstdlib>
@@ -55,11 +56,13 @@ const ushort cmNewGradientR = 104;
 const ushort cmNewGradientD = 105;
 const ushort cmPatternContinuous = 106;
 const ushort cmPatternTiled = 107;
+const ushort cmNewDonut = 108;
 
 // Forward declarations
 class TTestPatternView;
 class TTestPatternWindow;
 class TGradientWindow;
+class TFrameAnimationWindow;
 class TTestPatternApp;
 class TCustomMenuBar;
 
@@ -233,6 +236,28 @@ public:
 };
 
 /*---------------------------------------------------------*/
+/* TFrameAnimationWindow - Window containing animation    */
+/*---------------------------------------------------------*/
+class TFrameAnimationWindow : public TWindow
+{
+public:
+    TFrameAnimationWindow(const TRect& bounds, const char* aTitle, const std::string& filePath) :
+        TWindow(bounds, aTitle, wnNoNumber),
+        TWindowInit(&TFrameAnimationWindow::initFrame)
+    {
+        options |= ofTileable;  // Enable cascade/tile functionality
+        
+        // Get the interior bounds (excluding frame)
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+        
+        // Insert the frame animation view with 12 FPS (matching donut.txt header)
+        FrameFilePlayerView* animView = new FrameFilePlayerView(interior, filePath, 1000/12);
+        insert(animView);
+    }
+};
+
+/*---------------------------------------------------------*/
 /* TTestPatternApp - Main application class               */
 /*---------------------------------------------------------*/
 class TTestPatternApp : public TApplication
@@ -249,6 +274,7 @@ public:
 private:
     void newTestWindow();
     void newGradientWindow(TGradientWindow::GradientType type);
+    void newDonutWindow();
     void cascade();
     void tile();
     void closeAll();
@@ -295,6 +321,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmNewGradientD:
                 newGradientWindow(TGradientWindow::gtDiagonal);
+                clearEvent(event);
+                break;
+            case cmNewDonut:
+                newDonutWindow();
                 clearEvent(event);
                 break;
             case cmPatternContinuous:
@@ -397,6 +427,27 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     
     // Create and insert window
     TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+    deskTop->insert(window);
+}
+
+void TTestPatternApp::newDonutWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Donut Animation " << windowNumber;
+    
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        50 + offset * 2,          // right
+        15 + offset               // bottom
+    );
+    
+    // Create and insert window with donut.txt file
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), "donut.txt");
     deskTop->insert(window);
 }
 
@@ -504,6 +555,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                     *new TMenuItem("~R~adial", cmNewGradientR, kbNoKey) +
                     *new TMenuItem("~D~iagonal", cmNewGradientD, kbNoKey)
             ) +
+            *new TMenuItem("New ~D~onut Animation", cmNewDonut, kbCtrlD) +
             newLine() +
             *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
             newLine() +

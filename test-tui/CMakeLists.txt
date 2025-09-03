@@ -27,6 +27,7 @@ add_executable(test_pattern
     test_pattern.cpp 
     gradient.cpp 
     wallpaper.cpp
+    frame_file_player_view.cpp
 )
 
 # Link libraries for simple_tui
