@@ -65,14 +65,13 @@ void THorizontalGradientView::draw()
     
     for (int y = 0; y < size.y; y++)
     {
-        // Calculate colors for each column
-        for (int x = 0; x < size.x; x++)
-        {
-            float t = (size.x > 1) ? static_cast<float>(x) / (size.x - 1) : 0.0f;
-            TColorRGB color = getGradientColor(t);
-            TColorAttr attr(color, color);
-            b.moveChar(x, fillChar, attr, 1);
-        }
+        // Horizontal gradient: colors change horizontally (left to right)
+        float t = (size.y > 1) ? static_cast<float>(y) / (size.y - 1) : 0.0f;
+        TColorRGB color = getGradientColor(t);
+        TColorAttr attr(color, color);
+        
+        // Fill entire row with same color
+        b.moveChar(0, fillChar, attr, size.x);
         writeLine(0, y, size.x, 1, b);
     }
 }
@@ -95,12 +94,15 @@ void TVerticalGradientView::draw()
     
     for (int y = 0; y < size.y; y++)
     {
-        float t = (size.y > 1) ? static_cast<float>(y) / (size.y - 1) : 0.0f;
-        TColorRGB color = getGradientColor(t);
-        TColorAttr attr(color, color);
-        
-        // Fill entire row with same color
-        b.moveChar(0, fillChar, attr, size.x);
+        // Vertical gradient: colors change vertically (top to bottom)
+        // Calculate colors for each column
+        for (int x = 0; x < size.x; x++)
+        {
+            float t = (size.x > 1) ? static_cast<float>(x) / (size.x - 1) : 0.0f;
+            TColorRGB color = getGradientColor(t);
+            TColorAttr attr(color, color);
+            b.moveChar(x, fillChar, attr, 1);
+        }
         writeLine(0, y, size.x, 1, b);
     }
 }

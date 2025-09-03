@@ -42,6 +42,7 @@
 #include <ctime>
 #include <cmath>
 #include <sys/stat.h>
+#include <cstdio>
 #include <fstream>
 #include <vector>
 
@@ -427,10 +428,10 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     switch (type)
     {
         case TGradientWindow::gtHorizontal:
-            title << "Vertical Gradient " << windowNumber;  // THorizontalGradientView actually shows vertical color change
+            title << "Horizontal Gradient " << windowNumber;
             break;
         case TGradientWindow::gtVertical:
-            title << "Horizontal Gradient " << windowNumber;  // TVerticalGradientView actually shows horizontal color change
+            title << "Vertical Gradient " << windowNumber;
             break;
         case TGradientWindow::gtRadial:
             title << "Radial Gradient " << windowNumber;
@@ -742,12 +743,14 @@ std::string TTestPatternApp::buildWorkspaceJson()
 
     // Collect windows in current z-order (child list is circular)
     int idx = 0;
+    int focusedIndex = -1;
     TView *vStart = deskTop->first();
     if (vStart) {
     TView *v = vStart;
     do {
         TWindow *w = dynamic_cast<TWindow*>(v);
         if (!w) continue; // Skip non-window views (e.g., wallpaper)
+        if (!w->getState(sfVisible)) { v = v->next; continue; }
 
         // Determine type and props
         std::string type = "custom";
@@ -784,8 +787,14 @@ std::string TTestPatternApp::buildWorkspaceJson()
         TRect b = w->getBounds();
         int x = b.a.x, y = b.a.y, ww = b.b.x - b.a.x, hh = b.b.y - b.a.y;
 
-        // Zoomed: consider full-screen match
-        bool zoomed = (b.a.x == 0 && b.a.y == 0 && b.b.x == ext.b.x && b.b.y == ext.b.y);
+        // Zoomed: compare to max size from sizeLimits
+        TPoint minSz, maxSz;
+        w->sizeLimits(minSz, maxSz);
+        bool zoomed = (w->size.x == maxSz.x && w->size.y == maxSz.y && w->origin.x == 0 && w->origin.y == 0);
+
+        // Track focused window index (selected)
+        if (w->getState(sfSelected))
+            focusedIndex = idx; // zero-based
 
         if (idx++ > 0) json += ",\n";
         json += "    {\n";
@@ -802,7 +811,10 @@ std::string TTestPatternApp::buildWorkspaceJson()
     } while (v != vStart);
     }
 
-    json += "\n  ]\n}";
+    json += "\n  ]";
+    if (focusedIndex >= 0)
+        json += ",\n  \"focusedIndex\": " + std::to_string(focusedIndex);
+    json += "\n}";
     return json;
 }
 
@@ -813,19 +825,23 @@ void TTestPatternApp::saveWorkspace()
 
     std::string json = buildWorkspaceJson();
     const char *path = "workspaces/last_workspace.json";
-    std::ofstream out(path, std::ios::out | std::ios::trunc);
+    const char *tmpPath = "workspaces/last_workspace.json.tmp";
+    std::ofstream out(tmpPath, std::ios::out | std::ios::trunc);
     if (!out) {
-        std::string msg = std::string("Failed to open ") + path + " for writing";
+        std::string msg = std::string("Failed to open ") + tmpPath + " for writing";
         messageBox(msg.c_str(), mfError | mfOKButton);
         return;
     }
     out << json;
     out.close();
     if (!out.good()) {
-        std::string msg = std::string("Error writing ") + path;
+        std::string msg = std::string("Error writing ") + tmpPath;
         messageBox(msg.c_str(), mfError | mfOKButton);
         return;
     }
+    // Atomic replace
+    std::remove(path); // ignore errors
+    std::rename(tmpPath, path);
     std::string ok = std::string("Workspace saved to ") + path;
     messageBox(ok.c_str(), mfInformation | mfOKButton);
 }
