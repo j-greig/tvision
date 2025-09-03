@@ -120,12 +120,12 @@ CMakeFiles/simple_tui.dir/clean:
 CMakeFiles/test_pattern.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=3,4,5,6 "Built target test_pattern"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=3,4,5,6,7 "Built target test_pattern"
 .PHONY : CMakeFiles/test_pattern.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/test_pattern.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 4
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 5
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_pattern.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 0
 .PHONY : CMakeFiles/test_pattern.dir/rule
@@ -137,7 +137,7 @@ test_pattern: CMakeFiles/test_pattern.dir/rule
 # codegen rule for target.
 CMakeFiles/test_pattern.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=3,4,5,6 "Finished codegen for target test_pattern"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=3,4,5,6,7 "Finished codegen for target test_pattern"
 .PHONY : CMakeFiles/test_pattern.dir/codegen
 
 # clean rule for target.

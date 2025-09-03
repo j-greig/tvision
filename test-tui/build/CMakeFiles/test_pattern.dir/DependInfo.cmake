@@ -11,6 +11,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/james/Repos/tvision/test-tui/gradient.cpp" "CMakeFiles/test_pattern.dir/gradient.cpp.o" "gcc" "CMakeFiles/test_pattern.dir/gradient.cpp.o.d"
   "/Users/james/Repos/tvision/test-tui/test_pattern.cpp" "CMakeFiles/test_pattern.dir/test_pattern.cpp.o" "gcc" "CMakeFiles/test_pattern.dir/test_pattern.cpp.o.d"
   "/Users/james/Repos/tvision/test-tui/test_pattern_app.cpp" "CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o" "gcc" "CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o.d"
+  "/Users/james/Repos/tvision/test-tui/wallpaper.cpp" "CMakeFiles/test_pattern.dir/wallpaper.cpp.o" "gcc" "CMakeFiles/test_pattern.dir/wallpaper.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

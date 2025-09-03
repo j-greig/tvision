@@ -33,10 +33,12 @@
 
 #include "test_pattern.h"
 #include "gradient.h"
+#include "wallpaper.h"
 #include <sstream>
 #include <string>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
 #include <sys/stat.h>
 
 // Configuration - Toggle pattern display mode
@@ -127,6 +129,7 @@ public:
 /*---------------------------------------------------------*/
 class TTestPatternView : public TView
 {
+    
 public:
     TTestPatternView(const TRect& bounds) : TView(bounds)
     {
@@ -139,29 +142,18 @@ public:
         TDrawBuffer b;
         int patternHeight = TTestPattern::getPatternHeight();
         
-        if (USE_CONTINUOUS_PATTERN)
+        for (int y = 0; y < size.y; y++)
         {
-            // Continuous mode: pattern flows like text
-            int totalOffset = 0;
+            int patternRow = y % patternHeight;
+            int offset = 0;
             
-            for (int y = 0; y < size.y; y++)
-            {
-                int patternRow = y % patternHeight;
-                // Calculate offset based on previous rows
-                int offset = (y / patternHeight) * size.x;
-                TTestPattern::drawPatternRow(b, patternRow, size.x, offset);
-                writeLine(0, y, size.x, 1, b);
+            // Calculate offset for continuous patterns
+            if (USE_CONTINUOUS_PATTERN) {
+                offset = (y / patternHeight) * size.x;
             }
-        }
-        else
-        {
-            // Tiled mode: pattern resets at start of each line
-            for (int y = 0; y < size.y; y++)
-            {
-                int patternRow = y % patternHeight;
-                TTestPattern::drawPatternRow(b, patternRow, size.x, 0);
-                writeLine(0, y, size.x, 1, b);
-            }
+            
+            TTestPattern::drawPatternRow(b, patternRow, size.x, offset);
+            writeLine(0, y, size.x, 1, b);
         }
     }
 };
@@ -171,6 +163,9 @@ public:
 /*---------------------------------------------------------*/
 class TTestPatternWindow : public TWindow
 {
+private:
+    TTestPatternView* patternView;
+    
 public:
     TTestPatternWindow(const TRect& bounds, const char* aTitle) :
         TWindow(bounds, aTitle, wnNoNumber),
@@ -183,9 +178,12 @@ public:
         interior.grow(-1, -1);
         
         // Insert the test pattern view
-        TTestPatternView* patternView = new TTestPatternView(interior);
+        patternView = new TTestPatternView(interior);
         insert(patternView);
     }
+    
+    TTestPatternView* getPatternView() { return patternView; }
+    
 };
 
 /*---------------------------------------------------------*/
@@ -242,9 +240,11 @@ class TTestPatternApp : public TApplication
 public:
     TTestPatternApp();
     virtual void handleEvent(TEvent& event);
+    virtual void idle();
     virtual TPalette& getPalette() const;
     static TMenuBar* initMenuBar(TRect);
     static TStatusLine* initStatusLine(TRect);
+    static TDeskTop* initDeskTop(TRect);
     
 private:
     void newTestWindow();
@@ -538,6 +538,23 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
             *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
             *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu)
     );
+}
+
+TDeskTop* TTestPatternApp::initDeskTop(TRect r)
+{
+    r.a.y = 1;
+    r.b.y--;
+    // Create desktop with standard constructor
+    TDeskTop* desktop = new TDeskTop(r);
+    // Insert our custom wallpaper as the background
+    desktop->insert(new TWallpaperView(r));
+    return desktop;
+}
+
+
+void TTestPatternApp::idle()
+{
+    TApplication::idle();
 }
 
 int main()

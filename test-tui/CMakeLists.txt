@@ -22,7 +22,7 @@ endif()
 
 # Add executables
 add_executable(simple_tui simple_tui.cpp)
-add_executable(test_pattern test_pattern_app.cpp test_pattern.cpp gradient.cpp)
+add_executable(test_pattern test_pattern_app.cpp test_pattern.cpp gradient.cpp wallpaper.cpp)
 
 # Link libraries for simple_tui
 target_link_libraries(simple_tui 

@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/test_pattern.dir/test_pattern.cpp.o.d"
   "CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o"
   "CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o.d"
+  "CMakeFiles/test_pattern.dir/wallpaper.cpp.o"
+  "CMakeFiles/test_pattern.dir/wallpaper.cpp.o.d"
   "test_pattern"
   "test_pattern.pdb"
 )

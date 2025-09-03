@@ -238,6 +238,30 @@ test_pattern_app.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/test_pattern_app.cpp.s
 .PHONY : test_pattern_app.cpp.s
 
+wallpaper.o: wallpaper.cpp.o
+.PHONY : wallpaper.o
+
+# target to build an object file
+wallpaper.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/wallpaper.cpp.o
+.PHONY : wallpaper.cpp.o
+
+wallpaper.i: wallpaper.cpp.i
+.PHONY : wallpaper.i
+
+# target to preprocess a source file
+wallpaper.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/wallpaper.cpp.i
+.PHONY : wallpaper.cpp.i
+
+wallpaper.s: wallpaper.cpp.s
+.PHONY : wallpaper.s
+
+# target to generate assembly for a file
+wallpaper.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/wallpaper.cpp.s
+.PHONY : wallpaper.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -260,6 +284,9 @@ help:
 	@echo "... test_pattern_app.o"
 	@echo "... test_pattern_app.i"
 	@echo "... test_pattern_app.s"
+	@echo "... wallpaper.o"
+	@echo "... wallpaper.i"
+	@echo "... wallpaper.s"
 .PHONY : help
 
 
