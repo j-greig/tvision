@@ -29,6 +29,7 @@
 #define Uses_MsgBox
 #define Uses_cmTile
 #define Uses_cmCascade
+#define Uses_TFileDialog
 #include <tvision/tv.h>
 
 #include "test_pattern.h"
@@ -57,6 +58,7 @@ const ushort cmNewGradientD = 105;
 const ushort cmPatternContinuous = 106;
 const ushort cmPatternTiled = 107;
 const ushort cmNewDonut = 108;
+const ushort cmOpenAnimation = 109;
 
 // Forward declarations
 class TTestPatternView;
@@ -275,6 +277,7 @@ private:
     void newTestWindow();
     void newGradientWindow(TGradientWindow::GradientType type);
     void newDonutWindow();
+    void openAnimationFile();
     void cascade();
     void tile();
     void closeAll();
@@ -325,6 +328,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmNewDonut:
                 newDonutWindow();
+                clearEvent(event);
+                break;
+            case cmOpenAnimation:
+                openAnimationFile();
                 clearEvent(event);
                 break;
             case cmPatternContinuous:
@@ -451,6 +458,34 @@ void TTestPatternApp::newDonutWindow()
     deskTop->insert(window);
 }
 
+void TTestPatternApp::openAnimationFile()
+{
+    char fileName[MAXPATH];
+    strcpy(fileName, "*.txt");
+    
+    TFileDialog* dialog = new TFileDialog("*.txt", "Open Animation File", "~N~ame", fdOpenButton, 100);
+    if (executeDialog(dialog, fileName) != cmCancel)
+    {
+        // Create window title
+        windowNumber++;
+        std::stringstream title;
+        title << "Animation " << windowNumber;
+        
+        // Calculate window position (cascade effect)
+        int offset = (windowNumber - 1) % 10;
+        TRect bounds(
+            2 + offset * 2,           // left
+            1 + offset,               // top
+            50 + offset * 2,          // right
+            15 + offset               // bottom
+        );
+        
+        // Create and insert window with selected file
+        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), fileName);
+        deskTop->insert(window);
+    }
+}
+
 void TTestPatternApp::setPatternMode(bool continuous)
 {
     USE_CONTINUOUS_PATTERN = continuous;
@@ -556,6 +591,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                     *new TMenuItem("~D~iagonal", cmNewGradientD, kbNoKey)
             ) +
             *new TMenuItem("New ~D~onut Animation", cmNewDonut, kbCtrlD) +
+            *new TMenuItem("~O~pen Animation File...", cmOpenAnimation, kbCtrlO) +
             newLine() +
             *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
             newLine() +
