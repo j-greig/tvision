@@ -273,6 +273,8 @@ void TTextFileView::draw()
         return; // Skip unnecessary redraws during window dragging
     }
     
+    needsRedraw = false; // Clear flag early to prevent recursive calls
+    
     TDrawBuffer buf;
     int viewHeight = size.y;
     int viewWidth = size.x - 1; // Leave space for scrollbar
@@ -296,8 +298,6 @@ void TTextFileView::draw()
         
         writeLine(0, y, viewWidth, 1, buf);
     }
-    
-    needsRedraw = false;
 }
 
 void TTextFileView::handleEvent(TEvent &ev)
