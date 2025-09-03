@@ -45,6 +45,7 @@
 #include <cstdio>
 #include <fstream>
 #include <vector>
+#include <cstring>
 
 // Configuration - Toggle pattern display mode
 // true  = Continuous mode (pattern flows like text, wraps at line ends creating diagonals)
@@ -63,6 +64,7 @@ const ushort cmPatternTiled = 107;
 const ushort cmNewDonut = 108;
 const ushort cmOpenAnimation = 109;
 const ushort cmSaveWorkspace = 110;
+const ushort cmOpenWorkspace = 111;
 
 // Forward declarations
 class TTestPatternView;
@@ -289,6 +291,7 @@ private:
     void newGradientWindow(TGradientWindow::GradientType type);
     void newDonutWindow();
     void openAnimationFile();
+    void openWorkspace();
     void cascade();
     void tile();
     void closeAll();
@@ -297,6 +300,15 @@ private:
     void saveWorkspace();
     std::string buildWorkspaceJson();
     static std::string jsonEscape(const std::string& s);
+    bool loadWorkspaceFromFile(const std::string& path);
+    static bool parseBool(const std::string &s, size_t &pos, bool &out);
+    static bool parseString(const std::string &s, size_t &pos, std::string &out);
+    static bool parseNumber(const std::string &s, size_t &pos, int &out);
+    static void skipWs(const std::string &s, size_t &pos);
+    static bool consume(const std::string &s, size_t &pos, char ch);
+    static bool parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out);
+    static bool parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out);
+    static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
     
     int windowNumber;
     static const int maxWindows = 99;
@@ -346,6 +358,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmOpenAnimation:
                 openAnimationFile();
+                clearEvent(event);
+                break;
+            case cmOpenWorkspace:
+                openWorkspace();
                 clearEvent(event);
                 break;
             case cmSaveWorkspace:
@@ -620,6 +636,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~D~onut Animation", cmNewDonut, kbCtrlD) +
             *new TMenuItem("~O~pen Animation File...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbNoKey) +
+            *new TMenuItem("~O~pen Workspace...", cmOpenWorkspace, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
             newLine() +
@@ -696,6 +713,302 @@ int main()
     return 0;
 }
 
+// --- Minimal JSON parsing helpers (subset tailored to our schema) ---
+void TTestPatternApp::skipWs(const std::string &s, size_t &pos)
+{
+    while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\n' || s[pos] == '\r' || s[pos] == '\t')) ++pos;
+}
+
+bool TTestPatternApp::consume(const std::string &s, size_t &pos, char ch)
+{
+    skipWs(s, pos);
+    if (pos < s.size() && s[pos] == ch) { ++pos; return true; }
+    return false;
+}
+
+bool TTestPatternApp::parseString(const std::string &s, size_t &pos, std::string &out)
+{
+    skipWs(s, pos);
+    if (pos >= s.size() || s[pos] != '"') return false;
+    ++pos;
+    std::string res;
+    while (pos < s.size()) {
+        char c = s[pos++];
+        if (c == '"') { out = res; return true; }
+        if (c == '\\') {
+            if (pos >= s.size()) return false;
+            char e = s[pos++];
+            switch (e) {
+                case '"': res.push_back('"'); break;
+                case '\\': res.push_back('\\'); break;
+                case 'n': res.push_back('\n'); break;
+                case 'r': res.push_back('\r'); break;
+                case 't': res.push_back('\t'); break;
+                default: res.push_back(e); break;
+            }
+        } else res.push_back(c);
+    }
+    return false;
+}
+
+bool TTestPatternApp::parseNumber(const std::string &s, size_t &pos, int &out)
+{
+    skipWs(s, pos);
+    bool neg = false;
+    if (pos < s.size() && (s[pos] == '-' || s[pos] == '+')) { neg = (s[pos] == '-'); ++pos; }
+    long val = 0; bool any=false;
+    while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') { any=true; val = val*10 + (s[pos]-'0'); ++pos; }
+    if (!any) return false;
+    out = neg ? -int(val) : int(val);
+    return true;
+}
+
+bool TTestPatternApp::parseBool(const std::string &s, size_t &pos, bool &out)
+{
+    skipWs(s, pos);
+    if (s.compare(pos, 4, "true") == 0) { out = true; pos += 4; return true; }
+    if (s.compare(pos, 5, "false") == 0) { out = false; pos += 5; return true; }
+    return false;
+}
+
+bool TTestPatternApp::parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out)
+{
+    size_t pos = objStart;
+    while (pos < s.size()) {
+        skipWs(s, pos);
+        if (s[pos] == '}' || s[pos] == ']') return false;
+        std::string k; size_t kpos = pos;
+        if (!parseString(s, kpos, k)) { ++pos; continue; }
+        pos = kpos; skipWs(s, pos);
+        if (!consume(s, pos, ':')) continue;
+        if (k == key) {
+            return parseString(s, pos, out);
+        }
+        // Skip value
+        skipWs(s, pos);
+        if (pos>=s.size()) break;
+        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+    }
+    return false;
+}
+
+bool TTestPatternApp::parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out)
+{
+    size_t pos = objStart;
+    while (pos < s.size()) {
+        skipWs(s, pos);
+        if (s[pos] == '}' || s[pos] == ']') return false;
+        std::string k; size_t kpos = pos;
+        if (!parseString(s, kpos, k)) { ++pos; continue; }
+        pos = kpos; skipWs(s, pos);
+        if (!consume(s, pos, ':')) continue;
+        if (k == key) {
+            return parseBool(s, pos, out);
+        }
+        // Skip value
+        skipWs(s, pos);
+        if (pos>=s.size()) break;
+        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+    }
+    return false;
+}
+
+bool TTestPatternApp::parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h)
+{
+    size_t pos = objStart;
+    while (pos < s.size()) {
+        skipWs(s, pos);
+        if (s[pos] == '}' || s[pos] == ']') return false;
+        std::string k; size_t kpos = pos;
+        if (!parseString(s, kpos, k)) { ++pos; continue; }
+        pos = kpos; skipWs(s, pos);
+        if (!consume(s, pos, ':')) continue;
+        if (k == "bounds") {
+            skipWs(s, pos);
+            if (!consume(s, pos, '{')) return false;
+            int tx=0,ty=0,tw=0,th=0; bool okX=false,okY=false,okW=false,okH=false;
+            while (pos < s.size()) {
+                skipWs(s, pos);
+                if (s[pos] == '}') { ++pos; break; }
+                std::string bk; if (!parseString(s, pos, bk)) return false; if (!consume(s,pos,':')) return false;
+                if (bk == "x") { okX = parseNumber(s,pos,tx); }
+                else if (bk == "y") { okY = parseNumber(s,pos,ty); }
+                else if (bk == "w") { okW = parseNumber(s,pos,tw); }
+                else if (bk == "h") { okH = parseNumber(s,pos,th); }
+                skipWs(s,pos); if (pos<s.size() && s[pos]==',') ++pos;
+            }
+            if (okX && okY && okW && okH) { x=tx; y=ty; w=tw; h=th; return true; }
+            return false;
+        }
+        // Skip value
+        skipWs(s, pos);
+        if (pos>=s.size()) break;
+        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+    }
+    return false;
+}
+
+bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+{
+    std::ifstream in(path);
+    if (!in) {
+        std::string msg = std::string("Failed to open ") + path;
+        messageBox(msg.c_str(), mfError | mfOKButton);
+        return false;
+    }
+    std::string data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+
+    if (data.find("\"version\"") == std::string::npos || data.find("\"windows\"") == std::string::npos) {
+        messageBox("Invalid workspace file.", mfError | mfOKButton);
+        return false;
+    }
+
+    // Extract globals.patternMode
+    bool continuous = USE_CONTINUOUS_PATTERN;
+    size_t globalsPos = data.find("\"globals\"");
+    if (globalsPos != std::string::npos) {
+        size_t pos = data.find('{', globalsPos);
+        if (pos != std::string::npos) {
+            std::string pm;
+            if (parseKeyedString(data, pos+1, "patternMode", pm))
+                continuous = (pm == "continuous");
+        }
+    }
+
+    // Locate windows array and extract each object substring
+    size_t winKey = data.find("\"windows\"");
+    if (winKey == std::string::npos) {
+        messageBox("No windows in workspace.", mfError | mfOKButton);
+        return false;
+    }
+    size_t arrPos = data.find('[', winKey);
+    if (arrPos == std::string::npos) return false;
+    std::vector<std::string> objects;
+    size_t p = arrPos+1; bool inStr=false; int depth=0;
+    while (p < data.size()) {
+        char c = data[p];
+        if (c == '"') { inStr = !inStr; ++p; continue; }
+        if (!inStr) {
+            if (c == '{') {
+                int d=1; size_t q=p+1;
+                while (q<data.size() && d) {
+                    if (data[q] == '"') { ++q; while (q<data.size() && data[q] != '"') { if (data[q]=='\\') ++q; ++q; } ++q; continue; }
+                    if (data[q] == '{') d++; else if (data[q] == '}') d--; ++q;
+                }
+                objects.emplace_back(data.substr(p, q-p));
+                p = q; continue;
+            }
+            if (c == ']') break;
+        }
+        ++p;
+    }
+
+    // Close current windows
+    closeAll();
+
+    // Apply globals
+    USE_CONTINUOUS_PATTERN = continuous;
+
+    // Restore windows
+    std::vector<TWindow*> created;
+    for (const auto &obj : objects) {
+        std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+        std::string title; parseKeyedString(obj, 0, "title", title);
+        int x=2,y=1,w=50,h=15; parseBounds(obj, 0, x,y,w,h);
+        bool zoomed=false; parseKeyedBool(obj, 0, "zoomed", zoomed);
+
+        // Clamp
+        TRect ext = deskTop->getExtent();
+        int maxW = ext.b.x - ext.a.x;
+        int maxH = ext.b.y - ext.a.y;
+        if (w < 16) w = 16; if (h < 6) h = 6;
+        if (w > maxW) w = maxW; if (h > maxH) h = maxH;
+        if (x < 0) x = 0; if (y < 0) y = 0;
+        if (x + w > maxW) x = std::max(0, maxW - w);
+        if (y + h > maxH) y = std::max(0, maxH - h);
+        TRect bounds(x,y,x+w,y+h);
+
+        TWindow *win = nullptr;
+        if (type == "test_pattern") {
+            win = new TTestPatternWindow(bounds, title.c_str());
+        } else if (type == "gradient") {
+            std::string gtype; // props.gradientType preferred
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos)
+                    parseKeyedString(obj, brace+1, "gradientType", gtype);
+            }
+            TGradientWindow::GradientType gt = TGradientWindow::gtHorizontal;
+            if (gtype == "vertical") gt = TGradientWindow::gtVertical;
+            else if (gtype == "radial") gt = TGradientWindow::gtRadial;
+            else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+            win = new TGradientWindow(bounds, title.c_str(), gt);
+        } else {
+            continue;
+        }
+        deskTop->insert(win);
+        if (zoomed) win->zoom();
+        created.push_back(win);
+    }
+
+    // Focus saved
+    int focusedIdx = -1;
+    size_t fpos = data.find("\"focusedIndex\"");
+    if (fpos != std::string::npos) { size_t pos = data.find(':', fpos); if (pos != std::string::npos) { ++pos; parseNumber(data, pos, focusedIdx); } }
+    if (focusedIdx >= 0 && focusedIdx < (int)created.size()) created[focusedIdx]->select();
+
+    return true;
+}
+
+void TTestPatternApp::openWorkspace()
+{
+    // Open a dialog rooted at workspaces/ listing JSON files
+    char fileName[260];
+    std::strncpy(fileName, "workspaces/*.json", sizeof(fileName));
+    fileName[sizeof(fileName)-1] = '\0';
+    TFileDialog *dlg = new TFileDialog("workspaces/*.json", "Open Workspace", "~N~ame", fdOpenButton, 101);
+    ushort res = deskTop->execView(dlg);
+    std::string path;
+    if (res != cmCancel) {
+        dlg->getData(fileName);
+        path = fileName;
+        // Normalize: if only a filename, prepend workspaces/
+        if (!path.empty() && path.find('/') == std::string::npos)
+            path = std::string("workspaces/") + path;
+    } else {
+        path = "workspaces/last_workspace.json";
+    }
+    destroy(dlg);
+
+    // Fallback if file missing: try default
+    std::ifstream test(path.c_str());
+    if (!test.good()) {
+        test.close();
+        path = "workspaces/last_workspace.json";
+    } else test.close();
+
+    if (!loadWorkspaceFromFile(path))
+        return;
+    messageBox("Workspace loaded.", mfInformation | mfOKButton);
+}
+
 // Minimal JSON helpers
 std::string TTestPatternApp::jsonEscape(const std::string& s)
 {
@@ -748,9 +1061,10 @@ std::string TTestPatternApp::buildWorkspaceJson()
     if (vStart) {
     TView *v = vStart;
     do {
+        TView *nextV = v->next; // Always advance even on skips
         TWindow *w = dynamic_cast<TWindow*>(v);
-        if (!w) continue; // Skip non-window views (e.g., wallpaper)
-        if (!w->getState(sfVisible)) { v = v->next; continue; }
+        if (!w) { v = nextV; continue; } // Skip non-window views (e.g., wallpaper)
+        if (!w->getState(sfVisible)) { v = nextV; continue; }
 
         // Determine type and props
         std::string type = "custom";
@@ -767,13 +1081,13 @@ std::string TTestPatternApp::buildWorkspaceJson()
             TView *c = cStart;
             do {
                 if (dynamic_cast<THorizontalGradientView*>(c)) {
-                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"horizontal\\\"}"; isGradient = true; break;
+                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
-                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"vertical\\\"}"; isGradient = true; break;
+                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
-                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"radial\\\"}"; isGradient = true; break;
+                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
-                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"diagonal\\\"}"; isGradient = true; break;
+                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
                 }
                 c = c->next;
             } while (c != cStart);
@@ -807,7 +1121,7 @@ std::string TTestPatternApp::buildWorkspaceJson()
         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
         json += "      \"props\": " + props + "\n";
         json += "    }";
-        v = v->next;
+        v = nextV;
     } while (v != vStart);
     }
 
@@ -842,6 +1156,17 @@ void TTestPatternApp::saveWorkspace()
     // Atomic replace
     std::remove(path); // ignore errors
     std::rename(tmpPath, path);
-    std::string ok = std::string("Workspace saved to ") + path;
+    // Also write a timestamped snapshot: YYMMDD_HHMM
+    char tsName[32];
+    std::time_t t = std::time(nullptr);
+    std::tm *lt = std::localtime(&t);
+    std::strftime(tsName, sizeof(tsName), "%y%m%d_%H%M", lt);
+    std::string snapPath = std::string("workspaces/last_workspace_") + tsName + ".json";
+    std::ofstream snap(snapPath.c_str(), std::ios::out | std::ios::trunc);
+    if (snap) {
+        snap << json;
+        snap.close();
+    }
+    std::string ok = std::string("Workspace saved to ") + path + "\nSnapshot: " + snapPath;
     messageBox(ok.c_str(), mfInformation | mfOKButton);
 }
