@@ -42,6 +42,8 @@
 #include <ctime>
 #include <cmath>
 #include <sys/stat.h>
+#include <fstream>
+#include <vector>
 
 // Configuration - Toggle pattern display mode
 // true  = Continuous mode (pattern flows like text, wraps at line ends creating diagonals)
@@ -59,6 +61,7 @@ const ushort cmPatternContinuous = 106;
 const ushort cmPatternTiled = 107;
 const ushort cmNewDonut = 108;
 const ushort cmOpenAnimation = 109;
+const ushort cmSaveWorkspace = 110;
 
 // Forward declarations
 class TTestPatternView;
@@ -290,6 +293,9 @@ private:
     void closeAll();
     void takeScreenshot();
     void setPatternMode(bool continuous);
+    void saveWorkspace();
+    std::string buildWorkspaceJson();
+    static std::string jsonEscape(const std::string& s);
     
     int windowNumber;
     static const int maxWindows = 99;
@@ -339,6 +345,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmOpenAnimation:
                 openAnimationFile();
+                clearEvent(event);
+                break;
+            case cmSaveWorkspace:
+                saveWorkspace();
                 clearEvent(event);
                 break;
             case cmPatternContinuous:
@@ -473,10 +483,19 @@ void TTestPatternApp::openAnimationFile()
     TFileDialog* dialog = new TFileDialog("*.txt", "Open Animation File", "~N~ame", fdOpenButton, 100);
     if (executeDialog(dialog, fileName) != cmCancel)
     {
-        // Create window title
+        // Determine file type and create appropriate title
         windowNumber++;
         std::stringstream title;
-        title << "Animation " << windowNumber;
+        
+        if (hasFrameDelimiters(fileName)) {
+            title << "Animation " << windowNumber;
+        } else {
+            // Extract filename without path for text files
+            std::string fileStr(fileName);
+            size_t lastSlash = fileStr.find_last_of("/\\");
+            std::string baseName = (lastSlash != std::string::npos) ? fileStr.substr(lastSlash + 1) : fileStr;
+            title << baseName << " - Text " << windowNumber;
+        }
         
         // Calculate window position (cascade effect)
         int offset = (windowNumber - 1) % 10;
@@ -599,6 +618,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             ) +
             *new TMenuItem("New ~D~onut Animation", cmNewDonut, kbCtrlD) +
             *new TMenuItem("~O~pen Animation File...", cmOpenAnimation, kbCtrlO) +
+            *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
             newLine() +
@@ -673,4 +693,129 @@ int main()
     TTestPatternApp app;
     app.run();
     return 0;
+}
+
+// Minimal JSON helpers
+std::string TTestPatternApp::jsonEscape(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    char buf[7];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else out += char(c);
+        }
+    }
+    return out;
+}
+
+std::string TTestPatternApp::buildWorkspaceJson()
+{
+    // Screen size
+    TRect ext = deskTop->getExtent();
+    int sw = ext.b.x - ext.a.x;
+    int sh = ext.b.y - ext.a.y;
+
+    // Timestamp (basic)
+    char ts[64];
+    std::time_t t = std::time(nullptr);
+    std::tm *lt = std::localtime(&t);
+    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", lt);
+
+    std::string json;
+    json += "{\n";
+    json += "  \"version\": 1,\n";
+    json += "  \"app\": \"test_pattern\",\n";
+    json += std::string("  \"timestamp\": \"") + ts + "\",\n";
+    json += "  \"screen\": { \"width\": " + std::to_string(sw) + ", \"height\": " + std::to_string(sh) + " },\n";
+    json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
+    json += "  \"windows\": [\n";
+
+    // Collect windows in current z-order
+    int idx = 0;
+    for (TView *v = deskTop->first(); v; v = v->next) {
+        TWindow *w = dynamic_cast<TWindow*>(v);
+        if (!w) continue; // Skip non-window views (e.g., wallpaper)
+
+        // Determine type and props
+        std::string type = "custom";
+        std::string props = "{}";
+
+        if (dynamic_cast<TTestPatternWindow*>(w)) {
+            type = "test_pattern";
+            props = "{}"; // Pattern mode is global in MVP
+        } else {
+            // Try to detect gradient by scanning child views
+            bool isGradient = false;
+            for (TView *c = w->first(); c; c = c->next) {
+                if (dynamic_cast<THorizontalGradientView*>(c)) {
+                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"horizontal\\\"}"; isGradient = true; break;
+                } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"vertical\\\"}"; isGradient = true; break;
+                } else if (dynamic_cast<TRadialGradientView*>(c)) {
+                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"radial\\\"}"; isGradient = true; break;
+                } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+                    type = "gradient"; props = "{\\\"gradientType\\\": \\\"diagonal\\\"}"; isGradient = true; break;
+                }
+            }
+            if (!isGradient) {
+                // Unknown window type: keep as 'custom' with empty props
+            }
+        }
+
+        // Bounds (outer window rect)
+        TRect b = w->getBounds();
+        int x = b.a.x, y = b.a.y, ww = b.b.x - b.a.x, hh = b.b.y - b.a.y;
+
+        // Zoomed: consider full-screen match
+        bool zoomed = (b.a.x == 0 && b.a.y == 0 && b.b.x == ext.b.x && b.b.y == ext.b.y);
+
+        if (idx++ > 0) json += ",\n";
+        json += "    {\n";
+        json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+        json += "      \"type\": \"" + type + "\",\n";
+        const char *title = w->getTitle(0);
+        std::string safeTitle = title ? jsonEscape(title) : std::string("");
+        json += "      \"title\": \"" + safeTitle + "\",\n";
+        json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+        json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+        json += "      \"props\": " + props + "\n";
+        json += "    }";
+    }
+
+    json += "\n  ]\n}";
+    return json;
+}
+
+void TTestPatternApp::saveWorkspace()
+{
+    // Ensure directory exists
+    mkdir("workspaces", 0755);
+
+    std::string json = buildWorkspaceJson();
+    const char *path = "workspaces/last_workspace.json";
+    std::ofstream out(path, std::ios::out | std::ios::trunc);
+    if (!out) {
+        std::string msg = std::string("Failed to open ") + path + " for writing";
+        messageBox(msg.c_str(), mfError | mfOKButton);
+        return;
+    }
+    out << json;
+    out.close();
+    if (!out.good()) {
+        std::string msg = std::string("Error writing ") + path;
+        messageBox(msg.c_str(), mfError | mfOKButton);
+        return;
+    }
+    std::string ok = std::string("Workspace saved to ") + path;
+    messageBox(ok.c_str(), mfInformation | mfOKButton);
 }
