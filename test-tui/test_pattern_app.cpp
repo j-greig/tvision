@@ -73,6 +73,7 @@ class TGradientWindow;
 class TFrameAnimationWindow;
 class TTestPatternApp;
 class TCustomMenuBar;
+class TCustomStatusLine;
 
 /*---------------------------------------------------------*/
 /* TCustomMenuBar - Menu bar with right-aligned kaomoji   */
@@ -83,55 +84,70 @@ public:
     TCustomMenuBar(const TRect& bounds, TMenu* aMenu) : TMenuBar(bounds, aMenu) {}
     TCustomMenuBar(const TRect& bounds, TSubMenu& aMenu) : TMenuBar(bounds, aMenu) {}
     
-    virtual void draw()
+    virtual TColorAttr mapColor(uchar index) noexcept override
     {
-        // Draw the menu bar with custom content
-        TDrawBuffer b;
-        TMenuItem *p;
-        short x;
+        TColorRGB trueBlack(0, 0, 0);
+        TColorRGB trueWhite(255, 255, 255);
         
-        TAttrPair cNormal = getColor(0x0301);
-        TAttrPair cSelect = getColor(0x0604);
-        TAttrPair cNormDisabled = getColor(0x0202);
-        TAttrPair cSelDisabled = getColor(0x0505);
-        
-        // Fill background
-        b.moveChar(0, ' ', cNormal, size.x);
-        
-        // Draw menu items from left
-        if (menu != 0) {
-            x = 1;
-            p = menu->items;
-            while (p != 0) {
-                if (p->name != 0) {
-                    int l = cstrlen(p->name);
-                    if (x + l < size.x) {
-                        TAttrPair color;
-                        if (p->disabled)
-                            color = (p == current) ? cSelDisabled : cNormDisabled;
-                        else
-                            color = (p == current) ? cSelect : cNormal;
-                        
-                        b.moveChar(x, ' ', color, 1);
-                        b.moveCStr(x + 1, p->name, color);
-                        b.moveChar(x + l + 1, ' ', color, 1);
-                    }
-                    x += l + 2;
-                }
-                p = p->next;
-            }
+        // Experiment with different indices to find which controls hotkeys
+        // getColor(0x0301) uses indices 1 and 3, getColor(0x0604) uses indices 4 and 6
+        switch(index) {
+            case 1:  // First try index 1 (might be hotkey for getColor(0x0301))
+            case 3:  // Or index 3 (might be hotkey for getColor(0x0301)) 
+            case 4:  // Or index 4 (might be hotkey for getColor(0x0604))
+            case 6:  // Or index 6 (might be hotkey for getColor(0x0604))
+                return TColorAttr(trueBlack, trueWhite);  // BLACK ON TRUE WHITE
+            default:
+                return TMenuBar::mapColor(index);  // Use parent's mapping for others
         }
+    }
+    
+    virtual void draw() override
+    {
+        // Use standard TMenuBar drawing with our custom palette
+        TMenuBar::draw();
         
-        // Add kaomoji at right side
+        // Add kaomoji at right side with proper background fill
+        TDrawBuffer b;
         const char* kaomoji = "つ◕‿◕‿◕༽つ";
         int kaomojiWidth = 12;
-        int xPos = size.x - kaomojiWidth; // Removed the -1 to move it right to the edge
+        int xPos = size.x - kaomojiWidth;
         
-        if (xPos > x) { // Only draw if there's space
-            b.moveStr(xPos, kaomoji, cNormal);
+        if (xPos > 1) { // Only draw if there's space
+            TAttrPair cNormal = getColor(0x0301);
+            // Fill entire kaomoji area with background first
+            b.moveChar(0, ' ', cNormal, kaomojiWidth);
+            // Then write kaomoji text
+            b.moveStr(0, kaomoji, cNormal);
+            writeBuf(xPos, 0, kaomojiWidth, 1, b);
         }
+    }
+};
+
+/*---------------------------------------------------------*/
+/* TCustomStatusLine - Status line with white hotkeys     */
+/*---------------------------------------------------------*/
+class TCustomStatusLine : public TStatusLine
+{
+public:
+    TCustomStatusLine(const TRect& bounds, TStatusDef& aDefs) : TStatusLine(bounds, aDefs) {}
+    
+    virtual TColorAttr mapColor(uchar index) noexcept override
+    {
+        TColorRGB trueBlack(0, 0, 0);
+        TColorRGB trueWhite(255, 255, 255);
         
-        writeBuf(0, 0, size.x, 1, b);
+        // Status line uses different indices than menu bar
+        // Try common status line color indices for hotkeys
+        switch(index) {
+            case 1:  // Try index 1
+            case 2:  // Try index 2  
+            case 3:  // Try index 3
+            case 4:  // Try index 4
+                return TColorAttr(trueBlack, trueWhite);  // BLACK ON TRUE WHITE
+            default:
+                return TStatusLine::mapColor(index);  // Use parent's mapping for others
+        }
     }
 };
 
@@ -431,8 +447,24 @@ void TTestPatternApp::tile()
 
 void TTestPatternApp::closeAll()
 {
-    // Close all windows on desktop
-    message(deskTop, evCommand, cmCloseAll, 0);
+    // Close all regular windows on the desktop (iterating safely over circular list)
+    std::vector<TWindow*> toClose;
+    TView *start = deskTop->first();
+    if (start) {
+        TView *v = start;
+        do {
+            TView *nextV = v->next; // cache next to avoid invalidation issues
+            if (TWindow *w = dynamic_cast<TWindow*>(v)) {
+                // Skip non-user windows if any (none expected here)
+                toClose.push_back(w);
+            }
+            v = nextV;
+        } while (v != start);
+    }
+    for (auto *w : toClose) {
+        if (w && (w->flags & wfClose))
+            w->close();
+    }
 }
 
 void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
@@ -610,7 +642,7 @@ void TTestPatternApp::takeScreenshot()
     "\x70\x0F\x70\x07\x07\x70\x07\x0F\x70\x7F\x7F\x70\x07\x70\x07\x0F" \
     "\x70\x7F\x7F\x70\x07\x70\x70\x7F\x7F\x07\x70\x0F\x70\x0F\x70\x07" \
     "\x0F\x0F\x0F\x70\x0F\x07\x70\x70\x70\x07\x70\x0F\x07\x07\x78\x00" \
-    "\x70\x0F\x0F\x70\x07\x70\x70\x0F\x0F\x07\x0F\x7F\x08\x7F\x08\x70" \
+    "\x70\xF0\x0F\x70\x07\x70\x70\x0F\x0F\x07\xF0\x7F\x08\x7F\xF0\x70" \
     "\x7F\x7F\x7F\x0F\x70\x70\x07\x70\x70\x70\x07\x7F\x70\x07\x08\x00" \
     "\x70\x7F\x7F\x70\x07\x70\x70\x7F\x7F\x07\x0F\x0F\x78\x0F\x78\x07" \
     "\x0F\x0F\x0F\x70\x0F\x07\x70\x70\x70\x07\x70\x0F\x07\x07\x78\x00" \
@@ -665,7 +697,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
 TStatusLine* TTestPatternApp::initStatusLine(TRect r)
 {
     r.a.y = r.b.y - 1;
-    return new TStatusLine(r,
+    return new TCustomStatusLine(r,
         *new TStatusDef(0, 0xFFFF) +
             *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
             *new TStatusItem("~Ctrl-N~ New Window", kbCtrlN, cmNewWindow) +

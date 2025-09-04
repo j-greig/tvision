@@ -168,6 +168,19 @@ ansi_viewer/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/build
 .PHONY : ansi_viewer/fast
 
+#=============================================================================
+# Target rules for targets named paint_tui
+
+# Build rule for target.
+paint_tui: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 paint_tui
+.PHONY : paint_tui
+
+# fast build rule for target.
+paint_tui/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/build
+.PHONY : paint_tui/fast
+
 ansi_view.o: ansi_view.cpp.o
 .PHONY : ansi_view.o
 
@@ -294,6 +307,54 @@ gradient.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/gradient.cpp.s
 .PHONY : gradient.cpp.s
 
+paint/paint_app.o: paint/paint_app.cpp.o
+.PHONY : paint/paint_app.o
+
+# target to build an object file
+paint/paint_app.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_app.cpp.o
+.PHONY : paint/paint_app.cpp.o
+
+paint/paint_app.i: paint/paint_app.cpp.i
+.PHONY : paint/paint_app.i
+
+# target to preprocess a source file
+paint/paint_app.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_app.cpp.i
+.PHONY : paint/paint_app.cpp.i
+
+paint/paint_app.s: paint/paint_app.cpp.s
+.PHONY : paint/paint_app.s
+
+# target to generate assembly for a file
+paint/paint_app.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_app.cpp.s
+.PHONY : paint/paint_app.cpp.s
+
+paint/paint_canvas.o: paint/paint_canvas.cpp.o
+.PHONY : paint/paint_canvas.o
+
+# target to build an object file
+paint/paint_canvas.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_canvas.cpp.o
+.PHONY : paint/paint_canvas.cpp.o
+
+paint/paint_canvas.i: paint/paint_canvas.cpp.i
+.PHONY : paint/paint_canvas.i
+
+# target to preprocess a source file
+paint/paint_canvas.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_canvas.cpp.i
+.PHONY : paint/paint_canvas.cpp.i
+
+paint/paint_canvas.s: paint/paint_canvas.cpp.s
+.PHONY : paint/paint_canvas.s
+
+# target to generate assembly for a file
+paint/paint_canvas.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_canvas.cpp.s
+.PHONY : paint/paint_canvas.cpp.s
+
 simple_tui.o: simple_tui.cpp.o
 .PHONY : simple_tui.o
 
@@ -400,6 +461,7 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... ansi_viewer"
 	@echo "... frame_file_player"
+	@echo "... paint_tui"
 	@echo "... simple_tui"
 	@echo "... test_pattern"
 	@echo "... ansi_view.o"
@@ -417,6 +479,12 @@ help:
 	@echo "... gradient.o"
 	@echo "... gradient.i"
 	@echo "... gradient.s"
+	@echo "... paint/paint_app.o"
+	@echo "... paint/paint_app.i"
+	@echo "... paint/paint_app.s"
+	@echo "... paint/paint_canvas.o"
+	@echo "... paint/paint_canvas.i"
+	@echo "... paint/paint_canvas.s"
 	@echo "... simple_tui.o"
 	@echo "... simple_tui.i"
 	@echo "... simple_tui.s"

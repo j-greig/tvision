@@ -2,5 +2,6 @@
 /Users/james/Repos/tvision/test-tui/build/CMakeFiles/test_pattern.dir
 /Users/james/Repos/tvision/test-tui/build/CMakeFiles/frame_file_player.dir
 /Users/james/Repos/tvision/test-tui/build/CMakeFiles/ansi_viewer.dir
+/Users/james/Repos/tvision/test-tui/build/CMakeFiles/paint_tui.dir
 /Users/james/Repos/tvision/test-tui/build/CMakeFiles/edit_cache.dir
 /Users/james/Repos/tvision/test-tui/build/CMakeFiles/rebuild_cache.dir

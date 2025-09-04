@@ -81,3 +81,18 @@ target_link_libraries(ansi_viewer
 set_target_properties(ansi_viewer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+# Paint MVP app
+add_executable(paint_tui
+    paint/paint_app.cpp
+    paint/paint_canvas.cpp
+)
+
+target_link_libraries(paint_tui
+    ${TVISION_DIR}/build/libtvision.a
+    ${NCURSES_LIB}
+)
+
+set_target_properties(paint_tui PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
