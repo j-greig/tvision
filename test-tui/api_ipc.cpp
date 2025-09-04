@@ -23,6 +23,11 @@ extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern void api_save_workspace(TTestPatternApp& app);
 extern void api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
+extern std::string api_get_state(TTestPatternApp& app);
+extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
 
 ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
@@ -131,6 +136,44 @@ void ApiIpcServer::poll() {
         else resp = "err missing path\n";
     } else if (cmd == "screenshot") {
         api_screenshot(*app_);
+    } else if (cmd == "get_state") {
+        resp = api_get_state(*app_) + "\n";
+    } else if (cmd == "move_window") {
+        auto id = kv.find("id");
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y");
+        if (id != kv.end() && x_it != kv.end() && y_it != kv.end()) {
+            int x = std::atoi(x_it->second.c_str());
+            int y = std::atoi(y_it->second.c_str());
+            resp = api_move_window(*app_, id->second, x, y) + "\n";
+        } else {
+            resp = "err missing id/x/y\n";
+        }
+    } else if (cmd == "resize_window") {
+        auto id = kv.find("id");
+        auto w_it = kv.find("width");
+        auto h_it = kv.find("height");
+        if (id != kv.end() && w_it != kv.end() && h_it != kv.end()) {
+            int width = std::atoi(w_it->second.c_str());
+            int height = std::atoi(h_it->second.c_str());
+            resp = api_resize_window(*app_, id->second, width, height) + "\n";
+        } else {
+            resp = "err missing id/width/height\n";
+        }
+    } else if (cmd == "focus_window") {
+        auto id = kv.find("id");
+        if (id != kv.end()) {
+            resp = api_focus_window(*app_, id->second) + "\n";
+        } else {
+            resp = "err missing id\n";
+        }
+    } else if (cmd == "close_window") {
+        auto id = kv.find("id");
+        if (id != kv.end()) {
+            resp = api_close_window(*app_, id->second) + "\n";
+        } else {
+            resp = "err missing id\n";
+        }
     } else {
         resp = "err unknown cmd\n";
     }

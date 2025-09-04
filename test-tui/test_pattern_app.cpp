@@ -47,6 +47,7 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <map>
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
 
@@ -375,6 +376,46 @@ private:
     int windowNumber;
     static const int maxWindows = 99;
     
+    // API/IPC registry for per-window control
+    int apiIdCounter = 1;
+    std::map<TWindow*, std::string> winToId;
+    std::map<std::string, TWindow*> idToWin;
+    
+    std::string registerWindow(TWindow* w) {
+        if (!w) return std::string();
+        auto it = winToId.find(w);
+        if (it != winToId.end()) return it->second;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+        std::string id(buf);
+        winToId[w] = id;
+        idToWin[id] = w;
+        return id;
+    }
+    
+    TWindow* findWindowById(const std::string& id) {
+        auto it = idToWin.find(id);
+        if (it != idToWin.end()) return it->second;
+        // Fallback: scan desktop to refresh mapping if needed
+        // Rebuild maps for current windows
+        winToId.clear();
+        idToWin.clear();
+        TView *start = deskTop->first();
+        if (start) {
+            TView *v = start;
+            do {
+                TWindow *w = dynamic_cast<TWindow*>(v);
+                if (w) {
+                    registerWindow(w);
+                }
+                v = v->next;
+            } while (v != start);
+        }
+        it = idToWin.find(id);
+        if (it != idToWin.end()) return it->second;
+        return nullptr;
+    }
+    
     // IPC server
     ApiIpcServer* ipcServer = nullptr;
     
@@ -389,6 +430,11 @@ private:
     friend void api_save_workspace(TTestPatternApp&);
     friend void api_open_workspace_path(TTestPatternApp&, const std::string&);
     friend void api_screenshot(TTestPatternApp&);
+    friend std::string api_get_state(TTestPatternApp&);
+    friend std::string api_move_window(TTestPatternApp&, const std::string&, int, int);
+    friend std::string api_resize_window(TTestPatternApp&, const std::string&, int, int);
+    friend std::string api_focus_window(TTestPatternApp&, const std::string&);
+    friend std::string api_close_window(TTestPatternApp&, const std::string&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -634,6 +680,7 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     // Create and insert window
     TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
     deskTop->insert(window);
+    registerWindow(window);
 }
 
 void TTestPatternApp::newDonutWindow()
@@ -655,6 +702,7 @@ void TTestPatternApp::newDonutWindow()
     // Create and insert window with donut.txt file
     TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), "donut.txt");
     deskTop->insert(window);
+    registerWindow(window);
 }
 
 void TTestPatternApp::openAnimationFile()
@@ -691,6 +739,7 @@ void TTestPatternApp::openAnimationFile()
         // Create and insert window with selected file
         TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), fileName);
         deskTop->insert(window);
+        registerWindow(window);
     }
 }
 
@@ -721,6 +770,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     // Create and insert window with selected file
     TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
     deskTop->insert(window);
+    registerWindow(window);
 }
 
 
@@ -975,6 +1025,7 @@ void TTestPatternApp::idle()
         std::string title = "Spore Monster";
         TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.c_str(), filePath.c_str());
         deskTop->insert(window);
+        registerWindow(window);
         // Force immediate redraw
         redraw();
     }
@@ -1018,6 +1069,95 @@ void api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 }
 
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(); }
+
+std::string api_get_state(TTestPatternApp& app) {
+    // Rebuild window registry to sync with current desktop state
+    app.winToId.clear();
+    app.idToWin.clear();
+    
+    std::stringstream json;
+    json << "{\"windows\":[";
+    
+    bool first = true;
+    TView *start = app.deskTop->first();
+    if (start) {
+        TView *v = start;
+        do {
+            TWindow *w = dynamic_cast<TWindow*>(v);
+            if (w) {
+                std::string id = app.registerWindow(w);
+                
+                if (!first) json << ",";
+                json << "{\"id\":\"" << id << "\""
+                     << ",\"x\":" << w->origin.x
+                     << ",\"y\":" << w->origin.y  
+                     << ",\"width\":" << w->size.x
+                     << ",\"height\":" << w->size.y
+                     << ",\"title\":\"";
+                
+                // Safely escape title
+                if (w->title) {
+                    std::string title(w->title);
+                    for (char c : title) {
+                        if (c == '"') json << "\\\"";
+                        else if (c == '\\') json << "\\\\";
+                        else json << c;
+                    }
+                }
+                json << "\"}";
+                first = false;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+    
+    json << "]}";
+    return json.str();
+}
+
+std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    TRect newBounds = w->getBounds();
+    newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+    w->locate(newBounds);
+    
+    return "{\"success\":true}";
+}
+
+std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    TRect newBounds = w->getBounds();
+    newBounds.b.x = newBounds.a.x + width;
+    newBounds.b.y = newBounds.a.y + height;
+    w->locate(newBounds);
+    
+    return "{\"success\":true}";
+}
+
+std::string api_focus_window(TTestPatternApp& app, const std::string& id) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    app.deskTop->setCurrent(w, TDeskTop::normalSelect);
+    return "{\"success\":true}";
+}
+
+std::string api_close_window(TTestPatternApp& app, const std::string& id) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    // Remove from registry
+    app.winToId.erase(w);
+    app.idToWin.erase(id);
+    
+    // Close the window
+    w->close();
+    return "{\"success\":true}";
+}
 
 // --- Minimal JSON parsing helpers (subset tailored to our schema) ---
 void TTestPatternApp::skipWs(const std::string &s, size_t &pos)

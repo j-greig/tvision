@@ -175,3 +175,180 @@ cd test-tui && cmake --build ./build && ./build/test_pattern
 - Use `TVISION_MAX_FPS=-1` for immediate screen updates (useful for debugging)
 - Event viewer in tvdemo helps debug input events
 - Claude should never attempt to run tvision apps using bash as it borks the REPL - only humans should run the apps. Claude should ask the human to run if required and tell the human how. eg "cd test-tui && ./build/simple_tui"
+
+## Programmatic Control API
+
+The **tools/api_server** directory contains a FastAPI-based REST API server that provides programmatic control over TUI applications via HTTP endpoints. This enables remote window management, automated testing, and integration with external tools.
+
+### Architecture
+
+- **FastAPI Server** (`tools/api_server/`) - REST API with WebSocket events
+- **Unix Socket IPC** (`test-tui/api_ipc.*`) - Bridge between Python API and C++ TUI apps
+- **Window Registry** - Stable window ID management in C++ applications
+- **State Sync** - Real-time bidirectional state synchronization
+
+### Running the API Server
+
+#### 1. Setup Virtual Environment
+```bash
+cd tools/api_server
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### 2. Start the API Server
+```bash
+# From project root
+cd /path/to/tvision
+/path/to/tvision/tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
+```
+
+The API server will be available at: **http://127.0.0.1:8089**
+
+#### 3. Run a Compatible TUI Application
+```bash
+# In a separate terminal
+cd test-tui
+./build/test_pattern
+```
+
+The TUI app automatically creates a Unix socket at `/tmp/test_pattern_app.sock` for IPC communication.
+
+### API Endpoints
+
+#### Interactive Documentation
+- **Swagger UI**: http://127.0.0.1:8089/docs
+- **ReDoc**: http://127.0.0.1:8089/redoc
+
+#### Core Endpoints
+
+##### Application State
+- `GET /state` — Get current application state, window list, and properties
+
+##### Window Management  
+- `POST /windows` — Create window: `{type, title?, rect?, props?}`
+- `POST /windows/{id}/move` — Move/resize window: `{x?, y?, w?, h?}`  
+- `POST /windows/{id}/focus` — Focus window (bring to front)
+- `POST /windows/{id}/close` — Close specific window
+- `POST /windows/cascade` — Cascade all windows  
+- `POST /windows/tile` — Tile windows: `{cols?}`
+- `POST /windows/close_all` — Close all windows
+
+##### Application Control
+- `POST /pattern_mode` — Set pattern mode: `{mode:"continuous"|"tiled"}`
+- `POST /screenshot` — Take screenshot  
+- `POST /workspace/save` — Save workspace layout
+- `POST /workspace/load` — Load workspace: `{path}`
+
+##### Real-time Events
+- `GET /ws` — WebSocket connection for live events
+
+### Usage Examples
+
+#### Basic Window Control
+```bash
+# Create a test pattern window
+curl -X POST "http://127.0.0.1:8089/windows" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "test_pattern", "title": "Test Window"}'
+
+# Get current state to see window IDs  
+curl "http://127.0.0.1:8089/state"
+
+# Move window to position (30, 10)
+curl -X POST "http://127.0.0.1:8089/windows/w3/move" \
+  -H "Content-Type: application/json" \
+  -d '{"x": 30, "y": 10}'
+
+# Create gradient window
+curl -X POST "http://127.0.0.1:8089/windows" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "gradient", "props": {"gradient": "radial"}}'
+
+# Arrange windows in cascade
+curl -X POST "http://127.0.0.1:8089/windows/cascade"
+```
+
+#### Python Integration
+```python
+import requests
+
+api_base = "http://127.0.0.1:8089"
+
+# Create window
+response = requests.post(f"{api_base}/windows", json={
+    "type": "test_pattern", 
+    "title": "Remote Window"
+})
+print(response.json())
+
+# Get all windows  
+state = requests.get(f"{api_base}/state").json()
+windows = state["windows"]
+
+# Move first window
+if windows:
+    win_id = windows[0]["id"]
+    requests.post(f"{api_base}/windows/{win_id}/move", json={
+        "x": 50, "y": 15, "w": 60, "h": 20
+    })
+```
+
+#### WebSocket Events
+```javascript
+const ws = new WebSocket('ws://127.0.0.1:8089/ws');
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('Event:', data.type, data.payload);
+};
+```
+
+### Window Types
+
+- **test_pattern** - Test pattern generator window
+- **gradient** - Gradient display window (horizontal, vertical, radial, diagonal)
+- **frame_player** - Animation player window: `props: {"path": "file.txt"}`
+- **text_view** - Text file viewer window: `props: {"path": "file.txt"}`
+
+### IPC Protocol (Advanced)
+
+For direct integration, the Unix socket at `/tmp/test_pattern_app.sock` accepts commands:
+
+```bash
+# Command format: "cmd:<name> key=value key=value"
+echo "cmd:get_state" | nc -U /tmp/test_pattern_app.sock
+echo "cmd:move_window id=w1 x=20 y=10" | nc -U /tmp/test_pattern_app.sock
+```
+
+### Events & WebSocket
+
+The API emits real-time events via WebSocket:
+- `window.created` — `{id, type, title, rect, focused, props}`
+- `window.updated` — Same payload as created  
+- `window.closed` — `{id}`
+- `layout.cascade` — `{}`
+- `layout.tile` — `{cols}`
+
+### Troubleshooting
+
+#### Connection Issues
+```bash
+# Check if socket exists
+ls -la /tmp/test_pattern_app.sock
+
+# Check if app is running
+lsof /tmp/test_pattern_app.sock
+
+# Test direct IPC
+echo "cmd:get_state" | nc -U /tmp/test_pattern_app.sock
+```
+
+#### Socket Permission Issues  
+```bash
+# Remove stale socket and restart TUI app
+rm -f /tmp/test_pattern_app.sock
+cd test-tui && ./build/test_pattern
+```
+
+The API provides full programmatic control over TUI applications, enabling powerful automation and integration capabilities while maintaining real-time responsiveness.

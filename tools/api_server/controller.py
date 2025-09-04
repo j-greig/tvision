@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from .events import EventHub
 from .models import AppState, Rect, Window, WindowType, new_id
 from .ipc_client import send_cmd
+import json
 
 
 class Controller:
@@ -23,8 +24,44 @@ class Controller:
 
     # ----- Query -----
     async def get_state(self) -> AppState:
-        # caller should not mutate returned state
+        await self._sync_state()
         return self._state
+
+    async def _sync_state(self) -> None:
+        """Sync in-memory state with the real C++ app via IPC"""
+        try:
+            resp = send_cmd("get_state")
+            if resp and resp.strip():
+                # Parse JSON response
+                state_data = json.loads(resp.strip())
+                
+                async with self._lock:
+                    # Update windows list with real IDs from C++
+                    new_windows = []
+                    for win_data in state_data.get("windows", []):
+                        win = Window(
+                            id=win_data["id"],
+                            type=WindowType.test_pattern,  # Default for now
+                            title=win_data["title"],
+                            rect=Rect(
+                                x=win_data["x"],
+                                y=win_data["y"], 
+                                w=win_data["width"],
+                                h=win_data["height"]
+                            ),
+                            z=0,  # C++ doesn't provide z-order
+                            focused=False,  # Will be determined later
+                            props={}
+                        )
+                        new_windows.append(win)
+                    
+                    self._state.windows = new_windows
+                    print(f"Synced {len(new_windows)} windows: {[w.id for w in new_windows]}")
+        except Exception as e:
+            # Debug: Show what's actually failing
+            print(f"IPC sync failed: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
 
     # ----- Windows -----
     async def create_window(
@@ -70,36 +107,49 @@ class Controller:
         return win
 
     async def move_resize(self, win_id: str, *, x=None, y=None, w=None, h=None) -> Window:
-        async with self._lock:
+        # Sync state first to get current window info
+        await self._sync_state()
+        
+        try:
+            # Find the window after syncing
             win = self._require(win_id)
-            if x is not None:
-                win.rect.x = x
-            if y is not None:
-                win.rect.y = y
-            if w is not None:
-                win.rect.w = w
-            if h is not None:
-                win.rect.h = h
-        await self._events.emit("window.updated", self._serialize_window(win))
-        return win
+            
+            if x is not None or y is not None:
+                move_x = x if x is not None else win.rect.x
+                move_y = y if y is not None else win.rect.y
+                send_cmd("move_window", {"id": win_id, "x": str(move_x), "y": str(move_y)})
+            
+            if w is not None or h is not None:
+                new_w = w if w is not None else win.rect.w
+                new_h = h if h is not None else win.rect.h
+                send_cmd("resize_window", {"id": win_id, "width": str(new_w), "height": str(new_h)})
+        except Exception as e:
+            print(f"IPC move/resize failed: {type(e).__name__}: {e}")
+        
+        # Sync state again and return updated window
+        await self._sync_state()
+        try:
+            win = self._require(win_id)
+            await self._events.emit("window.updated", self._serialize_window(win))
+            return win
+        except KeyError:
+            raise KeyError(win_id)
 
     async def focus(self, win_id: str) -> Window:
-        async with self._lock:
+        # Send focus command to C++ app
+        try:
+            send_cmd("focus_window", {"id": win_id})
+        except Exception as e:
+            print(f"IPC focus failed: {type(e).__name__}: {e}")
+        
+        # Sync state and return focused window
+        await self._sync_state()
+        try:
             win = self._require(win_id)
-            for w in self._state.windows:
-                w.focused = False
-            win.focused = True
-            win.z = self._state.next_z
-            self._state.next_z += 1
-        await self._events.emit("window.updated", self._serialize_window(win))
-        return win
-
-    async def zoom(self, win_id: str, *, value: Optional[bool] = None) -> Window:
-        async with self._lock:
-            win = self._require(win_id)
-            win.zoomed = (not win.zoomed) if value is None else bool(value)
-        await self._events.emit("window.updated", self._serialize_window(win))
-        return win
+            await self._events.emit("window.updated", self._serialize_window(win))
+            return win
+        except KeyError:
+            raise KeyError(win_id)
 
     async def clone(self, win_id: str) -> Window:
         async with self._lock:
@@ -122,12 +172,15 @@ class Controller:
         return clone
 
     async def close(self, win_id: str) -> None:
-        async with self._lock:
-            before = len(self._state.windows)
-            self._state.windows = [w for w in self._state.windows if w.id != win_id]
-            removed = before != len(self._state.windows)
-        if removed:
-            await self._events.emit("window.closed", {"id": win_id})
+        # Send close command to C++ app
+        try:
+            send_cmd("close_window", {"id": win_id})
+        except Exception:
+            pass
+        
+        # Sync state and emit event
+        await self._sync_state()
+        await self._events.emit("window.closed", {"id": win_id})
 
     async def close_all(self) -> None:
         try:

@@ -45,7 +45,6 @@ Key Endpoints
   - `POST /windows` — create: `{type, title?, rect?, props?}`
   - `POST /windows/{id}/move` — move/resize: `{x?, y?, w?, h?}`
   - `POST /windows/{id}/focus` — bring to front and focus
-  - `POST /windows/{id}/zoom` — toggle zoom
   - `POST /windows/{id}/clone` — duplicate window and props
   - `POST /windows/{id}/close` — close a window
   - `POST /windows/cascade` — cascade layout
@@ -59,7 +58,7 @@ Key Endpoints
 - WebSocket events: `GET /ws`
 
 WebSocket Events
-- `window.created` — `{id, type, title, rect, z, focused, zoomed, props}`
+- `window.created` — `{id, type, title, rect, z, focused, props}`
 - `window.updated` — same payload as created
 - `window.closed` — `{id}`
 - `layout.cascade` — `{}`

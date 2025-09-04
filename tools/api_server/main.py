@@ -164,23 +164,6 @@ def make_app() -> FastAPI:
             props=win.props,
         )
 
-    @app.post("/windows/{win_id}/zoom", response_model=WindowState)
-    async def zoom(win_id: str) -> WindowState:
-        try:
-            win = await ctl.zoom(win_id)
-        except KeyError:
-            raise HTTPException(status_code=404, detail="window not found")
-        return WindowState(
-            id=win.id,
-            type=win.type.value,
-            title=win.title,
-            rect=RectModel(x=win.rect.x, y=win.rect.y, w=win.rect.w, h=win.rect.h),
-            z=win.z,
-            focused=win.focused,
-            zoomed=win.zoomed,
-            props=win.props,
-        )
-
     @app.post("/windows/{win_id}/clone", response_model=WindowState)
     async def clone(win_id: str) -> WindowState:
         try:
