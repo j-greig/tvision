@@ -27,6 +27,7 @@ add_executable(test_pattern
     test_pattern.cpp 
     gradient.cpp 
     wallpaper.cpp
+    ansi_view.cpp
     frame_file_player_view.cpp
 )
 
@@ -63,5 +64,20 @@ target_link_libraries(frame_file_player
 )
 
 set_target_properties(frame_file_player PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+# ANSI viewer microapp (MVP)
+add_executable(ansi_viewer
+    ansi_viewer_main.cpp
+    ansi_view.cpp
+)
+
+target_link_libraries(ansi_viewer
+    ${TVISION_DIR}/build/libtvision.a
+    ${NCURSES_LIB}
+)
+
+set_target_properties(ansi_viewer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

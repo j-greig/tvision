@@ -87,6 +87,21 @@ cmake --build ./build
 - Supports BIOS colors, RGB, xterm-256, and terminal defaults
 - Backward compatible with legacy code
 
+#### Pure Black Backgrounds
+**Issue**: Terminal color schemes often map ANSI color 0 (black) to dark grey (#15191E) instead of pure black (#000000)
+
+**Solution**: Use RGB colors to bypass terminal palette interpretation:
+```cpp
+// Wrong: Uses terminal palette (may be dark grey)
+TAttrPair black = 0x00;
+
+// Correct: Uses true RGB black
+TColorRGB trueBlack(0, 0, 0);
+TColorAttr black(trueBlack, trueBlack);
+```
+
+**Requirements**: Requires `COLORTERM=truecolor` for full RGB support
+
 ### Drawing System
 - Views draw to `TDrawBuffer` then write to screen
 - Unicode text handling with proper width calculations

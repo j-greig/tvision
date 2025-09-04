@@ -41,7 +41,8 @@ TWallpaperView::TWallpaperView(const TRect& bounds) : TBackground(bounds, ' ')
 void TWallpaperView::draw()
 {
     TDrawBuffer b;
-    TAttrPair bgColor = getBgColor();  // Pure black
+    TColorRGB trueBlack(0, 0, 0);  // Pure RGB black
+    TColorAttr bgColor(trueBlack, trueBlack);  // Pure black background
     TAttrPair artColor = getArtColor(); // White
     
     // Calculate centering offsets
@@ -72,35 +73,44 @@ void TWallpaperView::draw()
                     unsigned char ch = (unsigned char)line[x];
                     if (ch != ' ')  // Don't draw spaces
                     {
-                        TAttrPair color;
-                        // Use raw attribute values for true grayscale
+                        TColorAttr color;
+                        TColorRGB trueBlack(0, 0, 0);  // Pure RGB black
+                        
+                        // Use RGB colors to bypass terminal palette interpretation
                         if (ch == 0xB0)  // Light shade ░
                         {
-                            color = 0x08;  // Dark gray on black
+                            TColorRGB darkGray(64, 64, 64);
+                            color = TColorAttr(darkGray, trueBlack);
                         }
                         else if (ch == 0xB1)  // Medium shade ▒
                         {
-                            color = 0x07;  // Light gray on black
+                            TColorRGB lightGray(128, 128, 128);
+                            color = TColorAttr(lightGray, trueBlack);
                         }
                         else if (ch == 0xB2)  // Dark shade ▓
                         {
-                            color = 0x08;  // Dark gray (was causing red)
+                            TColorRGB mediumGray(96, 96, 96);
+                            color = TColorAttr(mediumGray, trueBlack);
                         }
                         else if (ch == 0xDB)  // Full block █
                         {
-                            color = 0x0F;  // Bright white on black
+                            TColorRGB white(255, 255, 255);
+                            color = TColorAttr(white, trueBlack);
                         }
                         else if (ch == 0xDC)  // Lower half block ▄
                         {
-                            color = 0x08;  // Dark gray (was causing red)
+                            TColorRGB mediumGray(96, 96, 96);
+                            color = TColorAttr(mediumGray, trueBlack);
                         }
                         else if (ch == 0xDF)  // Upper half block ▀
                         {
-                            color = 0x08;  // Dark gray (was causing red)
+                            TColorRGB mediumGray(96, 96, 96);
+                            color = TColorAttr(mediumGray, trueBlack);
                         }
                         else
                         {
-                            color = 0x0F;  // Bright white on black
+                            TColorRGB white(255, 255, 255);
+                            color = TColorAttr(white, trueBlack);
                         }
                         
                         b.putChar(x + xOffset, ch);
@@ -128,9 +138,10 @@ TAttrPair TWallpaperView::getArtColor()
 
 TAttrPair TWallpaperView::getBgColor()
 {
-    // Return raw black on black attribute (0x00)
+    // Use RGB true black instead of palette color 0 to bypass terminal color scheme
+    TColorRGB trueBlack(0, 0, 0);  // Pure black RGB
     TAttrPair black;
-    black = 0x00;
+    black = TColorAttr(trueBlack, trueBlack);  // Both foreground and background black
     return black;
 }
 

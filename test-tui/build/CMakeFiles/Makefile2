@@ -66,12 +66,14 @@ CMAKE_BINARY_DIR = /Users/james/Repos/tvision/test-tui/build
 all: CMakeFiles/simple_tui.dir/all
 all: CMakeFiles/test_pattern.dir/all
 all: CMakeFiles/frame_file_player.dir/all
+all: CMakeFiles/ansi_viewer.dir/all
 .PHONY : all
 
 # The main recursive "codegen" target.
 codegen: CMakeFiles/simple_tui.dir/codegen
 codegen: CMakeFiles/test_pattern.dir/codegen
 codegen: CMakeFiles/frame_file_player.dir/codegen
+codegen: CMakeFiles/ansi_viewer.dir/codegen
 .PHONY : codegen
 
 # The main recursive "preinstall" target.
@@ -82,6 +84,7 @@ preinstall:
 clean: CMakeFiles/simple_tui.dir/clean
 clean: CMakeFiles/test_pattern.dir/clean
 clean: CMakeFiles/frame_file_player.dir/clean
+clean: CMakeFiles/ansi_viewer.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -91,7 +94,7 @@ clean: CMakeFiles/frame_file_player.dir/clean
 CMakeFiles/simple_tui.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/simple_tui.dir/build.make CMakeFiles/simple_tui.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/simple_tui.dir/build.make CMakeFiles/simple_tui.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=4,5 "Built target simple_tui"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=7,8 "Built target simple_tui"
 .PHONY : CMakeFiles/simple_tui.dir/all
 
 # Build rule for subdir invocation for target.
@@ -108,7 +111,7 @@ simple_tui: CMakeFiles/simple_tui.dir/rule
 # codegen rule for target.
 CMakeFiles/simple_tui.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/simple_tui.dir/build.make CMakeFiles/simple_tui.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=4,5 "Finished codegen for target simple_tui"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=7,8 "Finished codegen for target simple_tui"
 .PHONY : CMakeFiles/simple_tui.dir/codegen
 
 # clean rule for target.
@@ -123,12 +126,12 @@ CMakeFiles/simple_tui.dir/clean:
 CMakeFiles/test_pattern.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=6,7,8,9,10,11 "Built target test_pattern"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=9,10,11,12,13,14,15 "Built target test_pattern"
 .PHONY : CMakeFiles/test_pattern.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/test_pattern.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 7
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_pattern.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 0
 .PHONY : CMakeFiles/test_pattern.dir/rule
@@ -140,7 +143,7 @@ test_pattern: CMakeFiles/test_pattern.dir/rule
 # codegen rule for target.
 CMakeFiles/test_pattern.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=6,7,8,9,10,11 "Finished codegen for target test_pattern"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=9,10,11,12,13,14,15 "Finished codegen for target test_pattern"
 .PHONY : CMakeFiles/test_pattern.dir/codegen
 
 # clean rule for target.
@@ -155,7 +158,7 @@ CMakeFiles/test_pattern.dir/clean:
 CMakeFiles/frame_file_player.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=1,2,3 "Built target frame_file_player"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=4,5,6 "Built target frame_file_player"
 .PHONY : CMakeFiles/frame_file_player.dir/all
 
 # Build rule for subdir invocation for target.
@@ -172,13 +175,45 @@ frame_file_player: CMakeFiles/frame_file_player.dir/rule
 # codegen rule for target.
 CMakeFiles/frame_file_player.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=1,2,3 "Finished codegen for target frame_file_player"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=4,5,6 "Finished codegen for target frame_file_player"
 .PHONY : CMakeFiles/frame_file_player.dir/codegen
 
 # clean rule for target.
 CMakeFiles/frame_file_player.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/clean
 .PHONY : CMakeFiles/frame_file_player.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/ansi_viewer.dir
+
+# All Build rule for target.
+CMakeFiles/ansi_viewer.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=1,2,3 "Built target ansi_viewer"
+.PHONY : CMakeFiles/ansi_viewer.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/ansi_viewer.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 3
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/ansi_viewer.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/james/Repos/tvision/test-tui/build/CMakeFiles 0
+.PHONY : CMakeFiles/ansi_viewer.dir/rule
+
+# Convenience name for target.
+ansi_viewer: CMakeFiles/ansi_viewer.dir/rule
+.PHONY : ansi_viewer
+
+# codegen rule for target.
+CMakeFiles/ansi_viewer.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/james/Repos/tvision/test-tui/build/CMakeFiles --progress-num=1,2,3 "Finished codegen for target ansi_viewer"
+.PHONY : CMakeFiles/ansi_viewer.dir/codegen
+
+# clean rule for target.
+CMakeFiles/ansi_viewer.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/clean
+.PHONY : CMakeFiles/ansi_viewer.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

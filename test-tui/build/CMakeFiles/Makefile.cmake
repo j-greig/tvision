@@ -66,4 +66,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/simple_tui.dir/DependInfo.cmake"
   "CMakeFiles/test_pattern.dir/DependInfo.cmake"
   "CMakeFiles/frame_file_player.dir/DependInfo.cmake"
+  "CMakeFiles/ansi_viewer.dir/DependInfo.cmake"
   )

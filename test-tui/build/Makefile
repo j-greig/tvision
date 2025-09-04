@@ -155,6 +155,70 @@ frame_file_player/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/frame_file_player.dir/build.make CMakeFiles/frame_file_player.dir/build
 .PHONY : frame_file_player/fast
 
+#=============================================================================
+# Target rules for targets named ansi_viewer
+
+# Build rule for target.
+ansi_viewer: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ansi_viewer
+.PHONY : ansi_viewer
+
+# fast build rule for target.
+ansi_viewer/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/build
+.PHONY : ansi_viewer/fast
+
+ansi_view.o: ansi_view.cpp.o
+.PHONY : ansi_view.o
+
+# target to build an object file
+ansi_view.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/ansi_view.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_view.cpp.o
+.PHONY : ansi_view.cpp.o
+
+ansi_view.i: ansi_view.cpp.i
+.PHONY : ansi_view.i
+
+# target to preprocess a source file
+ansi_view.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/ansi_view.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_view.cpp.i
+.PHONY : ansi_view.cpp.i
+
+ansi_view.s: ansi_view.cpp.s
+.PHONY : ansi_view.s
+
+# target to generate assembly for a file
+ansi_view.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/ansi_view.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_view.cpp.s
+.PHONY : ansi_view.cpp.s
+
+ansi_viewer_main.o: ansi_viewer_main.cpp.o
+.PHONY : ansi_viewer_main.o
+
+# target to build an object file
+ansi_viewer_main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_viewer_main.cpp.o
+.PHONY : ansi_viewer_main.cpp.o
+
+ansi_viewer_main.i: ansi_viewer_main.cpp.i
+.PHONY : ansi_viewer_main.i
+
+# target to preprocess a source file
+ansi_viewer_main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_viewer_main.cpp.i
+.PHONY : ansi_viewer_main.cpp.i
+
+ansi_viewer_main.s: ansi_viewer_main.cpp.s
+.PHONY : ansi_viewer_main.s
+
+# target to generate assembly for a file
+ansi_viewer_main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_viewer_main.cpp.s
+.PHONY : ansi_viewer_main.cpp.s
+
 frame_file_player_main.o: frame_file_player_main.cpp.o
 .PHONY : frame_file_player_main.o
 
@@ -334,9 +398,16 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... ansi_viewer"
 	@echo "... frame_file_player"
 	@echo "... simple_tui"
 	@echo "... test_pattern"
+	@echo "... ansi_view.o"
+	@echo "... ansi_view.i"
+	@echo "... ansi_view.s"
+	@echo "... ansi_viewer_main.o"
+	@echo "... ansi_viewer_main.i"
+	@echo "... ansi_viewer_main.s"
 	@echo "... frame_file_player_main.o"
 	@echo "... frame_file_player_main.i"
 	@echo "... frame_file_player_main.s"
