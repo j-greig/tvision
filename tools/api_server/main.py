@@ -11,6 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .controller import Controller
 from .events import EventHub
 from .models import Rect, WindowType
+
+# MCP Integration
+try:
+    from fastapi_mcp import FastApiMCP
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+
 from .schemas import (
     AppStateModel,
     Capabilities,
@@ -247,6 +255,15 @@ def make_app() -> FastAPI:
                 await websocket.receive_text()
         except WebSocketDisconnect:
             await events.remove(websocket)
+
+    # MCP Integration
+    if MCP_AVAILABLE:
+        mcp = FastApiMCP(app)
+        mcp.mount_http()  # Mounts MCP server at /mcp with HTTP transport
+        print("✅ MCP server mounted at /mcp")
+        print("🔗 MCP URL: http://127.0.0.1:8089/mcp")
+    else:
+        print("⚠️  MCP not available - install 'fastapi-mcp' for MCP support")
 
     return app
 

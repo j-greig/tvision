@@ -352,3 +352,90 @@ cd test-tui && ./build/test_pattern
 ```
 
 The API provides full programmatic control over TUI applications, enabling powerful automation and integration capabilities while maintaining real-time responsiveness.
+
+## MCP Integration for AI Agents
+
+The API server includes **Model Context Protocol (MCP)** support, enabling AI agents like Claude Code to directly control TUI applications through standardized tool interfaces.
+
+### MCP Server Setup
+
+The FastAPI server automatically exposes all REST endpoints as MCP tools when `fastapi-mcp` is installed:
+
+```bash
+# Install MCP support
+pip install fastapi-mcp
+
+# MCP server auto-mounts at /mcp when available
+python -m tools.api_server.main --port=8089
+# ✅ MCP server mounted at /mcp
+```
+
+### Claude Code Integration
+
+**Configuration** (`.mcp.json`):
+```json
+{
+  "mcpServers": {
+    "tui-control": {
+      "type": "http",
+      "url": "http://127.0.0.1:8089/mcp",
+      "description": "TUI application control via MCP"
+    }
+  }
+}
+```
+
+**Usage** (Headless Mode Only):
+```bash
+# ⚠️ IMPORTANT: Only use Claude Code in headless mode with TUI apps
+# Interactive Claude Code conflicts with terminal-based TUI applications
+
+# Get current TUI state
+claude -p --mcp-config=.mcp.json "Get the current TUI window state"
+
+# Create and manipulate windows  
+claude -p --mcp-config=.mcp.json "Create a test pattern window and move it to 50,20"
+
+# Complex window management
+claude -p --mcp-config=.mcp.json "Create a radial gradient window, then cascade all windows"
+
+# Pattern and layout control
+claude -p --mcp-config=.mcp.json "Set pattern mode to continuous and take a screenshot"
+```
+
+### Available MCP Tools
+
+The MCP server automatically exposes all REST endpoints as tools:
+
+- **`state_state_get`** - Get current application and window state
+- **`create_window_windows_post`** - Create windows (test_pattern, gradient, frame_player, etc.)
+- **`move_windows__win_id__move_post`** - Move/resize windows with coordinates
+- **`focus_windows__win_id__focus_post`** - Focus specific windows
+- **`close_windows__win_id__close_post`** - Close individual windows
+- **`cascade_windows_cascade_post`** - Cascade layout arrangement
+- **`tile_windows_tile_post`** - Tile layout arrangement  
+- **`close_all_windows_close_all_post`** - Close all windows
+- **`pattern_mode_pattern_mode_post`** - Set pattern display mode
+- **`screenshot_screenshot_post`** - Capture screenshots
+
+### Integration Workflow
+
+1. **Start TUI Application**: `cd test-tui && ./build/test_pattern`
+2. **Start MCP-enabled API Server**: `python -m tools.api_server.main --port=8089`
+3. **Use Claude Code Headless**: `claude -p --mcp-config=.mcp.json "<command>"`
+
+### Claude Desktop Integration
+
+Claude Desktop integration requires additional bridge setup (see `CLAUDE-DESKTOP-SETUP.md`). However, **Claude Code CLI is the recommended approach** due to:
+- Direct HTTP MCP support (no bridge required)
+- Better schema compatibility
+- More reliable session management
+- Designed for headless/scriptable operation
+
+### MCP Architecture
+
+```ascii
+Claude Code (Headless) → HTTP MCP Protocol → FastAPI Server → Unix Socket → C++ TUI App
+```
+
+This enables **full AI-driven TUI control** through natural language commands while maintaining the existing REST API for other clients.

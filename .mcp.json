@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "tui-control": {
+      "type": "http",
+      "url": "http://127.0.0.1:8089/mcp",
+      "description": "TUI application control via MCP - programmatic window management for Turbo Vision applications"
+    }
+  }
+}
