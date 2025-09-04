@@ -56,12 +56,9 @@ class Controller:
                         new_windows.append(win)
                     
                     self._state.windows = new_windows
-                    print(f"Synced {len(new_windows)} windows: {[w.id for w in new_windows]}")
-        except Exception as e:
-            # Debug: Show what's actually failing
-            print(f"IPC sync failed: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            # If sync fails, keep existing state
+            pass
 
     # ----- Windows -----
     async def create_window(
@@ -123,8 +120,8 @@ class Controller:
                 new_w = w if w is not None else win.rect.w
                 new_h = h if h is not None else win.rect.h
                 send_cmd("resize_window", {"id": win_id, "width": str(new_w), "height": str(new_h)})
-        except Exception as e:
-            print(f"IPC move/resize failed: {type(e).__name__}: {e}")
+        except Exception:
+            pass
         
         # Sync state again and return updated window
         await self._sync_state()
@@ -139,8 +136,8 @@ class Controller:
         # Send focus command to C++ app
         try:
             send_cmd("focus_window", {"id": win_id})
-        except Exception as e:
-            print(f"IPC focus failed: {type(e).__name__}: {e}")
+        except Exception:
+            pass
         
         # Sync state and return focused window
         await self._sync_state()
