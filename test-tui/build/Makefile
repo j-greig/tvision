@@ -232,6 +232,30 @@ ansi_viewer_main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ansi_viewer.dir/build.make CMakeFiles/ansi_viewer.dir/ansi_viewer_main.cpp.s
 .PHONY : ansi_viewer_main.cpp.s
 
+api_ipc.o: api_ipc.cpp.o
+.PHONY : api_ipc.o
+
+# target to build an object file
+api_ipc.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/api_ipc.cpp.o
+.PHONY : api_ipc.cpp.o
+
+api_ipc.i: api_ipc.cpp.i
+.PHONY : api_ipc.i
+
+# target to preprocess a source file
+api_ipc.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/api_ipc.cpp.i
+.PHONY : api_ipc.cpp.i
+
+api_ipc.s: api_ipc.cpp.s
+.PHONY : api_ipc.s
+
+# target to generate assembly for a file
+api_ipc.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_pattern.dir/build.make CMakeFiles/test_pattern.dir/api_ipc.cpp.s
+.PHONY : api_ipc.cpp.s
+
 frame_file_player_main.o: frame_file_player_main.cpp.o
 .PHONY : frame_file_player_main.o
 
@@ -355,6 +379,78 @@ paint/paint_canvas.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_canvas.cpp.s
 .PHONY : paint/paint_canvas.cpp.s
 
+paint/paint_palette.o: paint/paint_palette.cpp.o
+.PHONY : paint/paint_palette.o
+
+# target to build an object file
+paint/paint_palette.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_palette.cpp.o
+.PHONY : paint/paint_palette.cpp.o
+
+paint/paint_palette.i: paint/paint_palette.cpp.i
+.PHONY : paint/paint_palette.i
+
+# target to preprocess a source file
+paint/paint_palette.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_palette.cpp.i
+.PHONY : paint/paint_palette.cpp.i
+
+paint/paint_palette.s: paint/paint_palette.cpp.s
+.PHONY : paint/paint_palette.s
+
+# target to generate assembly for a file
+paint/paint_palette.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_palette.cpp.s
+.PHONY : paint/paint_palette.cpp.s
+
+paint/paint_status.o: paint/paint_status.cpp.o
+.PHONY : paint/paint_status.o
+
+# target to build an object file
+paint/paint_status.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_status.cpp.o
+.PHONY : paint/paint_status.cpp.o
+
+paint/paint_status.i: paint/paint_status.cpp.i
+.PHONY : paint/paint_status.i
+
+# target to preprocess a source file
+paint/paint_status.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_status.cpp.i
+.PHONY : paint/paint_status.cpp.i
+
+paint/paint_status.s: paint/paint_status.cpp.s
+.PHONY : paint/paint_status.s
+
+# target to generate assembly for a file
+paint/paint_status.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_status.cpp.s
+.PHONY : paint/paint_status.cpp.s
+
+paint/paint_tools.o: paint/paint_tools.cpp.o
+.PHONY : paint/paint_tools.o
+
+# target to build an object file
+paint/paint_tools.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_tools.cpp.o
+.PHONY : paint/paint_tools.cpp.o
+
+paint/paint_tools.i: paint/paint_tools.cpp.i
+.PHONY : paint/paint_tools.i
+
+# target to preprocess a source file
+paint/paint_tools.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_tools.cpp.i
+.PHONY : paint/paint_tools.cpp.i
+
+paint/paint_tools.s: paint/paint_tools.cpp.s
+.PHONY : paint/paint_tools.s
+
+# target to generate assembly for a file
+paint/paint_tools.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/paint_tui.dir/build.make CMakeFiles/paint_tui.dir/paint/paint_tools.cpp.s
+.PHONY : paint/paint_tools.cpp.s
+
 simple_tui.o: simple_tui.cpp.o
 .PHONY : simple_tui.o
 
@@ -470,6 +566,9 @@ help:
 	@echo "... ansi_viewer_main.o"
 	@echo "... ansi_viewer_main.i"
 	@echo "... ansi_viewer_main.s"
+	@echo "... api_ipc.o"
+	@echo "... api_ipc.i"
+	@echo "... api_ipc.s"
 	@echo "... frame_file_player_main.o"
 	@echo "... frame_file_player_main.i"
 	@echo "... frame_file_player_main.s"
@@ -485,6 +584,15 @@ help:
 	@echo "... paint/paint_canvas.o"
 	@echo "... paint/paint_canvas.i"
 	@echo "... paint/paint_canvas.s"
+	@echo "... paint/paint_palette.o"
+	@echo "... paint/paint_palette.i"
+	@echo "... paint/paint_palette.s"
+	@echo "... paint/paint_status.o"
+	@echo "... paint/paint_status.i"
+	@echo "... paint/paint_status.s"
+	@echo "... paint/paint_tools.o"
+	@echo "... paint/paint_tools.i"
+	@echo "... paint/paint_tools.s"
 	@echo "... simple_tui.o"
 	@echo "... simple_tui.i"
 	@echo "... simple_tui.s"

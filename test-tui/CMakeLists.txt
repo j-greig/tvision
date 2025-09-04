@@ -29,6 +29,7 @@ add_executable(test_pattern
     wallpaper.cpp
     ansi_view.cpp
     frame_file_player_view.cpp
+    api_ipc.cpp
 )
 
 # Link libraries for simple_tui
@@ -86,6 +87,9 @@ set_target_properties(ansi_viewer PROPERTIES
 add_executable(paint_tui
     paint/paint_app.cpp
     paint/paint_canvas.cpp
+    paint/paint_status.cpp
+    paint/paint_tools.cpp
+    paint/paint_palette.cpp
 )
 
 target_link_libraries(paint_tui

@@ -1,6 +1,8 @@
 file(REMOVE_RECURSE
   "CMakeFiles/test_pattern.dir/ansi_view.cpp.o"
   "CMakeFiles/test_pattern.dir/ansi_view.cpp.o.d"
+  "CMakeFiles/test_pattern.dir/api_ipc.cpp.o"
+  "CMakeFiles/test_pattern.dir/api_ipc.cpp.o.d"
   "CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.o"
   "CMakeFiles/test_pattern.dir/frame_file_player_view.cpp.o.d"
   "CMakeFiles/test_pattern.dir/gradient.cpp.o"

@@ -37,6 +37,7 @@
 #include "wallpaper.h"
 #include "frame_file_player_view.h"
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <cstdlib>
 #include <ctime>
@@ -46,6 +47,8 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+// Local API IPC bridge (Unix domain socket)
+#include "api_ipc.h"
 
 // Configuration - Toggle pattern display mode
 // true  = Continuous mode (pattern flows like text, wraps at line ends creating diagonals)
@@ -53,18 +56,47 @@
 bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
 
 // Command constants
+// File menu commands
 const ushort cmNewWindow = 100;
-const ushort cmScreenshot = 101;
 const ushort cmNewGradientH = 102;
 const ushort cmNewGradientV = 103;
 const ushort cmNewGradientR = 104;
 const ushort cmNewGradientD = 105;
-const ushort cmPatternContinuous = 106;
-const ushort cmPatternTiled = 107;
 const ushort cmNewDonut = 108;
 const ushort cmOpenAnimation = 109;
 const ushort cmSaveWorkspace = 110;
 const ushort cmOpenWorkspace = 111;
+// Future File commands
+const ushort cmOpenAnsiArt = 112;
+const ushort cmNewPaintCanvas = 113;
+const ushort cmOpenImageFile = 114;
+
+// Edit menu commands
+const ushort cmScreenshot = 101;
+const ushort cmPatternContinuous = 106;
+const ushort cmPatternTiled = 107;
+// Edit menu commands
+const ushort cmSettings = 117;
+
+// View menu commands
+const ushort cmWallpaperWibwob = 118;
+const ushort cmWallpaperCustom = 119;
+const ushort cmWallpaperDisable = 120;
+const ushort cmZoomIn = 121;
+const ushort cmZoomOut = 122;
+const ushort cmActualSize = 123;
+const ushort cmFullScreen = 124;
+
+// Tools menu commands (future)
+const ushort cmAnsiEditor = 125;
+const ushort cmPaintTools = 126;
+const ushort cmAnimationStudio = 127;
+const ushort cmQuantumPrinter = 128;
+
+// Help menu commands
+const ushort cmAbout = 129;
+const ushort cmKeyboardShortcuts = 130;
+const ushort cmDebugInfo = 131;
 
 // Forward declarations
 class TTestPatternView;
@@ -286,6 +318,16 @@ public:
             insert(textView);
         }
     }
+    
+    // Override changeBounds to fix tile redraw issue
+    virtual void changeBounds(const TRect& bounds) override
+    {
+        TWindow::changeBounds(bounds);
+        
+        // Force complete redraw after window is resized/moved (e.g., by tile operations)
+        setState(sfExposed, True);
+        redraw();
+    }
 };
 
 /*---------------------------------------------------------*/
@@ -297,6 +339,7 @@ public:
     TTestPatternApp();
     virtual void handleEvent(TEvent& event);
     virtual void idle();
+    virtual void run();
     virtual TPalette& getPalette() const;
     static TMenuBar* initMenuBar(TRect);
     static TStatusLine* initStatusLine(TRect);
@@ -307,13 +350,16 @@ private:
     void newGradientWindow(TGradientWindow::GradientType type);
     void newDonutWindow();
     void openAnimationFile();
+    void openAnimationFilePath(const std::string& path);
     void openWorkspace();
+    bool openWorkspacePath(const std::string& path);
     void cascade();
     void tile();
     void closeAll();
     void takeScreenshot();
     void setPatternMode(bool continuous);
     void saveWorkspace();
+    TRect calculateWindowBounds(const std::string& filePath);
     std::string buildWorkspaceJson();
     static std::string jsonEscape(const std::string& s);
     bool loadWorkspaceFromFile(const std::string& path);
@@ -328,6 +374,21 @@ private:
     
     int windowNumber;
     static const int maxWindows = 99;
+    
+    // IPC server
+    ApiIpcServer* ipcServer = nullptr;
+    
+    // Friend API helper functions implemented below to bridge IPC calls.
+    friend void api_spawn_test(TTestPatternApp&);
+    friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
+    friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+    friend void api_cascade(TTestPatternApp&);
+    friend void api_tile(TTestPatternApp&);
+    friend void api_close_all(TTestPatternApp&);
+    friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
+    friend void api_save_workspace(TTestPatternApp&);
+    friend void api_open_workspace_path(TTestPatternApp&, const std::string&);
+    friend void api_screenshot(TTestPatternApp&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -336,8 +397,9 @@ TTestPatternApp::TTestPatternApp() :
               &TTestPatternApp::initDeskTop),
     windowNumber(0)
 {
-    // Create first window automatically
-    newTestWindow();
+    // Start IPC server for local API control (best-effort; ignore failures)
+    ipcServer = new ApiIpcServer(this);
+    ipcServer->start("/tmp/test_pattern_app.sock");
 }
 
 void TTestPatternApp::handleEvent(TEvent& event)
@@ -408,6 +470,77 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 closeAll();
                 clearEvent(event);
                 break;
+                
+            // Edit menu commands
+                
+            // View menu commands  
+            case cmWallpaperWibwob:
+                messageBox("WIBWOBWORLD wallpaper is already active!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmWallpaperCustom:
+                messageBox("Custom wallpaper loading coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmWallpaperDisable:
+                messageBox("Wallpaper disable coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmZoomIn:
+                messageBox("Zoom In coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmZoomOut:
+                messageBox("Zoom Out coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmActualSize:
+                messageBox("Actual Size coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmFullScreen:
+                messageBox("Full Screen mode coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
+            // Tools menu commands
+            case cmAnsiEditor:
+                messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmPaintTools:
+                messageBox("Paint Tools coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmAnimationStudio:
+                messageBox("Animation Studio coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmQuantumPrinter:
+                messageBox("🚀 QUANTUM PRINTER ACTIVATED! 🚀\n\nPrinting reality at 42Hz...", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
+            // Help menu commands
+            case cmAbout:
+                messageBox("WIBWOBWORLD Test Pattern Generator\n\nBuilt with Turbo Vision\nつ◕‿◕‿◕༽つ", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
+            // Future File commands
+            case cmOpenAnsiArt:
+                messageBox("ANSI Art file opening coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmNewPaintCanvas:
+                messageBox("Paint Canvas creation coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmOpenImageFile:
+                messageBox("Image file opening coming soon!", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
             default:
                 break;
         }
@@ -527,9 +660,9 @@ void TTestPatternApp::newDonutWindow()
 void TTestPatternApp::openAnimationFile()
 {
     char fileName[MAXPATH];
-    strcpy(fileName, "*.txt");
+    strcpy(fileName, "primers/*.txt");
     
-    TFileDialog* dialog = new TFileDialog("*.txt", "Open Animation File", "~N~ame", fdOpenButton, 100);
+    TFileDialog* dialog = new TFileDialog("primers/*.txt", "Open Text/Animation File", "~N~ame", fdOpenButton, 100);
     if (executeDialog(dialog, fileName) != cmCancel)
     {
         // Determine file type and create appropriate title
@@ -559,6 +692,35 @@ void TTestPatternApp::openAnimationFile()
         TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), fileName);
         deskTop->insert(window);
     }
+}
+
+void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
+{
+    // Determine file type and create appropriate title
+    windowNumber++;
+    std::stringstream title;
+    
+    if (hasFrameDelimiters(filePath)) {
+        title << "Animation " << windowNumber;
+    } else {
+        // Extract filename without path for text files
+        size_t lastSlash = filePath.find_last_of("/\\");
+        std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+        title << baseName << " - Text " << windowNumber;
+    }
+    
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        50 + offset * 2,          // right
+        15 + offset               // bottom
+    );
+    
+    // Create and insert window with selected file
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
+    deskTop->insert(window);
 }
 
 
@@ -660,37 +822,62 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
     
     return new TCustomMenuBar(r,
         *new TSubMenu("~F~ile", kbAltF) +
-            *new TMenuItem("~N~ew Test Window", cmNewWindow, kbCtrlN) +
-            (TMenuItem&) (
-                *new TSubMenu("New ~G~radient", kbNoKey) +
-                    *new TMenuItem("~H~orizontal", cmNewGradientH, kbNoKey) +
-                    *new TMenuItem("~V~ertical", cmNewGradientV, kbNoKey) +
-                    *new TMenuItem("~R~adial", cmNewGradientR, kbNoKey) +
-                    *new TMenuItem("~D~iagonal", cmNewGradientD, kbNoKey)
-            ) +
-            *new TMenuItem("New ~D~onut Animation", cmNewDonut, kbCtrlD) +
-            *new TMenuItem("~O~pen Animation File...", cmOpenAnimation, kbCtrlO) +
-            *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbNoKey) +
-            *new TMenuItem("~O~pen Workspace...", cmOpenWorkspace, kbNoKey) +
+            *new TMenuItem("New ~T~est Pattern", cmNewWindow, kbCtrlN) +
+            *new TMenuItem("New ~H~-Gradient", cmNewGradientH, kbNoKey) +
+            *new TMenuItem("New ~V~-Gradient", cmNewGradientV, kbNoKey) +
+            *new TMenuItem("New ~R~adial Gradient", cmNewGradientR, kbNoKey) +
+            *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
+            *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
+            *new TMenuItem("New A~N~SI Art", cmOpenAnsiArt, kbNoKey) +
+            *new TMenuItem("New ~P~aint Canvas", cmNewPaintCanvas, kbNoKey) +
             newLine() +
-            *new TMenuItem("~S~creenshot", cmScreenshot, kbCtrlS) +
+            *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
+            *new TMenuItem("Open ANS~I~ Art...", cmOpenAnsiArt, kbNoKey) +
+            *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
             newLine() +
-            *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
-            *new TMenuItem("~T~ile", cmTile, kbNoKey) +
-            *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
+            *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
+            *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
             newLine() +
             *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
-        *new TSubMenu("~P~attern", kbAltP) +
-            *new TMenuItem(USE_CONTINUOUS_PATTERN ? "\x04 Continuous (Diagonal)" : "  Continuous (Diagonal)", 
-                          cmPatternContinuous, kbNoKey) +
-            *new TMenuItem(!USE_CONTINUOUS_PATTERN ? "\x04 Tiled (Cropped)" : "  Tiled (Cropped)", 
-                          cmPatternTiled, kbNoKey) +
+        *new TSubMenu("~E~dit", kbAltE) +
+            *new TMenuItem("Sc~r~eenshot", cmScreenshot, kbCtrlP) +
+            newLine() +
+            (TMenuItem&) (
+                *new TSubMenu("Pattern ~M~ode", kbNoKey) +
+                    *new TMenuItem(USE_CONTINUOUS_PATTERN ? "\x04 ~C~ontinuous (Diagonal)" : "  ~C~ontinuous (Diagonal)", 
+                                  cmPatternContinuous, kbNoKey) +
+                    *new TMenuItem(!USE_CONTINUOUS_PATTERN ? "\x04 ~T~iled (Cropped)" : "  ~T~iled (Cropped)", 
+                                  cmPatternTiled, kbNoKey)
+            ) +
+        *new TSubMenu("~V~iew", kbAltV) +
+            (TMenuItem&) (
+                *new TSubMenu("~W~allpaper", kbNoKey) +
+                    *new TMenuItem("WIBWO~B~WORLD", cmWallpaperWibwob, kbNoKey) +
+                    *new TMenuItem("Load ~C~ustom...", cmWallpaperCustom, kbNoKey) +
+                    *new TMenuItem("~D~isable", cmWallpaperDisable, kbNoKey)
+            ) +
+            newLine() +
+            *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
+            *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
+            *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
+            *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
         *new TSubMenu("~W~indow", kbAltW) +
-            *new TMenuItem("~M~ove", cmResize, kbCtrlF5) +
-            *new TMenuItem("~Z~oom", cmZoom, kbF5) +
+            *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
+            *new TMenuItem("~T~ile", cmTile, kbNoKey) +
+            newLine() +
             *new TMenuItem("~N~ext", cmNext, kbF6) +
             *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
-            *new TMenuItem("~C~lose", cmClose, kbAltF3)
+            newLine() +
+            *new TMenuItem("Close", cmClose, kbAltF3) +
+            *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
+        *new TSubMenu("~T~ools", kbAltT) +
+            *new TMenuItem("~A~NSI Editor", cmAnsiEditor, kbNoKey) +
+            *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +
+            *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
+            newLine() +
+            *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
+        *new TSubMenu("~H~elp", kbAltH) +
+            *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey)
     );
 }
 
@@ -713,32 +900,84 @@ TDeskTop* TTestPatternApp::initDeskTop(TRect r)
 {
     r.a.y = 1;
     r.b.y--;
-    // Create desktop with standard constructor
+    // Create desktop with standard constructor (plain background)
     TDeskTop* desktop = new TDeskTop(r);
-    
-    // Remove the default background if it exists
-    if (desktop->background != 0)
-    {
-        desktop->remove(desktop->background);
-        destroy(desktop->background);
-        desktop->background = 0;
-    }
-    
-    // Insert our custom wallpaper as the new background
-    // Use desktop->getExtent() to match the desktop's internal coordinate system
-    TWallpaperView* wallpaper = new TWallpaperView(desktop->getExtent());
-    desktop->insert(wallpaper);
-    desktop->background = wallpaper;
     
     return desktop;
 }
 
 
+void TTestPatternApp::run()
+{
+    // Call parent run to initialize everything first
+    TApplication::run();
+}
+
+TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
+{
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        // Fallback size if file can't be read
+        return TRect(2, 1, 50, 15);
+    }
+    
+    int maxWidth = 0;
+    int height = 0;
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        // Skip frame delimiter lines if present
+        if (line == "----") continue;
+        
+        int lineWidth = line.length();
+        if (lineWidth > maxWidth) {
+            maxWidth = lineWidth;
+        }
+        height++;
+    }
+    file.close();
+    
+    // Add padding for window frame (2 chars horizontal, 2 lines vertical)
+    int windowWidth = maxWidth + 2;
+    int windowHeight = height + 2;
+    
+    // Get screen dimensions
+    TRect screenBounds = deskTop->getExtent();
+    int screenWidth = screenBounds.b.x;
+    int screenHeight = screenBounds.b.y;
+    
+    // Limit to screen size minus margins
+    if (windowWidth > screenWidth - 4) windowWidth = screenWidth - 4;
+    if (windowHeight > screenHeight - 2) windowHeight = screenHeight - 2;
+    
+    // Center the window
+    int x = (screenWidth - windowWidth) / 2;
+    int y = (screenHeight - windowHeight) / 2;
+    
+    return TRect(x, y, x + windowWidth, y + windowHeight);
+}
+
 void TTestPatternApp::idle()
 {
     TApplication::idle();
+    // Poll IPC server for incoming API commands
+    if (ipcServer) ipcServer->poll();
     
-    // No animated views anymore
+    // Create spore monster window on first idle call (after full init)
+    static bool firstRun = true;
+    if (firstRun) {
+        firstRun = false;
+        
+        // Auto-size window to file content
+        std::string filePath = "primers/spore-monster.txt";
+        TRect bounds = calculateWindowBounds(filePath);
+        
+        std::string title = "Spore Monster";
+        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.c_str(), filePath.c_str());
+        deskTop->insert(window);
+        // Force immediate redraw
+        redraw();
+    }
 }
 
 int main()
@@ -747,6 +986,38 @@ int main()
     app.run();
     return 0;
 }
+
+// ---- IPC API helper functions (friend) ----
+void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
+
+void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
+    if (kind == "horizontal") app.newGradientWindow(TGradientWindow::gtHorizontal);
+    else if (kind == "vertical") app.newGradientWindow(TGradientWindow::gtVertical);
+    else if (kind == "radial") app.newGradientWindow(TGradientWindow::gtRadial);
+    else if (kind == "diagonal") app.newGradientWindow(TGradientWindow::gtDiagonal);
+    else app.newGradientWindow(TGradientWindow::gtHorizontal);
+}
+
+void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
+    app.openAnimationFilePath(path);
+}
+
+void api_cascade(TTestPatternApp& app) { app.cascade(); }
+void api_tile(TTestPatternApp& app) { app.tile(); }
+void api_close_all(TTestPatternApp& app) { app.closeAll(); }
+
+void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
+    bool continuous = (mode == "continuous");
+    app.setPatternMode(continuous);
+}
+
+void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
+
+void api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
+    app.openWorkspacePath(path);
+}
+
+void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(); }
 
 // --- Minimal JSON parsing helpers (subset tailored to our schema) ---
 void TTestPatternApp::skipWs(const std::string &s, size_t &pos)
@@ -1042,6 +1313,11 @@ void TTestPatternApp::openWorkspace()
     if (!loadWorkspaceFromFile(path))
         return;
     messageBox("Workspace loaded.", mfInformation | mfOKButton);
+}
+
+bool TTestPatternApp::openWorkspacePath(const std::string& path)
+{
+    return loadWorkspaceFromFile(path);
 }
 
 // Minimal JSON helpers
