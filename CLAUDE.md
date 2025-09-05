@@ -424,7 +424,7 @@ claude -p --mcp-config=.mcp.json "Set pattern mode to continuous and take a scre
 
 The MCP server automatically exposes all REST endpoints as tools:
 
-- **`state_state_get`** - Get current application and window state
+- **`state_state_get`** - Get current application and window state **including canvas dimensions**
 - **`create_window_windows_post`** - Create windows (test_pattern, gradient, frame_player, etc.)
 - **`move_windows__win_id__move_post`** - Move/resize windows with coordinates
 - **`focus_windows__win_id__focus_post`** - Focus specific windows
@@ -434,6 +434,29 @@ The MCP server automatically exposes all REST endpoints as tools:
 - **`close_all_windows_close_all_post`** - Close all windows
 - **`pattern_mode_pattern_mode_post`** - Set pattern display mode
 - **`screenshot_screenshot_post`** - Capture screenshots
+
+#### Canvas Size Support
+
+The state API now includes terminal dimensions for responsive layout planning:
+
+```json
+{
+  "pattern_mode": "continuous",
+  "windows": [...],
+  "canvas": {
+    "width": 160,
+    "height": 14, 
+    "cols": 160,
+    "rows": 14
+  }
+}
+```
+
+This enables AI agents to:
+- Calculate optimal window positioning within screen bounds
+- Plan typography layouts that fit terminal size
+- Avoid placing windows outside visible area
+- Create proportional designs that adapt to terminal resizing
 
 ### Integration Workflow
 
