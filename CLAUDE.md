@@ -228,6 +228,7 @@ The TUI app automatically creates a Unix socket at `/tmp/test_pattern_app.sock` 
 
 ##### Window Management  
 - `POST /windows` — Create window: `{type, title?, rect?, props?}`
+  - **NEW**: `rect: {x, y, w, h}` enables precise window positioning instead of cascade
 - `POST /windows/{id}/move` — Move/resize window: `{x?, y?, w?, h?}`  
 - `POST /windows/{id}/focus` — Focus window (bring to front)
 - `POST /windows/{id}/close` — Close specific window
@@ -261,10 +262,18 @@ curl -X POST "http://127.0.0.1:8089/windows/w3/move" \
   -H "Content-Type: application/json" \
   -d '{"x": 30, "y": 10}'
 
-# Create gradient window
+# Create gradient window with precise positioning
 curl -X POST "http://127.0.0.1:8089/windows" \
   -H "Content-Type: application/json" \
-  -d '{"type": "gradient", "props": {"gradient": "radial"}}'
+  -d '{"type": "gradient", "rect": {"x": 25, "y": 8, "w": 12, "h": 8}, "props": {"gradient": "radial"}}'
+
+# Create smiley face arrangement (precise positioning)
+curl -X POST "http://127.0.0.1:8089/windows" \
+  -d '{"type": "gradient", "title": "Left Eye", "rect": {"x": 25, "y": 8, "w": 12, "h": 8}, "props": {"gradient": "radial"}}'
+curl -X POST "http://127.0.0.1:8089/windows" \
+  -d '{"type": "gradient", "title": "Right Eye", "rect": {"x": 55, "y": 8, "w": 12, "h": 8}, "props": {"gradient": "radial"}}'
+curl -X POST "http://127.0.0.1:8089/windows" \
+  -d '{"type": "test_pattern", "title": "Nose", "rect": {"x": 43, "y": 18, "w": 6, "h": 4}}'
 
 # Arrange windows in cascade
 curl -X POST "http://127.0.0.1:8089/windows/cascade"
@@ -276,23 +285,28 @@ import requests
 
 api_base = "http://127.0.0.1:8089"
 
-# Create window
+# Create window with precise positioning
 response = requests.post(f"{api_base}/windows", json={
     "type": "test_pattern", 
-    "title": "Remote Window"
+    "title": "Remote Window",
+    "rect": {"x": 10, "y": 5, "w": 40, "h": 15}
 })
 print(response.json())
 
-# Get all windows  
-state = requests.get(f"{api_base}/state").json()
-windows = state["windows"]
-
-# Move first window
-if windows:
-    win_id = windows[0]["id"]
-    requests.post(f"{api_base}/windows/{win_id}/move", json={
-        "x": 50, "y": 15, "w": 60, "h": 20
-    })
+# Create a smiley face programmatically
+windows = []
+# Left eye
+windows.append(requests.post(f"{api_base}/windows", json={
+    "type": "gradient", "title": "Left Eye",
+    "rect": {"x": 25, "y": 8, "w": 12, "h": 8},
+    "props": {"gradient": "radial"}
+}))
+# Right eye  
+windows.append(requests.post(f"{api_base}/windows", json={
+    "type": "gradient", "title": "Right Eye", 
+    "rect": {"x": 55, "y": 8, "w": 12, "h": 8},
+    "props": {"gradient": "radial"}
+}))
 ```
 
 #### WebSocket Events
@@ -393,10 +407,13 @@ python -m tools.api_server.main --port=8089
 # Get current TUI state
 claude -p --mcp-config=.mcp.json "Get the current TUI window state"
 
-# Create and manipulate windows  
-claude -p --mcp-config=.mcp.json "Create a test pattern window and move it to 50,20"
+# Create and manipulate windows with precise positioning
+claude -p --mcp-config=.mcp.json "Create a test pattern window at position 50,20 with size 40x15"
 
-# Complex window management
+# Complex window arrangements (NEW: precise positioning support)
+claude -p --mcp-config=.mcp.json "Create a smiley face using gradient windows positioned as eyes and nose"
+
+# Traditional window management
 claude -p --mcp-config=.mcp.json "Create a radial gradient window, then cascade all windows"
 
 # Pattern and layout control
