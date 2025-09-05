@@ -56,6 +56,13 @@ class Controller:
                         new_windows.append(win)
                     
                     self._state.windows = new_windows
+                    
+            # Get canvas size separately
+            canvas_resp = send_cmd("get_canvas_size")
+            if canvas_resp and canvas_resp.strip():
+                canvas_data = json.loads(canvas_resp.strip())
+                self._state.canvas_width = canvas_data.get("width", 80)
+                self._state.canvas_height = canvas_data.get("height", 25)
         except Exception:
             # If sync fails, keep existing state
             pass

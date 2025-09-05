@@ -353,7 +353,7 @@ private:
     void newTestWindow(const TRect& bounds);
     void newGradientWindow(TGradientWindow::GradientType type);
     void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
-    void newMechWindow();
+    // void newMechWindow();
     void newDonutWindow();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
@@ -444,6 +444,7 @@ private:
     friend std::string api_resize_window(TTestPatternApp&, const std::string&, int, int);
     friend std::string api_focus_window(TTestPatternApp&, const std::string&);
     friend std::string api_close_window(TTestPatternApp&, const std::string&);
+    friend std::string api_get_canvas_size(TTestPatternApp&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -485,10 +486,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 newGradientWindow(TGradientWindow::gtDiagonal);
                 clearEvent(event);
                 break;
-            case cmNewMechs:
-                newMechWindow();
-                clearEvent(event);
-                break;
+            // case cmNewMechs:
+            //     newMechWindow();
+            //     clearEvent(event);
+            //     break;
             case cmNewDonut:
                 newDonutWindow();
                 clearEvent(event);
@@ -737,27 +738,27 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type, cons
     registerWindow(window);
 }
 
-void TTestPatternApp::newMechWindow()
-{
-    // Create window title
-    windowNumber++;
-    std::stringstream title;
-    title << "Mechs Grid " << windowNumber;
-    
-    // Calculate window position (cascade effect)
-    int offset = (windowNumber - 1) % 10;
-    TRect bounds(
-        2 + offset * 2,           // left
-        1 + offset,               // top
-        70 + offset * 2,          // right (wider for mech grid)
-        30 + offset               // bottom (taller for mech grid)
-    );
-    
-    // Create and insert window
-    TMechWindow* window = new TMechWindow(bounds, title.str().c_str(), windowNumber);
-    deskTop->insert(window);
-    registerWindow(window);
-}
+// void TTestPatternApp::newMechWindow()
+// {
+//     // Create window title
+//     windowNumber++;
+//     std::stringstream title;
+//     title << "Mechs Grid " << windowNumber;
+//     
+//     // Calculate window position (cascade effect)
+//     int offset = (windowNumber - 1) % 10;
+//     TRect bounds(
+//         2 + offset * 2,           // left
+//         1 + offset,               // top
+//         70 + offset * 2,          // right (wider for mech grid)
+//         30 + offset               // bottom (taller for mech grid)
+//     );
+//     
+//     // Create and insert window
+//     TMechWindow* window = new TMechWindow(bounds, title.str().c_str(), windowNumber);
+//     deskTop->insert(window);
+//     registerWindow(window);
+// }
 
 void TTestPatternApp::newDonutWindow()
 {
@@ -1748,4 +1749,14 @@ void TTestPatternApp::saveWorkspace()
     }
     std::string ok = std::string("Workspace saved to ") + path + "\nSnapshot: " + snapPath;
     messageBox(ok.c_str(), mfInformation | mfOKButton);
+}
+
+std::string api_get_canvas_size(TTestPatternApp& app) {
+    TRect desktop = TProgram::deskTop->getBounds();
+    std::stringstream json;
+    json << "{\"width\":" << desktop.b.x 
+         << ",\"height\":" << desktop.b.y
+         << ",\"cols\":" << desktop.b.x
+         << ",\"rows\":" << desktop.b.y << "}";
+    return json.str();
 }

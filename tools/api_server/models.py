@@ -43,6 +43,8 @@ class AppState:
     last_workspace: Optional[str] = None
     last_screenshot: Optional[str] = None
     started_at: float = field(default_factory=lambda: time.time())
+    canvas_width: int = 80
+    canvas_height: int = 25
 
 
 def new_id(prefix: str) -> str:

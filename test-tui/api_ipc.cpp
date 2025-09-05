@@ -35,6 +35,7 @@ extern std::string api_move_window(TTestPatternApp& app, const std::string& id, 
 extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
 extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TTestPatternApp& app);
 
 ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
@@ -198,6 +199,8 @@ void ApiIpcServer::poll() {
         } else {
             resp = "err missing id\n";
         }
+    } else if (cmd == "get_canvas_size") {
+        resp = api_get_canvas_size(*app_) + "\n";
     } else {
         resp = "err unknown cmd\n";
     }

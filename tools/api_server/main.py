@@ -21,6 +21,7 @@ except ImportError:
 
 from .schemas import (
     AppStateModel,
+    CanvasInfo,
     Capabilities,
     MenuCommand,
     PatternMode,
@@ -114,6 +115,12 @@ def make_app() -> FastAPI:
                 )
                 for w in st.windows
             ],
+            canvas=CanvasInfo(
+                width=st.canvas_width,
+                height=st.canvas_height,
+                cols=st.canvas_width,
+                rows=st.canvas_height
+            ),
             last_workspace=st.last_workspace,
             last_screenshot=st.last_screenshot,
             uptime_sec=time.time() - st.started_at,

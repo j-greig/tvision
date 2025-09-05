@@ -79,9 +79,17 @@ class WindowState(BaseModel):
     props: Dict[str, Any]
 
 
+class CanvasInfo(BaseModel):
+    width: int
+    height: int
+    cols: int
+    rows: int
+
+
 class AppStateModel(BaseModel):
     pattern_mode: str
     windows: List[WindowState]
+    canvas: CanvasInfo
     last_workspace: Optional[str] = None
     last_screenshot: Optional[str] = None
     uptime_sec: float
