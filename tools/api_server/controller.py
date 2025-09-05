@@ -70,15 +70,28 @@ class Controller:
     ) -> Window:
         # Try forwarding to the live app via IPC (best-effort)
         try:
+            cmd_params = {"type": wtype.value}
+            
+            # Add positioning parameters if rect is provided
+            if rect:
+                cmd_params.update({
+                    "x": str(rect.x),
+                    "y": str(rect.y), 
+                    "w": str(rect.w),
+                    "h": str(rect.h)
+                })
+            
             if wtype == WindowType.test_pattern:
-                send_cmd("create_window", {"type": "test_pattern"})
+                send_cmd("create_window", cmd_params)
             elif wtype == WindowType.gradient:
                 kind = str(props.get("gradient", "horizontal"))
-                send_cmd("create_window", {"type": "gradient", "gradient": kind})
+                cmd_params["gradient"] = kind
+                send_cmd("create_window", cmd_params)
             elif wtype in (WindowType.frame_player, WindowType.text_view):
                 path = str(props.get("path", ""))
                 if path:
-                    send_cmd("create_window", {"type": wtype.value, "path": path})
+                    cmd_params["path"] = path
+                    send_cmd("create_window", cmd_params)
         except Exception:
             pass
         async with self._lock:

@@ -12,10 +12,17 @@
 #include <sstream>
 #include <map>
 
+// Include TRect definition
+#define Uses_TRect
+#include <tvision/tv.h>
+
 // Forward declarations of helper methods implemented in test_pattern_app.cpp.
 extern void api_spawn_test(TTestPatternApp& app);
 extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
+extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
 extern void api_cascade(TTestPatternApp& app);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
@@ -107,14 +114,31 @@ void ApiIpcServer::poll() {
     std::string resp = "ok\n";
     if (cmd == "create_window") {
         std::string type = kv["type"]; // test_pattern|gradient|frame_player|text_view
+        
+        // Extract optional positioning parameters
+        TRect* bounds = nullptr;
+        TRect rectBounds;
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y"); 
+        auto w_it = kv.find("w");
+        auto h_it = kv.find("h");
+        if (x_it != kv.end() && y_it != kv.end() && w_it != kv.end() && h_it != kv.end()) {
+            int x = std::atoi(x_it->second.c_str());
+            int y = std::atoi(y_it->second.c_str());
+            int w = std::atoi(w_it->second.c_str());
+            int h = std::atoi(h_it->second.c_str());
+            rectBounds = TRect(x, y, x + w, y + h);
+            bounds = &rectBounds;
+        }
+        
         if (type == "test_pattern") {
-            api_spawn_test(*app_);
+            api_spawn_test(*app_, bounds);
         } else if (type == "gradient") {
             std::string kind = kv.count("gradient") ? kv["gradient"] : std::string("horizontal");
-            api_spawn_gradient(*app_, kind);
+            api_spawn_gradient(*app_, kind, bounds);
         } else if (type == "frame_player" || type == "text_view") {
             auto it = kv.find("path");
-            if (it != kv.end()) api_open_animation_path(*app_, it->second);
+            if (it != kv.end()) api_open_animation_path(*app_, it->second, bounds);
             else resp = "err missing path\n";
         } else {
             resp = "err unknown type\n";

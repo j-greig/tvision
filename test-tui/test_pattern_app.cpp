@@ -36,6 +36,7 @@
 #include "gradient.h"
 #include "wallpaper.h"
 #include "frame_file_player_view.h"
+#include "mech_window.h"
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -66,7 +67,8 @@ const ushort cmNewGradientD = 105;
 const ushort cmNewDonut = 108;
 const ushort cmOpenAnimation = 109;
 const ushort cmSaveWorkspace = 110;
-const ushort cmOpenWorkspace = 111;
+const ushort cmNewMechs = 111;
+const ushort cmOpenWorkspace = 115;
 // Future File commands
 const ushort cmOpenAnsiArt = 112;
 const ushort cmNewPaintCanvas = 113;
@@ -348,10 +350,14 @@ public:
     
 private:
     void newTestWindow();
+    void newTestWindow(const TRect& bounds);
     void newGradientWindow(TGradientWindow::GradientType type);
+    void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
+    void newMechWindow();
     void newDonutWindow();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
+    void openAnimationFilePath(const std::string& path, const TRect& bounds);
     void openWorkspace();
     bool openWorkspacePath(const std::string& path);
     void cascade();
@@ -423,6 +429,9 @@ private:
     friend void api_spawn_test(TTestPatternApp&);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
     friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+    friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
+    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_cascade(TTestPatternApp&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
@@ -474,6 +483,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmNewGradientD:
                 newGradientWindow(TGradientWindow::gtDiagonal);
+                clearEvent(event);
+                break;
+            case cmNewMechs:
+                newMechWindow();
                 clearEvent(event);
                 break;
             case cmNewDonut:
@@ -614,6 +627,19 @@ void TTestPatternApp::newTestWindow()
     deskTop->insert(window);
 }
 
+void TTestPatternApp::newTestWindow(const TRect& bounds)
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Test Pattern " << windowNumber;
+    
+    // Create and insert window with provided bounds
+    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
 void TTestPatternApp::cascade()
 {
     deskTop->cascade(deskTop->getExtent());
@@ -679,6 +705,56 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     
     // Create and insert window
     TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds)
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    
+    switch (type)
+    {
+        case TGradientWindow::gtHorizontal:
+            title << "Horizontal Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtVertical:
+            title << "Vertical Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtRadial:
+            title << "Radial Gradient " << windowNumber;
+            break;
+        case TGradientWindow::gtDiagonal:
+            title << "Diagonal Gradient " << windowNumber;
+            break;
+    }
+    
+    // Create and insert window with provided bounds
+    TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::newMechWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Mechs Grid " << windowNumber;
+    
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        70 + offset * 2,          // right (wider for mech grid)
+        30 + offset               // bottom (taller for mech grid)
+    );
+    
+    // Create and insert window
+    TMechWindow* window = new TMechWindow(bounds, title.str().c_str(), windowNumber);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -768,6 +844,27 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     );
     
     // Create and insert window with selected file
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds)
+{
+    // Determine file type and create appropriate title
+    windowNumber++;
+    std::stringstream title;
+    
+    if (hasFrameDelimiters(filePath)) {
+        title << "Animation " << windowNumber;
+    } else {
+        // Extract filename without path for text files
+        size_t lastSlash = filePath.find_last_of("/\\");
+        std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+        title << baseName << " - Text " << windowNumber;
+    }
+    
+    // Create and insert window with provided bounds
     TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
     deskTop->insert(window);
     registerWindow(window);
@@ -877,6 +974,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~V~-Gradient", cmNewGradientV, kbNoKey) +
             *new TMenuItem("New ~R~adial Gradient", cmNewGradientR, kbNoKey) +
             *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
+            *new TMenuItem("New ~M~echs Grid", cmNewMechs, kbCtrlM) +
             *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
             *new TMenuItem("New A~N~SI Art", cmOpenAnsiArt, kbNoKey) +
             *new TMenuItem("New ~P~aint Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -1039,8 +1137,8 @@ int main()
 }
 
 // ---- IPC API helper functions (friend) ----
+// Backward compatibility overloads
 void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
-
 void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
     if (kind == "horizontal") app.newGradientWindow(TGradientWindow::gtHorizontal);
     else if (kind == "vertical") app.newGradientWindow(TGradientWindow::gtVertical);
@@ -1048,9 +1146,39 @@ void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
     else if (kind == "diagonal") app.newGradientWindow(TGradientWindow::gtDiagonal);
     else app.newGradientWindow(TGradientWindow::gtHorizontal);
 }
-
 void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
     app.openAnimationFilePath(path);
+}
+
+// New overloads with bounds support
+void api_spawn_test(TTestPatternApp& app, const TRect* bounds) { 
+    if (bounds) {
+        app.newTestWindow(*bounds);
+    } else {
+        app.newTestWindow();
+    }
+}
+
+void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds) {
+    TGradientWindow::GradientType type = TGradientWindow::gtHorizontal;
+    if (kind == "horizontal") type = TGradientWindow::gtHorizontal;
+    else if (kind == "vertical") type = TGradientWindow::gtVertical;
+    else if (kind == "radial") type = TGradientWindow::gtRadial;
+    else if (kind == "diagonal") type = TGradientWindow::gtDiagonal;
+    
+    if (bounds) {
+        app.newGradientWindow(type, *bounds);
+    } else {
+        app.newGradientWindow(type);
+    }
+}
+
+void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+    if (bounds) {
+        app.openAnimationFilePath(path, *bounds);
+    } else {
+        app.openAnimationFilePath(path);
+    }
 }
 
 void api_cascade(TTestPatternApp& app) { app.cascade(); }
