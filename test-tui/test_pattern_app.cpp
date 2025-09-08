@@ -26,17 +26,20 @@
 #define Uses_TScrollBar
 #define Uses_TView
 #define Uses_TDrawBuffer
+#define Uses_TText
 #define Uses_MsgBox
 #define Uses_cmTile
 #define Uses_cmCascade
 #define Uses_TFileDialog
+#define Uses_TBackground
 #include <tvision/tv.h>
 
 #include "test_pattern.h"
 #include "gradient.h"
-#include "wallpaper.h"
 #include "frame_file_player_view.h"
-#include "mech_window.h"
+// Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
+class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
+// #include "mech_window.h" // deferred feature; header not present yet
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -82,19 +85,18 @@ const ushort cmPatternTiled = 107;
 const ushort cmSettings = 117;
 
 // View menu commands
-const ushort cmWallpaperWibwob = 118;
-const ushort cmWallpaperCustom = 119;
-const ushort cmWallpaperDisable = 120;
 const ushort cmZoomIn = 121;
 const ushort cmZoomOut = 122;
 const ushort cmActualSize = 123;
 const ushort cmFullScreen = 124;
+const ushort cmAsciiGridDemo = 132;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
 const ushort cmPaintTools = 126;
 const ushort cmAnimationStudio = 127;
 const ushort cmQuantumPrinter = 128;
+const ushort cmSendToBack = 133;
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -456,6 +458,8 @@ TTestPatternApp::TTestPatternApp() :
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
     ipcServer->start("/tmp/test_pattern_app.sock");
+
+    // No wallpaper initialization.
 }
 
 void TTestPatternApp::handleEvent(TEvent& event)
@@ -530,22 +534,17 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 closeAll();
                 clearEvent(event);
                 break;
+            case cmSendToBack: {
+                // Move the current window directly in front of the desktop background (i.e., to back).
+                if (deskTop && deskTop->current && deskTop->background)
+                    deskTop->current->putInFrontOf((TView*)deskTop->background);
+                clearEvent(event);
+                break;
+            }
                 
             // Edit menu commands
                 
             // View menu commands  
-            case cmWallpaperWibwob:
-                messageBox("WIBWOBWORLD wallpaper is already active!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmWallpaperCustom:
-                messageBox("Custom wallpaper loading coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmWallpaperDisable:
-                messageBox("Wallpaper disable coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
             case cmZoomIn:
                 messageBox("Zoom In coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -562,6 +561,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("Full Screen mode coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmAsciiGridDemo: {
+                TRect r = deskTop->getExtent();
+                r.grow(-10, -5);
+                deskTop->insert(createAsciiGridDemoWindow(r));
+                clearEvent(event);
+                break;
+            }
                 
             // Tools menu commands
             case cmAnsiEditor:
@@ -804,15 +810,8 @@ void TTestPatternApp::openAnimationFile()
             title << baseName << " - Text " << windowNumber;
         }
         
-        // Calculate window position (cascade effect)
-        int offset = (windowNumber - 1) % 10;
-        TRect bounds(
-            2 + offset * 2,           // left
-            1 + offset,               // top
-            50 + offset * 2,          // right
-            15 + offset               // bottom
-        );
-        
+        // Auto-size window to file content
+        TRect bounds = calculateWindowBounds(fileName);
         // Create and insert window with selected file
         TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), fileName);
         deskTop->insert(window);
@@ -835,15 +834,8 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
         title << baseName << " - Text " << windowNumber;
     }
     
-    // Calculate window position (cascade effect)
-    int offset = (windowNumber - 1) % 10;
-    TRect bounds(
-        2 + offset * 2,           // left
-        1 + offset,               // top
-        50 + offset * 2,          // right
-        15 + offset               // bottom
-    );
-    
+    // Auto-size window to file content
+    TRect bounds = calculateWindowBounds(filePath);
     // Create and insert window with selected file
     TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
     deskTop->insert(window);
@@ -999,13 +991,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                                   cmPatternTiled, kbNoKey)
             ) +
         *new TSubMenu("~V~iew", kbAltV) +
-            (TMenuItem&) (
-                *new TSubMenu("~W~allpaper", kbNoKey) +
-                    *new TMenuItem("WIBWO~B~WORLD", cmWallpaperWibwob, kbNoKey) +
-                    *new TMenuItem("Load ~C~ustom...", cmWallpaperCustom, kbNoKey) +
-                    *new TMenuItem("~D~isable", cmWallpaperDisable, kbNoKey)
-            ) +
-            newLine() +
+            *new TMenuItem("~A~SCII Grid Demo", cmAsciiGridDemo, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
@@ -1013,6 +999,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
             *new TMenuItem("~T~ile", cmTile, kbNoKey) +
+            *new TMenuItem("Send to ~B~ack", cmSendToBack, kbNoKey) +
             newLine() +
             *new TMenuItem("~N~ext", cmNext, kbF6) +
             *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
@@ -1051,7 +1038,6 @@ TDeskTop* TTestPatternApp::initDeskTop(TRect r)
     r.b.y--;
     // Create desktop with standard constructor (plain background)
     TDeskTop* desktop = new TDeskTop(r);
-    
     return desktop;
 }
 
@@ -1064,45 +1050,99 @@ void TTestPatternApp::run()
 
 TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
 {
-    std::ifstream file(filePath);
+    // If the file contains animation frame delimiters, size to the
+    // largest frame (width/height). Otherwise, size to full text
+    // dimensions (longest line, total lines).
+    auto capToDesktop = [&](int &w, int &h) {
+        TRect screenBounds = deskTop->getExtent();
+        int screenWidth = screenBounds.b.x;
+        int screenHeight = screenBounds.b.y;
+        // Hard caps: allow max width to use full desktop width; keep height within desktop.
+        if (w > screenWidth) w = screenWidth;
+        if (h > screenHeight - 2) h = screenHeight - 2; // never taller than app
+        // Minimum sensible size
+        if (w < 20) w = 20;
+        if (h < 5) h = 5;
+    };
+
+    std::ifstream file(filePath, std::ios::in | std::ios::binary);
     if (!file.is_open()) {
-        // Fallback size if file can't be read
-        return TRect(2, 1, 50, 15);
+        int ww = 50, hh = 15;
+        capToDesktop(ww, hh);
+        return TRect(2, 1, 2 + ww, 1 + hh);
     }
-    
+
+    const std::string delim = "----";
+    bool treatAsAnimation = hasFrameDelimiters(filePath);
+
     int maxWidth = 0;
-    int height = 0;
-    std::string line;
-    
-    while (std::getline(file, line)) {
-        // Skip frame delimiter lines if present
-        if (line == "----") continue;
-        
-        int lineWidth = line.length();
-        if (lineWidth > maxWidth) {
-            maxWidth = lineWidth;
+    int maxHeight = 0;
+
+    if (treatAsAnimation) {
+        // Track width/height per frame; split on exact delimiter lines (CR before LF allowed).
+        std::string line;
+        int curHeight = 0;
+        int curWidthMax = 0;
+        auto commitFrame = [&]() {
+            if (curHeight > 0 || curWidthMax > 0) {
+                if (curWidthMax > maxWidth) maxWidth = curWidthMax;
+                if (curHeight > maxHeight) maxHeight = curHeight;
+            }
+            curHeight = 0;
+            curWidthMax = 0;
+        };
+        while (std::getline(file, line)) {
+            // Trim trailing CR
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line == delim) {
+                commitFrame();
+                continue;
+            }
+            // Measure display columns (UTF-8 aware) instead of byte length.
+            int lineWidth = (int)TText::width(TStringView(line.c_str(), line.size()));
+            if (lineWidth > curWidthMax) curWidthMax = lineWidth;
+            curHeight++;
         }
-        height++;
+        commitFrame();
+        // Fallback: if no delimiters in content (edge case), use collected totals
+        if (maxHeight == 0 && maxWidth == 0) {
+            // Treat whole file as one frame
+            file.clear();
+            file.seekg(0);
+            int h = 0, w = 0;
+            while (std::getline(file, line)) {
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                w = std::max(w, (int)TText::width(TStringView(line.c_str(), line.size())));
+                h++;
+            }
+            maxWidth = w;
+            maxHeight = h;
+        }
+    } else {
+        // Plain text: longest line and total line count
+        std::string line;
+        int height = 0;
+        while (std::getline(file, line)) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            int lineWidth = (int)TText::width(TStringView(line.c_str(), line.size()));
+            if (lineWidth > maxWidth) maxWidth = lineWidth;
+            height++;
+        }
+        maxHeight = height;
     }
     file.close();
-    
-    // Add padding for window frame (2 chars horizontal, 2 lines vertical)
+
+    // Add padding for window frame (borders): +2 width, +2 height
     int windowWidth = maxWidth + 2;
-    int windowHeight = height + 2;
-    
-    // Get screen dimensions
+    int windowHeight = maxHeight + 2;
+    capToDesktop(windowWidth, windowHeight);
+
+    // Center on desktop
     TRect screenBounds = deskTop->getExtent();
     int screenWidth = screenBounds.b.x;
     int screenHeight = screenBounds.b.y;
-    
-    // Limit to screen size minus margins
-    if (windowWidth > screenWidth - 4) windowWidth = screenWidth - 4;
-    if (windowHeight > screenHeight - 2) windowHeight = screenHeight - 2;
-    
-    // Center the window
-    int x = (screenWidth - windowWidth) / 2;
-    int y = (screenHeight - windowHeight) / 2;
-    
+    int x = std::max(0, (screenWidth - windowWidth) / 2);
+    int y = std::max(0, (screenHeight - windowHeight) / 2);
     return TRect(x, y, x + windowWidth, y + windowHeight);
 }
 
@@ -1111,23 +1151,8 @@ void TTestPatternApp::idle()
     TApplication::idle();
     // Poll IPC server for incoming API commands
     if (ipcServer) ipcServer->poll();
-    
-    // Create spore monster window on first idle call (after full init)
-    static bool firstRun = true;
-    if (firstRun) {
-        firstRun = false;
-        
-        // Auto-size window to file content
-        std::string filePath = "primers/spore-monster.txt";
-        TRect bounds = calculateWindowBounds(filePath);
-        
-        std::string title = "Spore Monster";
-        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.c_str(), filePath.c_str());
-        deskTop->insert(window);
-        registerWindow(window);
-        // Force immediate redraw
-        redraw();
-    }
+
+    // Idle: no default content window or wallpaper.
 }
 
 int main()

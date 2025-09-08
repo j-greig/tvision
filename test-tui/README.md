@@ -27,6 +27,13 @@ Timer-based ASCII animation player that loads frame files:
 - **Run**: `./build/frame_file_player --file frames_demo.txt [--fps NN]`
 - **Documentation**: See [FRAME_PLAYER.md](FRAME_PLAYER.md)
 
+## Window Auto-sizing
+
+When using File → Open Text/Animation… in the test pattern app, the window automatically sizes to fit the content:
+- Text files: width = longest line; height = total lines.
+- Animation files (`----`-delimited): sized to the largest frame (max width/height across frames).
+The window never exceeds the desktop area and uses sensible minimum dimensions.
+
 ## Build System
 
 All applications use CMake and link against the main Turbo Vision library:

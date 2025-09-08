@@ -14,8 +14,9 @@ include_directories(${TVISION_DIR}/include/tvision)
 include_directories(${TVISION_DIR}/include/tvision/compat/borland)
 
 # Find ncurses
+# On macOS, prefer linking by name to avoid stale SDK paths to .tbd files.
 if(APPLE)
-    find_library(NCURSES_LIB ncurses REQUIRED)
+    set(NCURSES_LIB ncurses)
 else()
     find_library(NCURSES_LIB ncursesw REQUIRED)
 endif()
@@ -26,7 +27,7 @@ add_executable(test_pattern
     test_pattern_app.cpp 
     test_pattern.cpp 
     gradient.cpp 
-    wallpaper.cpp
+    ascii_grid_view.cpp
     ansi_view.cpp
     frame_file_player_view.cpp
     api_ipc.cpp

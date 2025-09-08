@@ -1,0 +1,21 @@
+AAAA|BB|CCCC
+AA🙂A|BB|CCCC
+
+HEAD|US|TAIL
+HEAD|🇺🇸|TAIL
+
+LEFT|XX|RIGHT
+LEFT|👨‍👩‍👧‍👦|RIGHT
+
+NUM |##| END
+NUM |#️⃣| END
+
+EYE |XX| TEST
+EYE |👁️| TEST
+
+Wrap test:
+1234567890🙂1234567890🙂1234567890🙂
+
+Combining:
+á|x|
+\u0061\u0301|x|

@@ -253,6 +253,17 @@ void TTextFileView::loadFile(const std::string &path)
     lines.clear();
     std::string line;
     while (std::getline(file, line)) {
+        // Strip CR for CRLF files.
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        // Skip internal guidance notes: lines prefixed with 1-4 '#'.
+        if (!line.empty() && line[0] == '#') {
+            size_t i = 0;
+            while (i < line.size() && line[i] == '#' && i < 4)
+                ++i;
+            if (i >= 1)
+                continue; // exclude this line
+        }
         lines.push_back(line);
     }
     
