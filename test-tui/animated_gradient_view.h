@@ -11,6 +11,7 @@
 #define Uses_TDrawBuffer
 #define Uses_TRect
 #include <tvision/tv.h>
+#include <vector>
 
 // Animated horizontal gradient view that shifts colors over time.
 // Colors flow horizontally (left to right) with configurable speed.
@@ -27,6 +28,7 @@ public:
     virtual void draw() override;
     virtual void handleEvent(TEvent &ev) override;
     virtual void setState(ushort aState, Boolean enable) override;
+    virtual void changeBounds(const TRect& bounds) override;
 
     void setSpeed(unsigned periodMs_);
     void setColors(TColorRGB start, TColorRGB end);
@@ -45,6 +47,7 @@ private:
     
     TColorRGB startColor;
     TColorRGB endColor;
+    std::vector<TScreenCell> lineBuf;
 };
 
 // Factory helper used by the app to avoid direct dependency on the view type.

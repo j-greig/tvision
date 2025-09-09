@@ -20,7 +20,8 @@ TAnimatedHGradientView::TAnimatedHGradientView(
     startColor(startColor), 
     endColor(endColor)
 {
-    growMode = gfGrowAll;
+    // Anchor to top-left and grow to the right and bottom like other views.
+    growMode = gfGrowHiX | gfGrowHiY;
     // Receive timer expirations via broadcast events (cmTimerExpired)
     eventMask |= evBroadcast;
 }
@@ -73,10 +74,13 @@ TColorRGB TAnimatedHGradientView::interpolate(TColorRGB start, TColorRGB end, fl
 }
 
 void TAnimatedHGradientView::draw() {
-    TDrawBuffer buf;
     const int W = size.x;
     const int H = size.y;
     if (W <= 0 || H <= 0) return;
+
+    // Ensure line buffer fits the current width (avoids TDrawBuffer 132-col cap).
+    if ((int)lineBuf.size() < W)
+        lineBuf.resize(W);
 
     const char fillChar = '\xDB';  // Full block character
 
@@ -99,9 +103,9 @@ void TAnimatedHGradientView::draw() {
             TColorRGB color = interpolate(startColor, endColor, t);
             TColorAttr attr(color, color);  // Same fore/back color for solid block
             
-            buf.moveChar(x, fillChar, attr, 1);
+            setCell(lineBuf[x], fillChar, attr);
         }
-        writeLine(0, y, W, 1, buf);
+        writeLine(0, y, W, 1, lineBuf.data());
     }
 }
 
@@ -127,6 +131,13 @@ void TAnimatedHGradientView::setState(ushort aState, Boolean enable) {
             stopTimer();
         }
     }
+}
+
+void TAnimatedHGradientView::changeBounds(const TRect& bounds)
+{
+    TView::changeBounds(bounds);
+    // Re-render immediately to cover any newly exposed area.
+    drawView();
 }
 
 // A wrapper window to ensure proper redraws on resize/tile.
