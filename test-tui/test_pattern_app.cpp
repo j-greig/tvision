@@ -37,6 +37,10 @@
 #include "test_pattern.h"
 #include "gradient.h"
 #include "frame_file_player_view.h"
+// Animated blocks view/window
+#include "animated_blocks_view.h"
+// Animated gradient view/window
+#include "animated_gradient_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -90,6 +94,8 @@ const ushort cmZoomOut = 122;
 const ushort cmActualSize = 123;
 const ushort cmFullScreen = 124;
 const ushort cmAsciiGridDemo = 132;
+const ushort cmAnimatedBlocks = 134;
+const ushort cmAnimatedGradient = 135;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -568,6 +574,20 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmAnimatedBlocks: {
+                TRect r = deskTop->getExtent();
+                r.grow(-10, -5);
+                deskTop->insert(createAnimatedBlocksWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmAnimatedGradient: {
+                TRect r = deskTop->getExtent();
+                r.grow(-10, -5);
+                deskTop->insert(createAnimatedGradientWindow(r));
+                clearEvent(event);
+                break;
+            }
                 
             // Tools menu commands
             case cmAnsiEditor:
@@ -992,6 +1012,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             ) +
         *new TSubMenu("~V~iew", kbAltV) +
             *new TMenuItem("~A~SCII Grid Demo", cmAsciiGridDemo, kbNoKey) +
+            *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
+            *new TMenuItem("Animated ~G~radient", cmAnimatedGradient, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
