@@ -7,6 +7,7 @@ This directory contains test TUI applications built with Turbo Vision.
 ### test_pattern
 Multi-window test pattern generator with gradients and wallpaper:
 - **Features**: Creates unlimited resizable windows with test patterns, gradient windows (horizontal, vertical, radial, diagonal), cascading/tiling window management, screenshot capability
+- **Animations**: View → Animated Blocks, Animated Gradient, Animated Score (musical ASCII score)
 - **Pattern modes**: Continuous (diagonal flowing patterns) or Tiled (cropped at window edges)
 - **Background**: ASCII art wallpaper with custom desktop
 - **Build**: `cmake . -B ./build && cmake --build ./build`
@@ -55,6 +56,9 @@ cmake --build ./build
 - `gradient.{h,cpp}` - Gradient rendering views  
 - `wallpaper.{h,cpp}` - ASCII art wallpaper
 - `frame_file_player_view.{h,cpp}` - Animation player view
+- `animated_blocks_view.{h,cpp}` - Color block animation view
+- `animated_gradient_view.{h,cpp}` - Flowing gradient animation view
+- `animated_score_view.{h,cpp}` - Musical-score style ASCII animation
 - `CMakeLists.txt` - Build configuration
 - `frames_demo.txt` - Sample animation file
 
