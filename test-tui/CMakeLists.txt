@@ -14,6 +14,8 @@ set(TV_COMMON_SOURCES
     test_pattern.cpp
     gradient.cpp
     api_ipc.cpp
+    wibwob_view.cpp
+    wibwob_engine.cpp
 )
 
 # test_pattern app (primary playground)
@@ -21,6 +23,7 @@ add_executable(test_pattern
     test_pattern_app.cpp
     ${TV_COMMON_SOURCES}
     ascii_grid_view.cpp
+    ascii_image_view.cpp
     frame_file_player_view.cpp
     animated_blocks_view.cpp
     animated_gradient_view.cpp
@@ -59,3 +62,17 @@ add_executable(paint_tui
     paint/paint_tools.cpp
 )
 target_link_libraries(paint_tui PRIVATE tvision)
+
+# tv_ascii_view (POC: Turbo Vision image→ASCII viewer)
+add_executable(tv_ascii_view
+    tvision_ascii_view_poc.cpp
+)
+target_compile_definitions(tv_ascii_view PRIVATE TVISION_AVAILABLE)
+target_include_directories(tv_ascii_view PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+target_link_libraries(tv_ascii_view PRIVATE tvision)
+
+# ascii_dump (POC fallback: stdout-only)
+add_executable(ascii_dump
+    tvision_ascii_view_poc.cpp
+)
+target_include_directories(ascii_dump PRIVATE ${CMAKE_CURRENT_LIST_DIR})

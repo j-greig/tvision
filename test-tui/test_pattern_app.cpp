@@ -37,10 +37,13 @@
 #include "test_pattern.h"
 #include "gradient.h"
 #include "frame_file_player_view.h"
+#include "ascii_image_view.h"
 // Animated blocks view/window
 #include "animated_blocks_view.h"
 // Animated gradient view/window
 #include "animated_gradient_view.h"
+// Wib&Wob AI chat interface
+#include "wibwob_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -102,6 +105,7 @@ const ushort cmAnsiEditor = 125;
 const ushort cmPaintTools = 126;
 const ushort cmAnimationStudio = 127;
 const ushort cmQuantumPrinter = 128;
+const ushort cmWibWobChat = 131;
 const ushort cmSendToBack = 133;
 
 // Help menu commands
@@ -363,6 +367,7 @@ private:
     void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
     // void newMechWindow();
     void newDonutWindow();
+    void newWibWobWindow();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
     void openAnimationFilePath(const std::string& path, const TRect& bounds);
@@ -590,6 +595,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
             }
                 
             // Tools menu commands
+            case cmWibWobChat:
+                newWibWobWindow();
+                clearEvent(event);
+                break;
             case cmAnsiEditor:
                 messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -622,10 +631,23 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("Paint Canvas creation coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
-            case cmOpenImageFile:
-                messageBox("Image file opening coming soon!", mfInformation | mfOKButton);
+            case cmOpenImageFile: {
+                char fileName[MAXPATH];
+                strcpy(fileName, "*.{png,jpg,jpeg}");
+                TFileDialog* dialog = new TFileDialog("*.{png,jpg,jpeg}", "Open Image File", "~N~ame", fdOpenButton, 101);
+                if (executeDialog(dialog, fileName) != cmCancel) {
+                    windowNumber++;
+                    // Cascade-like default bounds
+                    int offset = (windowNumber - 1) % 10;
+                    TRect bounds(2 + offset * 2, 1 + offset, 70 + offset * 2, 25 + offset);
+                    if (TWindow *w = createAsciiImageWindowFromFile(bounds, fileName)) {
+                        deskTop->insert(w);
+                        registerWindow(w);
+                    }
+                }
                 clearEvent(event);
                 break;
+            }
                 
             default:
                 break;
@@ -806,6 +828,35 @@ void TTestPatternApp::newDonutWindow()
     TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), "donut.txt");
     deskTop->insert(window);
     registerWindow(window);
+}
+
+void TTestPatternApp::newWibWobWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Wib&Wob Chat " << windowNumber;
+    
+    // Calculate window position (cascade effect) - make it much larger for chat
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top  
+        82 + offset * 2,          // right (much wider for chat)
+        28 + offset               // bottom (much taller for chat)
+    );
+    
+    // Create the chat view
+    TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
+    
+    // Create window and insert the chat view
+    TWindow* window = new TWindow(bounds, title.str().c_str(), windowNumber);
+    window->insert(chatView);
+    deskTop->insert(window);
+    registerWindow(window);
+    
+    // Focus the new window
+    window->select();
 }
 
 void TTestPatternApp::openAnimationFile()
@@ -1029,6 +1080,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Close", cmClose, kbAltF3) +
             *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
         *new TSubMenu("~T~ools", kbAltT) +
+            *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+            newLine() +
             *new TMenuItem("~A~NSI Editor", cmAnsiEditor, kbNoKey) +
             *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +
             *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
