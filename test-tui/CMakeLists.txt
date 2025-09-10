@@ -16,6 +16,10 @@ set(TV_COMMON_SOURCES
     api_ipc.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
+    llm/base/llm_config.cpp
+    llm/base/llm_provider_factory.cpp
+    llm/providers/claude_code_provider.cpp
+    llm/providers/anthropic_api_provider.cpp
 )
 
 # test_pattern app (primary playground)
