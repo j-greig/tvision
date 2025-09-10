@@ -1,23 +1,20 @@
 /*---------------------------------------------------------*/
 /*                                                         */
-/*   wibwob_engine.h - Claude Code Integration Engine     */
+/*   wibwob_engine.h - LLM Provider Integration Engine    */
 /*                                                         */
 /*---------------------------------------------------------*/
 
 #ifndef WIBWOB_ENGINE_H
 #define WIBWOB_ENGINE_H
 
+#include "llm/base/illm_provider.h"
+#include "llm/base/llm_config.h"
 #include <string>
 #include <functional>
+#include <memory>
 
-struct ClaudeResponse {
-    std::string result;
-    std::string session_id;
-    double cost = 0.0;
-    int duration_ms = 0;
-    bool is_error = false;
-    std::string error_message;
-};
+// Legacy compatibility alias
+using ClaudeResponse = LLMResponse;
 
 class WibWobEngine {
 public:
@@ -25,54 +22,48 @@ public:
     ~WibWobEngine();
     
     // Callback for response handling
-    using ResponseCallback = std::function<void(const ClaudeResponse&)>;
+    using ResponseCallback = std::function<void(const LLMResponse&)>;
     
-    // Send a query to Claude Code (non-blocking)
+    // Send a query to current LLM provider (non-blocking)
     bool sendQuery(const std::string& query, ResponseCallback callback);
     
-    // Poll for completion of async request
+    // Poll for completion of async request (placeholder for compatibility)
     void poll();
     
     // Cancel current request
     void cancel();
     
-    // Check if Claude Code is available
+    // Check if current provider is available
     bool isClaudeAvailable() const;
     
     // Configuration
     void setSystemPrompt(const std::string& prompt);
-    void setClaudePath(const std::string& path);
+    void setClaudePath(const std::string& path);  // Legacy compatibility
+    
+    // Provider management
+    bool switchProvider(const std::string& providerName);
+    std::string getCurrentProvider() const;
+    std::string getCurrentModel() const;
+    std::vector<std::string> getAvailableProviders() const;
     
     // Status
-    bool isBusy() const { return busy; }
-    std::string getLastError() const { return lastError; }
+    bool isBusy() const;
+    std::string getLastError() const;
 
 private:
-    bool busy = false;
-    std::string claudePath = "claude";
+    std::unique_ptr<LLMConfig> config;
+    std::unique_ptr<ILLMProvider> currentProvider;
     std::string systemPrompt;
-    std::string lastError;
-    std::string currentSessionId;
     
-    // Async execution state
-    FILE* activePipe = nullptr;
-    std::string outputBuffer;
-    ResponseCallback pendingCallback;
+    // Legacy compatibility
+    std::string claudePath = "claude";
     
-    // Claude Code execution
-    ClaudeResponse executeClaudeCommand(const std::string& query);
-    bool startAsyncCommand(const std::string& query, ResponseCallback callback);
-    std::string buildClaudeCommand(const std::string& query) const;
+    // Provider management
+    bool initializeProvider(const std::string& providerName);
+    void loadConfiguration();
     
-    // JSON parsing
-    ClaudeResponse parseClaudeResponse(const std::string& json) const;
-    std::string extractJsonField(const std::string& json, const std::string& field) const;
-    bool extractJsonBool(const std::string& json, const std::string& field) const;
-    double extractJsonNumber(const std::string& json, const std::string& field) const;
-    
-    // Error handling
-    void setError(const std::string& error);
-    void clearError();
+    // Configuration helpers
+    std::string generateProviderConfigJson(const ProviderConfig& config) const;
 };
 
 #endif // WIBWOB_ENGINE_H

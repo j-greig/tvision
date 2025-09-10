@@ -1,22 +1,24 @@
 /*---------------------------------------------------------*/
 /*                                                         */
-/*   wibwob_engine.cpp - Claude Code Integration Engine   */
+/*   wibwob_engine.cpp - LLM Provider Integration Engine  */
 /*                                                         */
 /*---------------------------------------------------------*/
 
 #include "wibwob_engine.h"
+#include "llm/base/llm_provider_factory.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <sstream>
 #include <algorithm>
-#include <fcntl.h>
-#include <unistd.h>
+#include <chrono>
 
 WibWobEngine::WibWobEngine() {
     // Default system prompt for wib&wob
     systemPrompt = "You are wib&wob, a helpful AI assistant integrated into a Turbo Vision TUI application.";
+    
+    // Defer configuration loading until first use
 }
 
 WibWobEngine::~WibWobEngine() {
@@ -25,95 +27,48 @@ WibWobEngine::~WibWobEngine() {
 }
 
 bool WibWobEngine::sendQuery(const std::string& query, ResponseCallback callback) {
-    if (busy || query.empty()) {
+    // Load configuration on first use
+    if (!currentProvider) {
+        loadConfiguration();
+    }
+    
+    if (!currentProvider || query.empty()) {
+        if (callback) {
+            LLMResponse response;
+            response.is_error = true;
+            response.error_message = "No provider available or empty query";
+            callback(response);
+        }
         return false;
     }
     
-    clearError();
+    // Build the request
+    LLMRequest request;
+    request.message = query;
+    request.system_prompt = systemPrompt;
     
-    // Start async command execution
-    return startAsyncCommand(query, callback);
+    // Send to current provider
+    return currentProvider->sendQuery(request, callback);
 }
 
 void WibWobEngine::poll() {
-    if (!busy || !activePipe) {
-        return;
-    }
-    
-    // Read available data from pipe (non-blocking)
-    char buffer[4096];
-    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
-    
-    if (bytesRead > 0) {
-        buffer[bytesRead] = '\0';
-        outputBuffer += buffer;
-    }
-    
-    // Check if process is done
-    if (feof(activePipe) || ferror(activePipe)) {
-        int exitCode = pclose(activePipe);
-        activePipe = nullptr;
-        busy = false;
-        
-        // Parse response and call callback
-        ClaudeResponse response;
-        if (exitCode == 0) {
-            response = parseClaudeResponse(outputBuffer);
-        } else {
-            response.is_error = true;
-            response.error_message = "Claude command failed with exit code " + std::to_string(exitCode);
-            if (!outputBuffer.empty()) {
-                response.error_message += ": " + outputBuffer;
-            }
-        }
-        
-        // Update session ID
-        if (!response.session_id.empty()) {
-            currentSessionId = response.session_id;
-        }
-        
-        // Call the callback
-        if (pendingCallback) {
-            pendingCallback(response);
-            pendingCallback = nullptr;
-        }
-        
-        outputBuffer.clear();
+    if (currentProvider) {
+        currentProvider->poll();
     }
 }
 
 void WibWobEngine::cancel() {
-    if (busy && activePipe) {
-        pclose(activePipe);
-        activePipe = nullptr;
-        busy = false;
-        
-        if (pendingCallback) {
-            ClaudeResponse response;
-            response.is_error = true;
-            response.error_message = "Request cancelled by user";
-            pendingCallback(response);
-            pendingCallback = nullptr;
-        }
-        
-        outputBuffer.clear();
+    if (currentProvider) {
+        currentProvider->cancel();
     }
 }
 
 bool WibWobEngine::isClaudeAvailable() const {
-    // Try to run claude --version to check availability
-    std::string command = claudePath + " --version 2>/dev/null";
-    
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        return false;
+    // Load configuration on first check
+    if (!currentProvider) {
+        const_cast<WibWobEngine*>(this)->loadConfiguration();
     }
-    
-    char buffer[128];
-    bool hasOutput = fgets(buffer, sizeof(buffer), pipe) != nullptr;
-    int exitCode = pclose(pipe);
-    
-    return exitCode == 0 && hasOutput;
+    return currentProvider && currentProvider->isAvailable();
 }
 
 void WibWobEngine::setSystemPrompt(const std::string& prompt) {
@@ -121,302 +76,160 @@ void WibWobEngine::setSystemPrompt(const std::string& prompt) {
 }
 
 void WibWobEngine::setClaudePath(const std::string& path) {
+    // Legacy compatibility - update claude_code provider configuration if active
     claudePath = path;
+    
+    if (currentProvider && currentProvider->getProviderName() == "claude_code") {
+        // Would need to reconfigure the provider - for now just store the path
+        // In production, this would update the provider's configuration
+    }
 }
 
-bool WibWobEngine::startAsyncCommand(const std::string& query, ResponseCallback callback) {
-    if (!isClaudeAvailable()) {
-        ClaudeResponse response;
-        response.is_error = true;
-        response.error_message = "Claude Code binary not found at: " + claudePath;
-        setError(response.error_message);
-        if (callback) callback(response);
+bool WibWobEngine::switchProvider(const std::string& providerName) {
+    return initializeProvider(providerName);
+}
+
+std::string WibWobEngine::getCurrentProvider() const {
+    // Load configuration on first check
+    if (!currentProvider) {
+        const_cast<WibWobEngine*>(this)->loadConfiguration();
+    }
+    if (currentProvider) {
+        return currentProvider->getProviderName();
+    }
+    return "none";
+}
+
+std::string WibWobEngine::getCurrentModel() const {
+    if (!config) return "unknown";
+    
+    std::string provider = getCurrentProvider();
+    if (provider == "none") return "unknown";
+    
+    ProviderConfig providerConfig = config->getProviderConfig(provider);
+    
+    // For claude_code, we don't know the exact model, just return generic name
+    if (provider == "claude_code") {
+        return "claude-code-cli";
+    }
+    
+    return providerConfig.model.empty() ? "unknown" : providerConfig.model;
+}
+
+std::vector<std::string> WibWobEngine::getAvailableProviders() const {
+    return LLMProviderFactory::getInstance().getAvailableProviders();
+}
+
+bool WibWobEngine::isBusy() const {
+    return currentProvider && currentProvider->isBusy();
+}
+
+std::string WibWobEngine::getLastError() const {
+    if (currentProvider) {
+        return currentProvider->getLastError();
+    }
+    return "No provider initialized";
+}
+
+void WibWobEngine::loadConfiguration() {
+    config = std::make_unique<LLMConfig>();
+    
+    // Try to load from config file
+    bool loadResult = config->loadFromFile("llm/config/llm_config.json");
+    if (loadResult) {
+        // Initialize the active provider
+        std::string activeProvider = config->getActiveProvider();
+        if (!activeProvider.empty()) {
+            initializeProvider(activeProvider);
+        }
+    } else {
+        // Config file missing or invalid - create default but DON'T overwrite existing file
+        fprintf(stderr, "ERROR: Failed to load llm/config/llm_config.json\n");
+        
+        // Check validation errors
+        auto errors = config->getValidationErrors();
+        for (const auto& error : errors) {
+            fprintf(stderr, "Config error: %s\n", error.c_str());
+        }
+        std::string defaultJson = LLMConfig::getDefaultConfigJson();
+        config->loadFromString(defaultJson);
+        
+        // Only save if file doesn't exist at all
+        FILE* check = fopen("llm/config/llm_config.json", "r");
+        if (!check) {
+            config->saveToFile("llm/config/llm_config.json");
+        } else {
+            fclose(check);
+        }
+        
+        // Try claude_code as default
+        initializeProvider("claude_code");
+    }
+}
+
+bool WibWobEngine::initializeProvider(const std::string& providerName) {
+    // Create new provider instance
+    auto provider = LLMProviderFactory::getInstance().createProvider(providerName);
+    if (!provider) {
         return false;
     }
     
-    // Build the command
-    std::string command = buildClaudeCommand(query);
+    // Get configuration for this provider
+    if (config) {
+        ProviderConfig providerConfig = config->getProviderConfig(providerName);
+        if (providerConfig.enabled) {
+            // Convert ProviderConfig to JSON string for provider configuration
+            std::string configJson = generateProviderConfigJson(providerConfig);
+            if (!provider->configure(configJson)) {
+                return false;
+            }
+        }
+    }
     
-    // Start async execution
-    activePipe = popen(command.c_str(), "r");
-    if (!activePipe) {
-        ClaudeResponse response;
-        response.is_error = true;
-        response.error_message = "Failed to execute Claude command";
-        setError(response.error_message);
-        if (callback) callback(response);
+    // Check if provider is available
+    if (!provider->isAvailable()) {
         return false;
     }
     
-    // Set non-blocking mode on pipe
-    int fd = fileno(activePipe);
-    int flags = fcntl(fd, F_GETFL, 0);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    // Switch to new provider
+    currentProvider = std::move(provider);
     
-    busy = true;
-    pendingCallback = callback;
-    outputBuffer.clear();
+    // Update active provider in config (but don't save - respect user's file)
+    if (config) {
+        config->setActiveProvider(providerName);
+        // Don't auto-save to avoid overwriting user's manual edits
+    }
     
     return true;
 }
 
-ClaudeResponse WibWobEngine::executeClaudeCommand(const std::string& query) {
-    ClaudeResponse response;
+std::string WibWobEngine::generateProviderConfigJson(const ProviderConfig& config) const {
+    std::ostringstream json;
+    json << "{";
     
-    if (!isClaudeAvailable()) {
-        response.is_error = true;
-        response.error_message = "Claude Code binary not found at: " + claudePath;
-        setError(response.error_message);
-        return response;
+    if (!config.model.empty()) {
+        json << "\"model\":\"" << config.model << "\",";
+    }
+    if (!config.endpoint.empty()) {
+        json << "\"endpoint\":\"" << config.endpoint << "\",";
+    }
+    if (!config.apiKeyEnv.empty()) {
+        json << "\"apiKeyEnv\":\"" << config.apiKeyEnv << "\",";
+    }
+    if (!config.command.empty()) {
+        json << "\"command\":\"" << config.command << "\",";
     }
     
-    // Build the command
-    std::string command = buildClaudeCommand(query);
-    
-    // Debug: Print the command being executed (remove in production)
-    // fprintf(stderr, "Executing: %s\n", command.c_str());
-    
-    // Execute the command
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        response.is_error = true;
-        response.error_message = "Failed to execute Claude command";
-        setError(response.error_message);
-        return response;
+    // Add generic parameters
+    for (const auto& param : config.parameters) {
+        json << "\"" << param.first << "\":\"" << param.second << "\",";
     }
     
-    // Read the output
-    std::string output;
-    char buffer[4096];
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        output += buffer;
+    std::string result = json.str();
+    if (result.back() == ',') {
+        result.pop_back(); // Remove trailing comma
     }
-    
-    int exitCode = pclose(pipe);
-    
-    if (exitCode != 0) {
-        response.is_error = true;
-        response.error_message = "Claude command failed with exit code " + std::to_string(exitCode);
-        if (!output.empty()) {
-            response.error_message += ": " + output;
-        }
-        setError(response.error_message);
-        return response;
-    }
-    
-    // Parse the JSON response
-    response = parseClaudeResponse(output);
-    
-    // Update session ID if we got one
-    if (!response.session_id.empty()) {
-        currentSessionId = response.session_id;
-    }
-    
-    return response;
-}
-
-std::string WibWobEngine::buildClaudeCommand(const std::string& query) const {
-    std::ostringstream cmd;
-    
-    cmd << claudePath << " -p";
-    cmd << " --output-format json";
-    
-    // Add continue flag if we have a session
-    if (!currentSessionId.empty()) {
-        cmd << " --continue";
-    }
-    
-    // Check if wibandwob.prompt.md exists and use it as system prompt
-    FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
-    if (promptCheck) {
-        fclose(promptCheck);
-        cmd << " --system-prompt-file wibandwob.prompt.md";
-    } else {
-        // Fallback to simple system prompt if file doesn't exist
-        if (!systemPrompt.empty()) {
-            cmd << " --append-system-prompt \"";
-            for (char c : systemPrompt) {
-                if (c == '"' || c == '\\' || c == '$' || c == '`') {
-                    cmd << '\\';
-                }
-                cmd << c;
-            }
-            cmd << "\"";
-        }
-    }
-    
-    // Escape the query for shell
-    cmd << " \"";
-    for (char c : query) {
-        if (c == '"' || c == '\\' || c == '$' || c == '`') {
-            cmd << '\\';
-        }
-        cmd << c;
-    }
-    cmd << "\"";
-    
-    cmd << " 2>&1";  // Capture stderr too
-    
-    return cmd.str();
-}
-
-ClaudeResponse WibWobEngine::parseClaudeResponse(const std::string& json) const {
-    ClaudeResponse response;
-    
-    if (json.empty()) {
-        response.is_error = true;
-        response.error_message = "Empty response from Claude";
-        return response;
-    }
-    
-    // Simple JSON parsing (for POC - production would use a proper JSON library)
-    response.result = extractJsonField(json, "result");
-    response.session_id = extractJsonField(json, "session_id");
-    response.cost = extractJsonNumber(json, "total_cost_usd");
-    response.duration_ms = (int)extractJsonNumber(json, "duration_ms");
-    response.is_error = extractJsonBool(json, "is_error");
-    
-    // If marked as error in JSON, extract error details
-    if (response.is_error) {
-        std::string errorField = extractJsonField(json, "error");
-        if (!errorField.empty()) {
-            response.error_message = errorField;
-        } else {
-            response.error_message = "Claude returned an error";
-        }
-    }
-    
-    // If we couldn't parse result, treat as error
-    if (response.result.empty() && !response.is_error) {
-        response.is_error = true;
-        response.error_message = "Could not parse Claude response: " + json.substr(0, 200);
-    }
-    
-    return response;
-}
-
-std::string WibWobEngine::extractJsonField(const std::string& json, const std::string& field) const {
-    std::string pattern = "\"" + field + "\":\"";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) {
-        return "";
-    }
-    
-    start += pattern.length();
-    size_t end = start;
-    
-    // Find the end of the string value, handling escaped quotes
-    while (end < json.length()) {
-        if (json[end] == '"' && (end == start || json[end-1] != '\\')) {
-            break;
-        }
-        end++;
-    }
-    
-    if (end >= json.length()) {
-        return "";
-    }
-    
-    std::string result = json.substr(start, end - start);
-    
-    // Unescape basic escaped characters
-    size_t pos = 0;
-    // Handle \\n first (escaped backslash followed by n)
-    while ((pos = result.find("\\\\n", pos)) != std::string::npos) {
-        result.replace(pos, 3, "\\n");
-        pos += 2;
-    }
-    // Handle \n (actual newlines)
-    pos = 0;
-    while ((pos = result.find("\\n", pos)) != std::string::npos) {
-        result.replace(pos, 2, "\n");
-        pos += 1;
-    }
-    // Handle \r (carriage returns)
-    pos = 0;
-    while ((pos = result.find("\\r", pos)) != std::string::npos) {
-        result.replace(pos, 2, "\r");
-        pos += 1;
-    }
-    // Handle \t (tabs)
-    pos = 0;
-    while ((pos = result.find("\\t", pos)) != std::string::npos) {
-        result.replace(pos, 2, "\t");
-        pos += 1;
-    }
-    // Handle \" (quotes)
-    pos = 0;
-    while ((pos = result.find("\\\"", pos)) != std::string::npos) {
-        result.replace(pos, 2, "\"");
-        pos += 1;
-    }
-    // Handle \\ (backslashes) - do this last
-    pos = 0;
-    while ((pos = result.find("\\\\", pos)) != std::string::npos) {
-        result.replace(pos, 2, "\\");
-        pos += 1;
-    }
+    result += "}";
     
     return result;
-}
-
-bool WibWobEngine::extractJsonBool(const std::string& json, const std::string& field) const {
-    std::string pattern = "\"" + field + "\":";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) {
-        return false;
-    }
-    
-    start += pattern.length();
-    
-    // Skip whitespace
-    while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) {
-        start++;
-    }
-    
-    if (start + 4 <= json.length() && json.substr(start, 4) == "true") {
-        return true;
-    }
-    
-    return false;
-}
-
-double WibWobEngine::extractJsonNumber(const std::string& json, const std::string& field) const {
-    std::string pattern = "\"" + field + "\":";
-    size_t start = json.find(pattern);
-    if (start == std::string::npos) {
-        return 0.0;
-    }
-    
-    start += pattern.length();
-    
-    // Skip whitespace
-    while (start < json.length() && (json[start] == ' ' || json[start] == '\t')) {
-        start++;
-    }
-    
-    size_t end = start;
-    while (end < json.length() && 
-           (std::isdigit(json[end]) || json[end] == '.' || json[end] == '-' || json[end] == '+' || json[end] == 'e' || json[end] == 'E')) {
-        end++;
-    }
-    
-    if (end > start) {
-        std::string numStr = json.substr(start, end - start);
-        try {
-            return std::stod(numStr);
-        } catch (...) {
-            return 0.0;
-        }
-    }
-    
-    return 0.0;
-}
-
-void WibWobEngine::setError(const std::string& error) {
-    lastError = error;
-}
-
-void WibWobEngine::clearError() {
-    lastError.clear();
 }
