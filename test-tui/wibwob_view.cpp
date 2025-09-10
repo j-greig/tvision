@@ -10,40 +10,73 @@
 #define Uses_TKeys
 #define Uses_TDrawBuffer
 #define Uses_TColorAttr
+#define Uses_TTimerEvent
+#define Uses_MsgBox
 #include <tvision/tv.h>
 
 #include <ctime>
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <fstream>
+#include <random>
+#include <sys/stat.h>
 
 TWibWobView::TWibWobView(const TRect& bounds) : TView(bounds) {
     options |= ofSelectable;
     eventMask |= evKeyDown | evBroadcast;
     
-    engine = new WibWobEngine();
+    engine = nullptr; // Lazy initialization
     
-    // Set up fallback system prompt (used only if wibandwob.prompt.md is not found)
-    engine->setSystemPrompt(
-        "You are wib&wob, a dual-minded artist/scientist AI assistant integrated into a Turbo Vision TUI application. "
-        "Respond as both Wib (chaotic, artistic) and Wob (precise, scientific). "
-        "Help with TVision framework, C++ development, and creative projects. "
-        "Use British English and maintain your distinctive personalities."
-    );
+    statusText = "Loading...";
     
-    statusText = engine->isClaudeAvailable() ? "Ready - Type a message and press Enter" : "Claude Code not available";
+    // Initialize spinner
+    showSpinner = false;
+    spinnerFrame = 0;
+    spinnerTimerId = nullptr;
     
-    // Add welcome message - check if custom prompt file exists
-    FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
-    if (promptCheck) {
-        fclose(promptCheck);
-        addMessage("System", "Wib&Wob loaded with custom prompt file! Ask them anything...");
-    } else {
-        addMessage("Wib", "Wotcher! I'm wib&wob, your AI assistant for this TVision app. (Note: wibandwob.prompt.md not found - using fallback prompt)");
+    // Defer logging initialization and welcome message until first access
+}
+
+void TWibWobView::ensureEngineInitialized() {
+    if (!engineInitialized) {
+        // Initialize logging first
+        if (logFilePath.empty()) {
+            initializeLogging();
+        }
+        
+        engine = new WibWobEngine();
+        
+        // Set up fallback system prompt (used only if wibandwob.prompt.md is not found)
+        engine->setSystemPrompt(
+            "You are wib&wob, a dual-minded artist/scientist AI assistant integrated into a Turbo Vision TUI application. "
+            "Respond as both Wib (chaotic, artistic) and Wob (precise, scientific). "
+            "Help with TVision framework, C++ development, and creative projects. "
+            "Use British English and maintain your distinctive personalities."
+        );
+        
+        statusText = engine->isClaudeAvailable() ? "Ready - Type a message and press Enter" : "Provider not available";
+        
+        // Log provider information
+        std::string providerName = engine->getCurrentProvider();
+        logMessage("System", "Initialized with provider: " + providerName);
+        
+        // Add welcome message - check if custom prompt file exists
+        FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
+        if (promptCheck) {
+            fclose(promptCheck);
+            addMessage("System", "Step into WibWobWorld, human.");
+        } else {
+            addMessage("Wib", "Wotcher! I'm wib&wob, your AI assistant for this TVision app. (Note: wibandwob.prompt.md not found - using fallback prompt)");
+        }
+        
+        engineInitialized = true;
+        drawView(); // Refresh to show the welcome message
     }
 }
 
 TWibWobView::~TWibWobView() {
+    stopSpinner();
     delete engine;
 }
 
@@ -126,7 +159,17 @@ void TWibWobView::drawStatus() {
     int statusY = size.y - 2;  // Second to last line
     
     buf.moveChar(0, ' ', statusColor, size.x);
-    std::string status = "[" + statusText + "]";
+    
+    std::string status;
+    if (showSpinner) {
+        // Spinner characters
+        const char spinnerChars[] = {'|', '/', '-', '\\'};
+        char spinnerChar = spinnerChars[spinnerFrame % 4];
+        status = "[" + statusText + " " + spinnerChar + "]";
+    } else {
+        status = "[" + statusText + "]";
+    }
+    
     if (status.length() > (size_t)size.x) {
         status = status.substr(0, size.x - 3) + "...";
     }
@@ -167,11 +210,17 @@ void TWibWobView::handleEvent(TEvent& event) {
     if (event.what == evKeyDown) {
         handleKeyDown(event);
         clearEvent(event);
-    }
-    
-    // Always poll the engine for async responses
-    if (engine) {
-        engine->poll();
+    } else if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
+        if (event.message.infoPtr == spinnerTimerId) {
+            updateSpinner();
+            
+            // Also poll engine for async responses
+            if (engineInitialized && engine) {
+                engine->poll();
+            }
+            
+            clearEvent(event);
+        }
     }
 }
 
@@ -217,6 +266,7 @@ void TWibWobView::handleKeyDown(TEvent& event) {
             break;
             
         case kbEsc:
+            ensureEngineInitialized();
             if (engine && engine->isBusy()) {
                 engine->cancel();
                 setStatus("Request cancelled - Type a message and press Enter");
@@ -235,6 +285,8 @@ void TWibWobView::handleKeyDown(TEvent& event) {
 }
 
 void TWibWobView::processInput() {
+    ensureEngineInitialized();
+    
     if (currentInput.empty() || engine->isBusy()) {
         return;
     }
@@ -245,9 +297,13 @@ void TWibWobView::processInput() {
     // Add user message to chat
     addMessage("User", userMessage);
     
-    // Set status to thinking
-    setStatus("Calling Claude Code...");
+    // Set status and start spinner with provider info
+    std::string providerName = engine->getCurrentProvider();
+    std::string modelName = engine->getCurrentModel();
+    std::string statusMsg = "Thinking with " + modelName + " (" + providerName + ")...";
+    setStatus(statusMsg);
     inputActive = false;
+    startSpinner();
     drawView();
     
     // Send to Claude (synchronous for POC)
@@ -256,6 +312,7 @@ void TWibWobView::processInput() {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         
+        stopSpinner();
         inputActive = true;
         if (response.is_error) {
             addMessage("System", "Error (" + std::to_string(duration.count()) + "ms): " + response.error_message, true);
@@ -281,6 +338,9 @@ void TWibWobView::addMessage(const std::string& sender, const std::string& conte
     msg.is_error = is_error;
     
     messages.push_back(msg);
+    
+    // Log the message
+    logMessage(sender, content, is_error);
     
     // Auto-scroll to bottom
     ensureInputVisible();
@@ -360,4 +420,97 @@ void TWibWobView::changeBounds(const TRect& bounds) {
     TView::changeBounds(bounds);
     // Force a redraw when bounds change to handle resize
     drawView();
+}
+
+void TWibWobView::startSpinner() {
+    if (showSpinner) return; // Already running
+    
+    showSpinner = true;
+    spinnerFrame = 0;
+    
+    // Set a timer for 200ms intervals
+    spinnerTimerId = setTimer(200, 200);
+}
+
+void TWibWobView::stopSpinner() {
+    if (!showSpinner) return; // Not running
+    
+    showSpinner = false;
+    
+    if (spinnerTimerId) {
+        killTimer(spinnerTimerId);
+        spinnerTimerId = nullptr;
+    }
+}
+
+void TWibWobView::updateSpinner() {
+    if (!showSpinner) return;
+    
+    spinnerFrame++;
+    drawView(); // Redraw to show new spinner frame
+}
+
+void TWibWobView::initializeLogging() {
+    // Generate unique session ID
+    sessionId = generateSessionId();
+    
+    // Create logs directory if it doesn't exist
+    mkdir("logs", 0755);
+    
+    // Create log file with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::ostringstream ss;
+    ss << "logs/chat_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") 
+       << "_" << sessionId << ".log";
+    logFilePath = ss.str();
+    
+    // Write session header
+    std::ofstream logFile(logFilePath, std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "=== WibWob Chat Session ===" << std::endl;
+        logFile << "Session ID: " << sessionId << std::endl;
+        logFile << "Started: " << getTimestamp() << std::endl;
+        logFile << "Provider: [To be determined]" << std::endl;
+        logFile << "============================" << std::endl;
+        logFile.close();
+    }
+}
+
+void TWibWobView::logMessage(const std::string& sender, const std::string& content, bool is_error) {
+    if (logFilePath.empty()) return;
+    
+    std::ofstream logFile(logFilePath, std::ios::app);
+    if (logFile.is_open()) {
+        std::string timestamp = getTimestamp();
+        std::string status = is_error ? " [ERROR]" : "";
+        
+        logFile << "[" << timestamp << "] " << sender << status << ": " << content << std::endl;
+        
+        // Add extra metadata for errors
+        if (is_error) {
+            logFile << "    ^^ Error occurred during message processing" << std::endl;
+        }
+        
+        logFile.close();
+    }
+}
+
+std::string TWibWobView::generateSessionId() const {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(100000, 999999);
+    return std::to_string(dis(gen));
+}
+
+std::string TWibWobView::getTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::ostringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
 }

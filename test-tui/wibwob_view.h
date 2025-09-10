@@ -52,8 +52,27 @@ private:
     int maxVisibleLines = 0;
     bool inputActive = true;
     
+    // Spinner animation
+    bool showSpinner = false;
+    int spinnerFrame = 0;
+    void* spinnerTimerId = nullptr;
+    
     // Engine
     WibWobEngine* engine = nullptr;
+    bool engineInitialized = false;
+    
+    // Logging
+    std::string sessionId;
+    std::string logFilePath;
+    
+    // Lazy initialization
+    void ensureEngineInitialized();
+    
+    // Logging
+    void initializeLogging();
+    void logMessage(const std::string& sender, const std::string& content, bool is_error = false);
+    std::string generateSessionId() const;
+    std::string getTimestamp() const;
     
     // Drawing helpers
     void drawMessages();
@@ -67,6 +86,11 @@ private:
     void handleKeyDown(TEvent& event);
     void handleChar(TEvent& event);
     void processInput();
+    
+    // Animation
+    void startSpinner();
+    void stopSpinner();
+    void updateSpinner();
     
     // Text formatting
     std::vector<std::string> wrapText(const std::string& text, int width) const;
