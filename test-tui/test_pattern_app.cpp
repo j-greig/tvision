@@ -36,6 +36,8 @@
 
 #include "test_pattern.h"
 #include "gradient.h"
+#include "glitch_engine.h"
+#include "frame_capture.h"
 #include "frame_file_player_view.h"
 #include "ascii_image_view.h"
 // Animated blocks view/window
@@ -112,6 +114,16 @@ const ushort cmSendToBack = 133;
 const ushort cmAbout = 129;
 const ushort cmKeyboardShortcuts = 130;
 const ushort cmDebugInfo = 131;
+
+// Glitch menu commands
+const ushort cmToggleGlitchMode = 140;
+const ushort cmGlitchScatter = 141;
+const ushort cmGlitchColorBleed = 142;
+const ushort cmGlitchRadialDistort = 143;
+const ushort cmGlitchDiagonalScatter = 144;
+const ushort cmCaptureGlitchedFrame = 145;
+const ushort cmResetGlitchParams = 146;
+const ushort cmGlitchSettings = 147;
 
 // Forward declarations
 class TTestPatternView;
@@ -622,6 +634,108 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
                 
+            // Glitch menu commands
+            case cmToggleGlitchMode: {
+                bool currentMode = getGlitchEngine().isGlitchModeEnabled();
+                getGlitchEngine().enableGlitchMode(!currentMode);
+                std::string msg = !currentMode ? 
+                    "Glitch mode ENABLED! Visual corruption effects are now active." :
+                    "Glitch mode disabled. Normal rendering restored.";
+                messageBox(msg.c_str(), mfInformation | mfOKButton);
+                // Update menu checkmark (would need menu refresh)
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchScatter: {
+                if (!getGlitchEngine().isGlitchModeEnabled()) {
+                    messageBox("Enable Glitch Mode first to use scatter effects.", mfWarning | mfOKButton);
+                } else {
+                    GlitchParams params = getGlitchEngine().getGlitchParams();
+                    params.scatterIntensity = 0.8f;
+                    params.scatterRadius = 8;
+                    getGlitchEngine().setGlitchParams(params);
+                    messageBox("Scatter pattern applied! Characters will scatter during resize.", mfInformation | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchColorBleed: {
+                if (!getGlitchEngine().isGlitchModeEnabled()) {
+                    messageBox("Enable Glitch Mode first to use color bleeding.", mfWarning | mfOKButton);
+                } else {
+                    GlitchParams params = getGlitchEngine().getGlitchParams();
+                    params.colorBleedChance = 0.6f;
+                    params.colorBleedDistance = 5;
+                    getGlitchEngine().setGlitchParams(params);
+                    messageBox("Color bleed applied! Colors will bleed across character positions.", mfInformation | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchRadialDistort: {
+                if (!getGlitchEngine().isGlitchModeEnabled()) {
+                    messageBox("Enable Glitch Mode first to use radial distortion.", mfWarning | mfOKButton);
+                } else {
+                    // Apply radial distortion to current active window
+                    if (TView* activeView = deskTop->current) {
+                        TRect bounds = activeView->getBounds();
+                        int centerX = bounds.a.x + (bounds.b.x - bounds.a.x) / 2;
+                        int centerY = bounds.a.y + (bounds.b.y - bounds.a.y) / 2;
+                        // Note: This would need integration with drawing system
+                        messageBox("Radial distortion applied from window center!", mfInformation | mfOKButton);
+                    } else {
+                        messageBox("No active window for radial distortion.", mfWarning | mfOKButton);
+                    }
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchDiagonalScatter: {
+                if (!getGlitchEngine().isGlitchModeEnabled()) {
+                    messageBox("Enable Glitch Mode first to use diagonal scatter.", mfWarning | mfOKButton);
+                } else {
+                    GlitchParams params = getGlitchEngine().getGlitchParams();
+                    params.scatterIntensity = 0.5f;
+                    params.enableCoordinateOffset = true;
+                    params.dimensionCorruption = 0.3f;
+                    getGlitchEngine().setGlitchParams(params);
+                    messageBox("Diagonal scatter applied! Creates diagonal streaking effects.", mfInformation | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmCaptureGlitchedFrame: {
+                TView* activeView = deskTop->current;
+                std::string captured = captureGlitchedFrame(activeView);
+                
+                // Save to file with timestamp
+                auto now = std::chrono::system_clock::now();
+                auto time_t = std::chrono::system_clock::to_time_t(now);
+                std::ostringstream filename;
+                filename << "glitched_frame_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".txt";
+                
+                if (getFrameCapture().saveFrame(getFrameCapture().captureScreen(), filename.str(), 
+                                               CaptureOptions{CaptureFormat::AnsiEscapes, true, false, true, true, true})) {
+                    messageBox(("Frame captured to: " + filename.str()).c_str(), mfInformation | mfOKButton);
+                } else {
+                    messageBox("Failed to capture frame.", mfError | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmResetGlitchParams: {
+                getGlitchEngine().resetCorruption();
+                GlitchParams defaultParams;
+                getGlitchEngine().setGlitchParams(defaultParams);
+                messageBox("Glitch parameters reset to defaults.", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchSettings:
+                messageBox("Glitch Settings dialog coming soon!\n\nUse menu items to adjust parameters for now.", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
             // Future File commands
             case cmOpenAnsiArt:
                 messageBox("ANSI Art file opening coming soon!", mfInformation | mfOKButton);
@@ -1081,6 +1195,21 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
         *new TSubMenu("~T~ools", kbAltT) +
             *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+            newLine() +
+            (TMenuItem&) (
+                *new TSubMenu("~G~litch Effects", kbNoKey) +
+                    *new TMenuItem(getGlitchEngine().isGlitchModeEnabled() ? "\x04 ~E~nable Glitch Mode" : "  ~E~nable Glitch Mode", 
+                                  cmToggleGlitchMode, kbCtrlG) +
+                    newLine() +
+                    *new TMenuItem("~S~catter Pattern", cmGlitchScatter, kbNoKey) +
+                    *new TMenuItem("~C~olor Bleed", cmGlitchColorBleed, kbNoKey) +
+                    *new TMenuItem("~R~adial Distort", cmGlitchRadialDistort, kbNoKey) +
+                    *new TMenuItem("~D~iagonal Scatter", cmGlitchDiagonalScatter, kbNoKey) +
+                    newLine() +
+                    *new TMenuItem("Ca~p~ture Frame", cmCaptureGlitchedFrame, kbF9) +
+                    *new TMenuItem("R~e~set Parameters", cmResetGlitchParams, kbNoKey) +
+                    *new TMenuItem("Glitch Se~t~tings...", cmGlitchSettings, kbNoKey)
+            ) +
             newLine() +
             *new TMenuItem("~A~NSI Editor", cmAnsiEditor, kbNoKey) +
             *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +

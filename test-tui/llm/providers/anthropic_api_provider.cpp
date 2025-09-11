@@ -122,6 +122,9 @@ bool AnthropicAPIProvider::configure(const std::string& config) {
                 const char* envValue = std::getenv(envVar.c_str());
                 if (envValue) {
                     apiKey = std::string(envValue);
+                    // Trim whitespace and newlines from API key
+                    apiKey.erase(apiKey.find_last_not_of(" \t\r\n") + 1);
+                    apiKey.erase(0, apiKey.find_first_not_of(" \t\r\n"));
                 }
             }
         }

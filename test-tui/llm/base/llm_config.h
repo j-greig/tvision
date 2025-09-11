@@ -65,8 +65,14 @@ private:
     
     // JSON parsing helpers
     bool parseJson(const std::string& json);
+    void parseProvider(const std::string& json, const std::string& providerName);
+    std::string parseJsonString(const std::string& json, const std::string& key) const;
+    bool parseJsonBool(const std::string& json, const std::string& key, bool defaultValue = false) const;
     std::string generateJson() const;
     void validateConfiguration();
+    
+    // Environment variable helpers
+    void loadDotEnv(const std::string& envPath = ".env");
 };
 
 #endif // LLM_CONFIG_H

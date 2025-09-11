@@ -43,6 +43,9 @@ bool ProviderConfig::getParameterBool(const std::string& key, bool defaultValue)
 }
 
 LLMConfig::LLMConfig() {
+    // Load .env file first to set environment variables
+    loadDotEnv();
+    
     // Set up default configuration
     loadFromString(getDefaultConfigJson());
 }
@@ -117,15 +120,12 @@ std::vector<std::string> LLMConfig::getValidationErrors() const {
 
 // Simple JSON parsing for basic configuration (production would use proper JSON library)
 bool LLMConfig::parseJson(const std::string& json) {
-    // This is a very basic JSON parser - in production we'd use a proper JSON library
-    // For now, implement basic parsing for our known configuration structure
-    
-    // Find activeProvider
+    // Parse activeProvider
     size_t pos = json.find("\"activeProvider\"");
     if (pos != std::string::npos) {
-        size_t start = json.find("\"", pos + 16);  // Skip past "activeProvider":
+        size_t start = json.find("\"", pos + 16);
         if (start != std::string::npos) {
-            start++; // Skip opening quote
+            start++;
             size_t end = json.find("\"", start);
             if (end != std::string::npos) {
                 activeProvider = json.substr(start, end - start);
@@ -133,31 +133,62 @@ bool LLMConfig::parseJson(const std::string& json) {
         }
     }
     
-    // Set up default providers (simplified for POC)
-    ProviderConfig claudeCode;
-    claudeCode.enabled = true;
-    claudeCode.command = "claude";
-    claudeCode.args = {"-p"};
-    providers["claude_code"] = claudeCode;
+    providers.clear(); // Clear any existing providers
     
-    ProviderConfig anthropicApi;
-    anthropicApi.enabled = true;
-    anthropicApi.model = "claude-3-haiku-20240307";
-    anthropicApi.endpoint = "https://api.anthropic.com/v1/messages";
-    anthropicApi.apiKeyEnv = "ANTHROPIC_API_KEY";
-    anthropicApi.parameters["maxTokens"] = "4096";
-    anthropicApi.parameters["temperature"] = "0.7";
-    providers["anthropic_api"] = anthropicApi;
+    // Parse providers section - find the "providers" object
+    size_t providersPos = json.find("\"providers\"");
+    if (providersPos == std::string::npos) {
+        validationErrors.push_back("No providers section found in config");
+        return false;
+    }
     
-    ProviderConfig openRouter;
-    openRouter.enabled = true;
-    openRouter.model = "anthropic/claude-3-haiku";
-    openRouter.endpoint = "https://openrouter.ai/api/v1/chat/completions";
-    openRouter.apiKeyEnv = "OPENROUTER_API_KEY";
-    providers["openrouter"] = openRouter;
+    // Find opening brace of providers object
+    size_t providersStart = json.find("{", providersPos);
+    if (providersStart == std::string::npos) return false;
+    
+    // Parse each provider
+    parseProvider(json, "claude_code");
+    parseProvider(json, "anthropic_api");  
+    parseProvider(json, "openrouter");
     
     validateConfiguration();
     return validationErrors.empty();
+}
+
+// Helper method to parse individual provider configurations
+void LLMConfig::parseProvider(const std::string& json, const std::string& providerName) {
+    std::string pattern = "\"" + providerName + "\"";
+    size_t pos = json.find(pattern);
+    if (pos == std::string::npos) return;
+    
+    size_t objStart = json.find("{", pos);
+    if (objStart == std::string::npos) return;
+    
+    // Find the end of this provider object
+    int braceCount = 1;
+    size_t objEnd = objStart + 1;
+    while (objEnd < json.length() && braceCount > 0) {
+        if (json[objEnd] == '{') braceCount++;
+        else if (json[objEnd] == '}') braceCount--;
+        objEnd++;
+    }
+    
+    std::string providerJson = json.substr(objStart, objEnd - objStart);
+    
+    ProviderConfig config;
+    config.enabled = parseJsonBool(providerJson, "enabled", true);
+    config.model = parseJsonString(providerJson, "model");
+    config.endpoint = parseJsonString(providerJson, "endpoint");
+    config.apiKeyEnv = parseJsonString(providerJson, "apiKeyEnv");
+    config.command = parseJsonString(providerJson, "command");
+    
+    // Parse maxTokens and temperature as parameters
+    std::string maxTokens = parseJsonString(providerJson, "maxTokens");
+    std::string temperature = parseJsonString(providerJson, "temperature");
+    if (!maxTokens.empty()) config.parameters["maxTokens"] = maxTokens;
+    if (!temperature.empty()) config.parameters["temperature"] = temperature;
+    
+    providers[providerName] = config;
 }
 
 std::string LLMConfig::generateJson() const {
@@ -258,6 +289,38 @@ void LLMConfig::validateConfiguration() {
     }
 }
 
+std::string LLMConfig::parseJsonString(const std::string& json, const std::string& key) const {
+    std::string pattern = "\"" + key + "\"";
+    size_t pos = json.find(pattern);
+    if (pos == std::string::npos) return "";
+    
+    size_t start = json.find("\"", pos + pattern.length());
+    if (start == std::string::npos) return "";
+    start++; // Skip opening quote
+    
+    size_t end = json.find("\"", start);
+    if (end == std::string::npos) return "";
+    
+    return json.substr(start, end - start);
+}
+
+bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, bool defaultValue) const {
+    std::string pattern = "\"" + key + "\"";
+    size_t pos = json.find(pattern);
+    if (pos == std::string::npos) return defaultValue;
+    
+    size_t valuePos = json.find(":", pos);
+    if (valuePos == std::string::npos) return defaultValue;
+    valuePos++;
+    
+    // Skip whitespace
+    while (valuePos < json.length() && (json[valuePos] == ' ' || json[valuePos] == '\t')) {
+        valuePos++;
+    }
+    
+    return (valuePos + 4 <= json.length() && json.substr(valuePos, 4) == "true");
+}
+
 std::string LLMConfig::getDefaultConfigJson() {
     return R"({
   "activeProvider": "claude_code",
@@ -283,4 +346,47 @@ std::string LLMConfig::getDefaultConfigJson() {
     }
   }
 })";
+}
+
+void LLMConfig::loadDotEnv(const std::string& envPath) {
+    std::ifstream file(envPath);
+    if (!file.is_open()) {
+        // .env file is optional, so don't error if it doesn't exist
+        return;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Find the = separator
+        size_t equalPos = line.find('=');
+        if (equalPos == std::string::npos) {
+            continue;
+        }
+        
+        std::string key = line.substr(0, equalPos);
+        std::string value = line.substr(equalPos + 1);
+        
+        // Trim whitespace
+        key.erase(key.find_last_not_of(" \t\r\n") + 1);
+        key.erase(0, key.find_first_not_of(" \t\r\n"));
+        value.erase(value.find_last_not_of(" \t\r\n") + 1);
+        value.erase(0, value.find_first_not_of(" \t\r\n"));
+        
+        // Remove quotes if present
+        if (value.length() >= 2 && 
+            ((value[0] == '"' && value[value.length()-1] == '"') ||
+             (value[0] == '\'' && value[value.length()-1] == '\''))) {
+            value = value.substr(1, value.length() - 2);
+        }
+        
+        // Set environment variable using setenv (POSIX)
+        if (!key.empty()) {
+            setenv(key.c_str(), value.c_str(), 1); // 1 = overwrite existing
+        }
+    }
 }

@@ -13,6 +13,8 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/.. ${CMAKE_BINARY_DIR}/tvision-root)
 set(TV_COMMON_SOURCES
     test_pattern.cpp
     gradient.cpp
+    glitch_engine.cpp
+    frame_capture.cpp
     api_ipc.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
