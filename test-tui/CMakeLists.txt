@@ -20,8 +20,11 @@ set(TV_COMMON_SOURCES
     wibwob_engine.cpp
     llm/base/llm_config.cpp
     llm/base/llm_provider_factory.cpp
+    llm/base/tool_executor.cpp
     llm/providers/claude_code_provider.cpp
     llm/providers/anthropic_api_provider.cpp
+    llm/tools/time_tools.cpp
+    llm/tools/tui_tools.cpp
 )
 
 # test_pattern app (primary playground)
@@ -33,6 +36,14 @@ add_executable(test_pattern
     frame_file_player_view.cpp
     animated_blocks_view.cpp
     animated_gradient_view.cpp
+    animated_score_view.cpp
+    generative_verse_view.cpp
+    generative_orbit_view.cpp
+    generative_mycelium_view.cpp
+    generative_torus_view.cpp
+    generative_monster_portal_view.cpp
+    generative_cube_view.cpp
+    generative_monster_verse_view.cpp
     ansi_view.cpp
 )
 target_link_libraries(test_pattern PRIVATE tvision)
