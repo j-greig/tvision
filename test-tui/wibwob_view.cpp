@@ -55,11 +55,11 @@ void TWibWobView::ensureEngineInitialized() {
             "Use British English and maintain your distinctive personalities."
         );
         
-        statusText = engine->isClaudeAvailable() ? "Ready - Type a message and press Enter" : "Provider not available";
+        // Defer provider availability checks to first send to avoid UI stalls.
+        statusText = "Ready - Type a message and press Enter";
         
-        // Log provider information
-        std::string providerName = engine->getCurrentProvider();
-        logMessage("System", "Initialized with provider: " + providerName);
+        // Do not touch provider/config here; keep init instant
+        logMessage("System", "Chat engine initialized (provider loads on first send)");
         
         // Add welcome message - check if custom prompt file exists
         FILE* promptCheck = fopen("wibandwob.prompt.md", "r");

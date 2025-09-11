@@ -39,19 +39,34 @@ bool ClaudeCodeProvider::sendQuery(const LLMRequest& request, ResponseCallback c
 }
 
 bool ClaudeCodeProvider::isAvailable() const {
-    // Try to run claude --version to check availability
-    std::string command = claudePath + " --version 2>/dev/null";
-    
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        return false;
+    // Fast, non-blocking check: verify executable is present and executable.
+    // 1) If claudePath is an explicit path (contains '/'), check it directly.
+    // 2) Otherwise, scan PATH for an executable named claudePath.
+    auto isExec = [](const std::string &p) -> bool {
+        return access(p.c_str(), X_OK) == 0;
+    };
+
+    if (claudePath.find('/') != std::string::npos) {
+        return isExec(claudePath);
     }
-    
-    char buffer[128];
-    bool hasOutput = fgets(buffer, sizeof(buffer), pipe) != nullptr;
-    int exitCode = pclose(pipe);
-    
-    return exitCode == 0 && hasOutput;
+
+    const char *pathEnv = std::getenv("PATH");
+    if (!pathEnv) return false;
+    std::string paths(pathEnv);
+
+    size_t start = 0;
+    while (start <= paths.size()) {
+        size_t end = paths.find(':', start);
+        std::string dir = (end == std::string::npos) ? paths.substr(start)
+                                                     : paths.substr(start, end - start);
+        if (!dir.empty()) {
+            std::string cand = dir + "/" + claudePath;
+            if (isExec(cand)) return true;
+        }
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return false;
 }
 
 bool ClaudeCodeProvider::isBusy() const {

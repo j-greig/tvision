@@ -1,13 +1,13 @@
 {
-  "activeProvider": "claude_code",
+  "activeProvider": "anthropic_api",
   "providers": {
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-3-haiku-20240307",
+      "model": "claude-3-5-haiku-latest",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",
-      "temperature": "0.7"
+      "temperature": "1.0"
     },
     "claude_code": {
       "enabled": true,
