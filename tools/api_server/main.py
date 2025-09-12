@@ -304,10 +304,11 @@ def make_app() -> FastAPI:
         for primer_spec in payload.primers:
             try:
                 # Create text_view window with primer path
+                # Let text_view auto-size by only specifying position, not dimensions
                 win = await ctl.create_window(
                     WindowType.text_view,
                     title=primer_spec.title or primer_spec.primer_path.split('/')[-1].replace('.txt', ''),
-                    rect=Rect(x=primer_spec.x, y=primer_spec.y, w=0, h=0),  # w/h auto-sized
+                    rect=Rect(x=primer_spec.x, y=primer_spec.y, w=-1, h=-1),  # -1 = auto-size
                     props={"path": primer_spec.primer_path}
                 )
                 windows.append(WindowState(

@@ -71,6 +71,8 @@ Key Endpoints
 - Pattern mode: `POST /pattern_mode` — `{mode:"continuous"|"tiled"}`
 - **Batch layout: `POST /windows/batch_layout`** — create/move/close multiple windows in one call with macro support
 - **Timeline operations: `GET /timeline/status?group_id=...`, `POST /timeline/cancel`** — for future scheduled operations 
+- **Primer discovery: `GET /primers/list`** — list all available primer files with metadata
+- **Batch primers: `POST /primers/batch`** — spawn up to 20 primer windows at once
 - WebSocket events: `GET /ws`
 
 WebSocket Events
@@ -136,6 +138,39 @@ curl -X POST localhost:8089/windows -H 'Content-Type: application/json' \
 ```
 
 Available primer files: `perception.txt`, `monster-emoji.txt`, `wibwob-portrait-2.txt`, `ascii-draws-itself.txt`
+
+### Primer Discovery API
+Discover all available primer files with metadata:
+```bash
+# List all primer files
+curl -X GET localhost:8089/primers/list
+
+# Response includes name, path, and file size
+{
+  "primers": [
+    {"name": "monster-emoji", "path": "primers/monster-emoji.txt", "size_kb": 3.3},
+    {"name": "perception", "path": "primers/perception.txt", "size_kb": 5.4}
+  ],
+  "count": 128
+}
+```
+
+### Batch Primer Spawning
+Spawn up to 20 primer windows at specified positions:
+```bash
+# Batch spawn primers with precise positioning
+curl -X POST localhost:8089/primers/batch -H 'Content-Type: application/json' \
+  -d '{
+    "primers": [
+      {"primer_path": "primers/monster-emoji.txt", "x": 10, "y": 5},
+      {"primer_path": "primers/space-cat.txt", "x": 60, "y": 15},
+      {"primer_path": "primers/hypersigil-mesh.txt", "x": 100, "y": 25}
+    ]
+  }'
+
+# Windows auto-size based on content, only position is required
+# Returns list of created windows with their final dimensions
+```
 
 ## Batch Layout (LLM-Optimized)
 
