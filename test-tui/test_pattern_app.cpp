@@ -383,6 +383,15 @@ public:
         
         // Force complete redraw after window is resized/moved (e.g., by tile operations)
         setState(sfExposed, True);
+        
+        // Ensure child views are properly notified of resize for text content redraw
+        forEach([](TView* view, void*) {
+            if (auto* textView = dynamic_cast<TTextFileView*>(view)) {
+                // Force text view to redraw its content
+                textView->drawView();
+            }
+        }, nullptr);
+        
         redraw();
     }
 };

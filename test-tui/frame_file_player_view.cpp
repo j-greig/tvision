@@ -280,10 +280,8 @@ void TTextFileView::setLimit()
 
 void TTextFileView::draw()
 {
-    if (!needsRedraw) {
-        return; // Skip unnecessary redraws during window dragging
-    }
-    
+    // Always draw when explicitly called by TVision framework
+    // The needsRedraw optimization caused blank windows during terminal resize
     needsRedraw = false; // Clear flag early to prevent recursive calls
     
     TDrawBuffer buf;
