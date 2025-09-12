@@ -20,6 +20,7 @@
 extern void api_spawn_test(TTestPatternApp& app);
 extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
+extern void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
 extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
@@ -36,6 +37,12 @@ extern std::string api_resize_window(TTestPatternApp& app, const std::string& id
 extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_get_canvas_size(TTestPatternApp& app);
+extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
+                                 const std::string& content, const std::string& mode, 
+                                 const std::string& position);
+extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
+                                   const std::string& font, int width, const std::string& mode);
 
 ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
@@ -137,10 +144,16 @@ void ApiIpcServer::poll() {
         } else if (type == "gradient") {
             std::string kind = kv.count("gradient") ? kv["gradient"] : std::string("horizontal");
             api_spawn_gradient(*app_, kind, bounds);
-        } else if (type == "frame_player" || type == "text_view") {
+        } else if (type == "frame_player") {
             auto it = kv.find("path");
             if (it != kv.end()) api_open_animation_path(*app_, it->second, bounds);
             else resp = "err missing path\n";
+        } else if (type == "text_view") {
+            auto it = kv.find("path");
+            if (it != kv.end()) api_open_text_view_path(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "text_editor") {
+            api_spawn_text_editor(*app_, bounds);
         } else {
             resp = "err unknown type\n";
         }
@@ -198,6 +211,34 @@ void ApiIpcServer::poll() {
             resp = api_close_window(*app_, id->second) + "\n";
         } else {
             resp = "err missing id\n";
+        }
+    } else if (cmd == "send_text") {
+        auto id_it = kv.find("id");
+        auto content_it = kv.find("content");
+        auto mode_it = kv.find("mode");
+        auto pos_it = kv.find("position");
+        
+        if (id_it != kv.end() && content_it != kv.end()) {
+            std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
+            std::string position = (pos_it != kv.end()) ? pos_it->second : "end";
+            resp = api_send_text(*app_, id_it->second, content_it->second, mode, position) + "\n";
+        } else {
+            resp = "err missing id or content\n";
+        }
+    } else if (cmd == "send_figlet") {
+        auto id_it = kv.find("id");
+        auto text_it = kv.find("text");
+        auto font_it = kv.find("font");
+        auto width_it = kv.find("width");
+        auto mode_it = kv.find("mode");
+        
+        if (id_it != kv.end() && text_it != kv.end()) {
+            std::string font = (font_it != kv.end()) ? font_it->second : "standard";
+            int width = (width_it != kv.end()) ? std::atoi(width_it->second.c_str()) : 0;
+            std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
+            resp = api_send_figlet(*app_, id_it->second, text_it->second, font, width, mode) + "\n";
+        } else {
+            resp = "err missing id or text\n";
         }
     } else if (cmd == "get_canvas_size") {
         resp = api_get_canvas_size(*app_) + "\n";

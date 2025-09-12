@@ -21,11 +21,20 @@ except ImportError:
 
 from .schemas import (
     AppStateModel,
+    BatchLayoutRequest,
+    BatchLayoutResponse,
+    BatchPrimersRequest,
+    BatchPrimersResponse,
     CanvasInfo,
     Capabilities,
     MenuCommand,
     PatternMode,
+    PrimerInfo,
+    PrimersListResponse,
     ScreenshotReq,
+    SendTextReq,
+    SendFigletReq,
+    SendMultiFigletReq,
     WindowCreate,
     WindowMoveResize,
     WindowPropsUpdate,
@@ -201,6 +210,36 @@ def make_app() -> FastAPI:
         await ctl.close(win_id)
         return {"ok": True}
 
+    @app.post("/windows/{win_id}/send_text")
+    async def send_text(win_id: str, payload: SendTextReq) -> Dict[str, Any]:
+        return await ctl.send_text(win_id, payload.content, payload.mode, payload.position)
+
+    @app.post("/text_editor/send_text")
+    async def send_text_auto(payload: SendTextReq) -> Dict[str, Any]:
+        """Send text to any text editor window, creating one if none exists"""
+        return await ctl.send_text("auto", payload.content, payload.mode, payload.position)
+
+    @app.post("/windows/{win_id}/send_figlet")
+    async def send_figlet(win_id: str, payload: SendFigletReq) -> Dict[str, Any]:
+        return await ctl.send_figlet(win_id, payload.text, payload.font, payload.width or 0, payload.mode)
+
+    @app.post("/text_editor/send_figlet")
+    async def send_figlet_auto(payload: SendFigletReq) -> Dict[str, Any]:
+        """Send figlet ASCII art to any text editor window, creating one if none exists"""
+        return await ctl.send_figlet("auto", payload.text, payload.font, payload.width or 0, payload.mode)
+
+    @app.post("/windows/{win_id}/send_multi_figlet")
+    async def send_multi_figlet(win_id: str, payload: SendMultiFigletReq) -> Dict[str, Any]:
+        """Send multiple figlet segments with different fonts"""
+        # For now, concatenate all segments - can be enhanced later for true multi-segment support
+        combined_text = ""
+        for segment in payload.segments:
+            combined_text += f"[Font: {segment.font}] {segment.text}{payload.separator}"
+        
+        # Use the first font as default for the combined text
+        first_font = payload.segments[0].font if payload.segments else "standard"
+        return await ctl.send_figlet(win_id, combined_text, first_font, 0, payload.mode)
+
     @app.post("/windows/cascade")
     async def cascade() -> Dict[str, Any]:
         await ctl.cascade()
@@ -251,6 +290,75 @@ def make_app() -> FastAPI:
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:
         target = await ctl.screenshot((payload or ScreenshotReq()).path)
         return {"ok": True, "path": target}
+
+    @app.post("/windows/batch_layout", response_model=BatchLayoutResponse)
+    async def windows_batch_layout(payload: BatchLayoutRequest) -> BatchLayoutResponse:
+        return await ctl.batch_layout(payload)
+
+    @app.post("/primers/batch", response_model=BatchPrimersResponse)
+    async def batch_primers(payload: BatchPrimersRequest) -> BatchPrimersResponse:
+        """Spawn up to 20 primer windows at specified positions"""
+        windows = []
+        skipped = []
+        
+        for primer_spec in payload.primers:
+            try:
+                # Create text_view window with primer path
+                win = await ctl.create_window(
+                    WindowType.text_view,
+                    title=primer_spec.title or primer_spec.primer_path.split('/')[-1].replace('.txt', ''),
+                    rect=Rect(x=primer_spec.x, y=primer_spec.y, w=0, h=0),  # w/h auto-sized
+                    props={"path": primer_spec.primer_path}
+                )
+                windows.append(WindowState(
+                    id=win.id,
+                    type=win.type.value,
+                    title=win.title,
+                    rect=RectModel(x=win.rect.x, y=win.rect.y, w=win.rect.w, h=win.rect.h),
+                    z=win.z,
+                    focused=win.focused,
+                    zoomed=win.zoomed,
+                    props=win.props,
+                ))
+            except Exception as e:
+                skipped.append(f"{primer_spec.primer_path}: {str(e)}")
+                
+        return BatchPrimersResponse(windows=windows, skipped=skipped)
+
+    @app.get("/primers/list", response_model=PrimersListResponse)
+    async def list_primers() -> PrimersListResponse:
+        """List all available primer files in test-tui/primers/"""
+        import os
+        import glob
+        
+        primers_dir = "../../test-tui/primers/"
+        primers = []
+        
+        if os.path.exists(primers_dir):
+            for primer_path in sorted(glob.glob(f"{primers_dir}*.txt")):
+                try:
+                    stat = os.stat(primer_path)
+                    name = os.path.basename(primer_path).replace('.txt', '')
+                    primers.append(PrimerInfo(
+                        name=name,
+                        path=primer_path,
+                        size_kb=round(stat.st_size / 1024, 1)
+                    ))
+                except Exception:
+                    continue
+                    
+        return PrimersListResponse(primers=primers, count=len(primers))
+
+    @app.post("/timeline/cancel")
+    async def timeline_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
+        gid = str((body or {}).get("group_id", ""))
+        if not gid:
+            raise HTTPException(status_code=400, detail="missing group_id")
+        return await ctl.cancel_timeline(gid)
+
+    @app.get("/timeline/status")
+    async def timeline_status(group_id: str) -> Dict[str, Any]:
+        return await ctl.get_timeline_status(group_id)
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:

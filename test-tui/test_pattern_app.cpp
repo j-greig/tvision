@@ -44,6 +44,25 @@
 #include "animated_blocks_view.h"
 // Animated gradient view/window
 #include "animated_gradient_view.h"
+// Animated score (ASCII score) view/window
+#include "animated_score_view.h"
+// Generative art: Verse Field
+#include "generative_verse_view.h"
+// Generative art experiments
+#include "generative_orbit_view.h"
+#include "generative_mycelium_view.h"
+// Generative art: Torus Field
+#include "generative_torus_view.h"
+// Generative art: Cube Spinner
+#include "generative_cube_view.h"
+// Generative art: Monster Portal (emoji tiler)
+#include "generative_monster_portal_view.h"
+// Generative art: Monster Verse (Verse engine + monsters)
+#include "generative_monster_verse_view.h"
+// Generative art: Monster Cam (Emoji)
+#include "generative_monster_cam_view.h"
+// API-controllable text editor
+#include "text_editor_view.h"
 // Wib&Wob AI chat interface
 #include "wibwob_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
@@ -98,9 +117,20 @@ const ushort cmZoomIn = 121;
 const ushort cmZoomOut = 122;
 const ushort cmActualSize = 123;
 const ushort cmFullScreen = 124;
+const ushort cmTextEditor = 130;
 const ushort cmAsciiGridDemo = 132;
 const ushort cmAnimatedBlocks = 134;
 const ushort cmAnimatedGradient = 135;
+const ushort cmAnimatedScore = 136;
+const ushort cmScoreBgColor = 137;
+const ushort cmVerseField = 138;
+const ushort cmOrbitField = 150;
+const ushort cmMyceliumField = 151;
+const ushort cmTorusField = 152;
+const ushort cmCubeField = 153;
+const ushort cmMonsterPortal = 154;
+const ushort cmMonsterVerse = 155;
+const ushort cmMonsterCam   = 156;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -454,6 +484,7 @@ private:
     friend void api_spawn_test(TTestPatternApp&);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
     friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
@@ -470,6 +501,11 @@ private:
     friend std::string api_focus_window(TTestPatternApp&, const std::string&);
     friend std::string api_close_window(TTestPatternApp&, const std::string&);
     friend std::string api_get_canvas_size(TTestPatternApp&);
+    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
+                                     const std::string&, const std::string&);
+    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
+                                       const std::string&, int, const std::string&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -584,6 +620,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("Full Screen mode coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmTextEditor: {
+                TRect r = deskTop->getExtent();
+                r.grow(-5, -3); // Leave some margin
+                deskTop->insert(createTextEditorWindow(r));
+                clearEvent(event);
+                break;
+            }
             case cmAsciiGridDemo: {
                 TRect r = deskTop->getExtent();
                 r.grow(-10, -5);
@@ -602,6 +645,100 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TRect r = deskTop->getExtent();
                 r.grow(-10, -5);
                 deskTop->insert(createAnimatedGradientWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmAnimatedScore: {
+                TRect r = deskTop->getExtent();
+                r.grow(-12, -6);
+                deskTop->insert(createAnimatedScoreWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmVerseField: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1); // almost full-screen to emphasise immersion
+                deskTop->insert(createGenerativeVerseWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmOrbitField: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeOrbitWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmMyceliumField: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeMyceliumWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmTorusField: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeTorusWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmCubeField: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeCubeWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmMonsterPortal: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeMonsterPortalWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmMonsterVerse: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeMonsterVerseWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmMonsterCam: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createGenerativeMonsterCamWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmScoreBgColor: {
+                // Try to find an Animated Score view in the current window.
+                auto findScore = [](TView *p, void *out) -> Boolean {
+                    if (!p) return False;
+                    TAnimatedScoreView **pp = (TAnimatedScoreView**)out;
+                    if (*pp) return False;
+                    if (auto *v = dynamic_cast<TAnimatedScoreView*>(p)) { *pp = v; return True; }
+                    return False;
+                };
+                TAnimatedScoreView *score = nullptr;
+                if (deskTop && deskTop->current) {
+                    TView *cur = deskTop->current;
+                    // If current is a window/group, search its children; else, check itself.
+                    if (auto *grp = dynamic_cast<TGroup*>(cur))
+                        grp->firstThat(findScore, &score);
+                    if (!score)
+                        score = dynamic_cast<TAnimatedScoreView*>(cur);
+                }
+                if (!score) {
+                    // Fallback: search desktop for any score view.
+                    if (deskTop)
+                        deskTop->firstThat(findScore, &score);
+                }
+                if (score) {
+                    score->openBackgroundPaletteDialog();
+                } else {
+                    messageBox("No Animated Score view is active.", mfInformation | mfOKButton);
+                }
                 clearEvent(event);
                 break;
             }
@@ -1154,11 +1291,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
             *new TMenuItem("New ~M~echs Grid", cmNewMechs, kbCtrlM) +
             *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
-            *new TMenuItem("New A~N~SI Art", cmOpenAnsiArt, kbNoKey) +
-            *new TMenuItem("New ~P~aint Canvas", cmNewPaintCanvas, kbNoKey) +
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
-            *new TMenuItem("Open ANS~I~ Art...", cmOpenAnsiArt, kbNoKey) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
@@ -1179,11 +1313,23 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~A~SCII Grid Demo", cmAsciiGridDemo, kbNoKey) +
             *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
             *new TMenuItem("Animated ~G~radient", cmAnimatedGradient, kbNoKey) +
+            *new TMenuItem("Animated S~c~ore", cmAnimatedScore, kbNoKey) +
+            *new TMenuItem("Score ~B~G Color...", cmScoreBgColor, kbNoKey) +
+            *new TMenuItem("~V~erse Field (Generative)", cmVerseField, kbNoKey) +
+            *new TMenuItem("~O~rbit Field (Generative)", cmOrbitField, kbNoKey) +
+            *new TMenuItem("~M~ycelium Field (Generative)", cmMyceliumField, kbNoKey) +
+            *new TMenuItem("~T~orus Field (Generative)", cmTorusField, kbNoKey) +
+            *new TMenuItem("~C~ube Spinner (Generative)", cmCubeField, kbNoKey) +
+            *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
+            *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
+            *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
         *new TSubMenu("~W~indow", kbAltW) +
+            *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+            newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
             *new TMenuItem("~T~ile", cmTile, kbNoKey) +
             *new TMenuItem("Send to ~B~ack", cmSendToBack, kbNoKey) +
@@ -1400,6 +1546,14 @@ void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRe
         app.newGradientWindow(type, *bounds);
     } else {
         app.newGradientWindow(type);
+    }
+}
+
+void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+    if (bounds) {
+        app.openAnimationFilePath(path, *bounds);
+    } else {
+        app.openAnimationFilePath(path);
     }
 }
 
@@ -1988,4 +2142,103 @@ std::string api_get_canvas_size(TTestPatternApp& app) {
          << ",\"cols\":" << desktop.b.x
          << ",\"rows\":" << desktop.b.y << "}";
     return json.str();
+}
+
+void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
+    TRect r;
+    if (bounds) {
+        r = *bounds;
+    } else {
+        r = TProgram::deskTop->getBounds();
+        r.grow(-5, -3);
+    }
+    TWindow* window = createTextEditorWindow(r);
+    TProgram::deskTop->insert(window);
+}
+
+std::string api_send_text(TTestPatternApp& app, const std::string& id, 
+                         const std::string& content, const std::string& mode, 
+                         const std::string& position) {
+    // Special case: if id is "auto" or no text editor exists, create one
+    bool autoSpawn = (id == "auto" || id == "text_editor");
+    
+    // Find existing text editor windows
+    TView* view = app.deskTop->first();
+    TTextEditorWindow* editorWindow = nullptr;
+    
+    while (view) {
+        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(view);
+        if (candidate) {
+            editorWindow = candidate;
+            break; // Found a text editor
+        }
+        view = view->next;
+    }
+    
+    // If no text editor found and auto-spawn is enabled, create one
+    if (!editorWindow && autoSpawn) {
+        TRect r = app.deskTop->getBounds();
+        r.grow(-5, -3);
+        TWindow* newWindow = createTextEditorWindow(r);
+        app.deskTop->insert(newWindow);
+        editorWindow = dynamic_cast<TTextEditorWindow*>(newWindow);
+    }
+    
+    // If we have a text editor, send the text
+    if (editorWindow) {
+        // Focus the window
+        editorWindow->select();
+        
+        // Send the text
+        TTextEditorView* editorView = editorWindow->getEditorView();
+        if (editorView) {
+            editorView->sendText(content, mode, position);
+            return "ok";
+        }
+    }
+    
+    return "err no text editor available";
+}
+
+std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text, 
+                           const std::string& font, int width, const std::string& mode) {
+    // Special case: if id is "auto" or no text editor exists, create one
+    bool autoSpawn = (id == "auto" || id == "text_editor");
+    
+    // Find existing text editor windows
+    TView* view = app.deskTop->first();
+    TTextEditorWindow* editorWindow = nullptr;
+    
+    while (view) {
+        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(view);
+        if (candidate) {
+            editorWindow = candidate;
+            break; // Found a text editor
+        }
+        view = view->next;
+    }
+    
+    // If no text editor found and auto-spawn is enabled, create one
+    if (!editorWindow && autoSpawn) {
+        TRect r = app.deskTop->getBounds();
+        r.grow(-5, -3);
+        TWindow* newWindow = createTextEditorWindow(r);
+        app.deskTop->insert(newWindow);
+        editorWindow = dynamic_cast<TTextEditorWindow*>(newWindow);
+    }
+    
+    // If we have a text editor, send the figlet text
+    if (editorWindow) {
+        // Focus the window
+        editorWindow->select();
+        
+        // Send the figlet text
+        TTextEditorView* editorView = editorWindow->getEditorView();
+        if (editorView) {
+            editorView->sendFigletText(text, font, width, mode);
+            return "ok";
+        }
+    }
+    
+    return "err no text editor available";
 }

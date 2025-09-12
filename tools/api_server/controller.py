@@ -7,6 +7,14 @@ from typing import Any, Dict, List, Optional
 from .events import EventHub
 from .models import AppState, Rect, Window, WindowType, new_id
 from .ipc_client import send_cmd
+from .schemas import (
+    BatchLayoutRequest, 
+    BatchLayoutResponse, 
+    BatchOp, 
+    BatchOpResult,
+    BoundsModel, 
+    TimelineSummary,
+)
 import json
 
 
@@ -21,6 +29,9 @@ class Controller:
         self._state = AppState()
         self._events = events
         self._lock = asyncio.Lock()
+        # Batch layout support
+        self._requests: Dict[str, BatchLayoutResponse] = {}
+        self._timelines: Dict[str, List[asyncio.Task]] = {}
 
     # ----- Query -----
     async def get_state(self) -> AppState:
@@ -99,6 +110,8 @@ class Controller:
                 if path:
                     cmd_params["path"] = path
                     send_cmd("create_window", cmd_params)
+            elif wtype == WindowType.text_editor:
+                send_cmd("create_window", cmd_params)
         except Exception:
             pass
         async with self._lock:
@@ -254,6 +267,62 @@ class Controller:
         await self._events.emit("window.updated", self._serialize_window(win))
         return win
 
+    async def send_text(self, win_id: str, content: str, mode: str = "append", position: str = "end") -> Dict[str, Any]:
+        """Send text to a text editor window"""
+        try:
+            # Forward to the live app via IPC
+            send_cmd("send_text", {
+                "id": win_id,
+                "content": content,
+                "mode": mode,
+                "position": position
+            })
+            
+            # Update in-memory state (simplified)
+            async with self._lock:
+                win = self._require(win_id)
+                if win.type == WindowType.text_editor:
+                    if "content" not in win.props:
+                        win.props["content"] = ""
+                    
+                    if mode == "replace":
+                        win.props["content"] = content
+                    elif mode == "append":
+                        win.props["content"] += content
+                    # For insert mode, we'd need cursor position - simplified for MVP
+                    
+            await self._events.emit("text.sent", {"window_id": win_id, "content": content, "mode": mode})
+            return {"ok": True, "window_id": win_id}
+            
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    async def send_figlet(self, win_id: str, text: str, font: str = "standard", width: int = 0, mode: str = "append") -> Dict[str, Any]:
+        """Send figlet ASCII art to a text editor window"""
+        try:
+            # Forward to the live app via IPC
+            send_cmd("send_figlet", {
+                "id": win_id,
+                "text": text,
+                "font": font,
+                "width": str(width) if width > 0 else "",
+                "mode": mode
+            })
+            
+            # Update in-memory state (simplified)
+            async with self._lock:
+                win = self._require(win_id)
+                if win.type == WindowType.text_editor:
+                    if "figlet_history" not in win.props:
+                        win.props["figlet_history"] = []
+                    win.props["figlet_history"].append({"text": text, "font": font, "width": width})
+                    
+            await self._events.emit("figlet.sent", {"window_id": win_id, "text": text, "font": font, "mode": mode})
+            return {"ok": True, "window_id": win_id, "text": text, "font": font}
+            
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     async def exec_command(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         # Simulate a few commands
         handled = {"command": name, "ok": True}
@@ -333,4 +402,164 @@ class Controller:
             "focused": w.focused,
             "zoomed": w.zoomed,
             "props": dict(w.props),
+        }
+
+    # ----- Batch Layout -----
+    async def batch_layout(self, req: BatchLayoutRequest) -> BatchLayoutResponse:
+        """Batch create/move/close windows with macro expansion (MVP: immediate apply)"""
+        # Idempotency check
+        if req.request_id in self._requests:
+            return self._requests[req.request_id]
+
+        results: List[BatchOpResult] = []
+        warnings: List[str] = []
+        expanded_ops: List[BatchOp] = []
+
+        # Macro expansion (grid only in MVP)
+        for op in req.ops:
+            if op.op == "macro.create_grid" and op.grid:
+                g = op.grid
+                vt = op.view_type or (req.defaults.view_type if req.defaults else None)
+                if not vt:
+                    results.append(BatchOpResult(
+                        status="rejected", 
+                        reason="missing view_type for macro.create_grid"
+                    ))
+                    continue
+                
+                # Expand grid macro into individual create operations
+                idx = 0
+                if g.order == "row_major":
+                    for r in range(g.rows):
+                        for c in range(g.cols):
+                            x = g.origin.x + c * (g.cell_w + g.gap_x)
+                            y = g.origin.y + r * (g.cell_h + g.gap_y)
+                            expanded_ops.append(BatchOp(
+                                op="create",
+                                view_type=vt,
+                                title=(op.title or f"{vt} #{idx+1}"),
+                                bounds=BoundsModel(x=x, y=y, w=g.cell_w, h=g.cell_h),
+                                options=dict(op.options or {}),
+                                schedule=op.schedule,
+                            ))
+                            idx += 1
+                else:  # col_major
+                    for c in range(g.cols):
+                        for r in range(g.rows):
+                            x = g.origin.x + c * (g.cell_w + g.gap_x)
+                            y = g.origin.y + r * (g.cell_h + g.gap_y)
+                            expanded_ops.append(BatchOp(
+                                op="create",
+                                view_type=vt,
+                                title=(op.title or f"{vt} #{idx+1}"),
+                                bounds=BoundsModel(x=x, y=y, w=g.cell_w, h=g.cell_h),
+                                options=dict(op.options or {}),
+                                schedule=op.schedule,
+                            ))
+                            idx += 1
+            else:
+                # Pass through non-macro operations
+                expanded_ops.append(op)
+
+        # MVP: apply operations immediately (ignore schedule fields for now)
+        if not req.dry_run:
+            for eop in expanded_ops:
+                try:
+                    if eop.op == "create" and eop.view_type:
+                        # Map view_type string to WindowType enum
+                        try:
+                            wtype = WindowType(eop.view_type)
+                        except ValueError:
+                            results.append(BatchOpResult(
+                                status="rejected",
+                                reason=f"unsupported view_type: {eop.view_type}"
+                            ))
+                            continue
+                        
+                        rect = None
+                        if eop.bounds:
+                            rect = Rect(eop.bounds.x, eop.bounds.y, eop.bounds.w, eop.bounds.h)
+                        
+                        win = await self.create_window(wtype, eop.title, rect, eop.options or {})
+                        results.append(BatchOpResult(
+                            status="applied",
+                            window_id=win.id,
+                            final_bounds=BoundsModel(x=win.rect.x, y=win.rect.y, w=win.rect.w, h=win.rect.h)
+                        ))
+                    
+                    elif eop.op == "move_resize" and eop.window_id and eop.bounds:
+                        win = await self.move_resize(
+                            eop.window_id, 
+                            x=eop.bounds.x, 
+                            y=eop.bounds.y, 
+                            w=eop.bounds.w, 
+                            h=eop.bounds.h
+                        )
+                        results.append(BatchOpResult(
+                            status="applied",
+                            window_id=win.id,
+                            final_bounds=BoundsModel(x=win.rect.x, y=win.rect.y, w=win.rect.w, h=win.rect.h)
+                        ))
+                    
+                    elif eop.op == "close" and eop.window_id:
+                        await self.close(eop.window_id)
+                        results.append(BatchOpResult(
+                            status="applied",
+                            window_id=eop.window_id
+                        ))
+                    
+                    else:
+                        results.append(BatchOpResult(
+                            status="rejected",
+                            reason=f"unsupported or invalid operation: {eop.op}"
+                        ))
+                        
+                except Exception as ex:
+                    results.append(BatchOpResult(
+                        status="rejected",
+                        reason=str(ex)
+                    ))
+        else:
+            # Dry run: simulate operations without applying
+            for eop in expanded_ops:
+                if eop.op == "create":
+                    results.append(BatchOpResult(
+                        status="scheduled",
+                        reason="dry_run simulation",
+                        final_bounds=eop.bounds
+                    ))
+                else:
+                    results.append(BatchOpResult(
+                        status="scheduled", 
+                        reason="dry_run simulation"
+                    ))
+
+        resp = BatchLayoutResponse(
+            dry_run=req.dry_run,
+            applied=(not req.dry_run),
+            group_id=req.group_id,
+            op_results=results,
+            warnings=warnings,
+            timeline_summary=TimelineSummary(counts={"ops": len(results)})
+        )
+        
+        # Cache response for idempotency
+        self._requests[req.request_id] = resp
+        return resp
+
+    async def cancel_timeline(self, group_id: str) -> Dict[str, Any]:
+        """Cancel scheduled timeline operations (MVP stub)"""
+        return {
+            "ok": True,
+            "group_id": group_id,
+            "canceled": 0
+        }
+
+    async def get_timeline_status(self, group_id: str) -> Dict[str, Any]:
+        """Get timeline operation status (MVP stub)"""
+        return {
+            "group_id": group_id,
+            "scheduled": 0,
+            "pending": 0,
+            "applied": 0
         }

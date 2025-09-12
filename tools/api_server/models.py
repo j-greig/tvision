@@ -12,6 +12,7 @@ class WindowType(str, enum.Enum):
     gradient = "gradient"
     frame_player = "frame_player"
     text_view = "text_view"
+    text_editor = "text_editor"
     wallpaper = "wallpaper"
 
 
