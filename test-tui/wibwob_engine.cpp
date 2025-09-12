@@ -18,6 +18,9 @@ WibWobEngine::WibWobEngine() {
     // Default system prompt for wib&wob
     systemPrompt = "You are wib&wob, a helpful AI assistant integrated into a Turbo Vision TUI application.";
     
+    // Initialize built-in tools
+    initializeBuiltinTools();
+    
     // Defer configuration loading until first use
 }
 
@@ -47,8 +50,55 @@ bool WibWobEngine::sendQuery(const std::string& query, ResponseCallback callback
     request.message = query;
     request.system_prompt = systemPrompt;
     
+    // Add available tools to request
+    if (currentProvider->supportsTools()) {
+        request.tools = ToolRegistry::instance().getAllTools();
+    }
+    
+    // Create wrapper callback to handle tool execution
+    auto wrappedCallback = [this, callback](const LLMResponse& response) {
+        fprintf(stderr, "DEBUG: Wrapper callback - needs_tool_execution=%d, tool_calls=%zu\n", 
+                response.needs_tool_execution, response.tool_calls.size());
+                
+        if (response.needs_tool_execution && !response.tool_calls.empty()) {
+            fprintf(stderr, "DEBUG: Executing %zu tool calls\n", response.tool_calls.size());
+            
+            // Execute all tool calls
+            LLMRequest followUpRequest;
+            followUpRequest.system_prompt = systemPrompt;
+            followUpRequest.message = "Please continue with the tool results.";
+            
+            for (const auto& toolCall : response.tool_calls) {
+                fprintf(stderr, "DEBUG: Executing tool: %s (id: %s)\n", toolCall.name.c_str(), toolCall.id.c_str());
+                ToolResult result = ToolRegistry::instance().execute(toolCall);
+                
+                if (result.is_error) {
+                    fprintf(stderr, "DEBUG: Tool execution failed: %s\n", result.error_message.c_str());
+                } else {
+                    fprintf(stderr, "DEBUG: Tool result: %s\n", result.content.c_str());
+                }
+                
+                followUpRequest.tool_results.push_back(result);
+            }
+            
+            // Add tools again for follow-up
+            if (currentProvider->supportsTools()) {
+                followUpRequest.tools = ToolRegistry::instance().getAllTools();
+            }
+            
+            fprintf(stderr, "DEBUG: Sending follow-up request with %zu tool results\n", followUpRequest.tool_results.size());
+            
+            // Send follow-up request with tool results
+            currentProvider->sendQuery(followUpRequest, callback);
+        } else {
+            fprintf(stderr, "DEBUG: No tool execution needed - returning response directly\n");
+            // No tools needed, return response directly
+            if (callback) callback(response);
+        }
+    };
+    
     // Send to current provider
-    return currentProvider->sendQuery(request, callback);
+    return currentProvider->sendQuery(request, wrappedCallback);
 }
 
 void WibWobEngine::poll() {
@@ -110,7 +160,7 @@ std::string WibWobEngine::getCurrentModel() const {
     
     // For claude_code, we don't know the exact model, just return generic name
     if (provider == "claude_code") {
-        return "claude-code-cli";
+        return "Claude Code";
     }
     
     return providerConfig.model.empty() ? "unknown" : providerConfig.model;
@@ -136,15 +186,22 @@ void WibWobEngine::loadConfiguration() {
     
     // Try to load from config file
     bool loadResult = config->loadFromFile("llm/config/llm_config.json");
+    fprintf(stderr, "DEBUG: Config file load result: %s\n", loadResult ? "SUCCESS" : "FAILED");
     if (loadResult) {
         // Initialize the active provider
         std::string activeProvider = config->getActiveProvider();
+        fprintf(stderr, "DEBUG: Config loaded successfully, active provider: %s\n", activeProvider.c_str());
         if (!activeProvider.empty()) {
-            initializeProvider(activeProvider);
+            if (initializeProvider(activeProvider)) {
+                fprintf(stderr, "DEBUG: Successfully initialized provider: %s\n", activeProvider.c_str());
+            } else {
+                fprintf(stderr, "ERROR: Failed to initialize provider: %s\n", activeProvider.c_str());
+            }
         }
     } else {
         // Config file missing or invalid - create default but DON'T overwrite existing file
         fprintf(stderr, "ERROR: Failed to load llm/config/llm_config.json\n");
+        fprintf(stderr, "DEBUG: Using default config with activeProvider: %s\n", config->getActiveProvider().c_str());
         
         // Check validation errors
         auto errors = config->getValidationErrors();
@@ -162,15 +219,28 @@ void WibWobEngine::loadConfiguration() {
             fclose(check);
         }
         
-        // Try claude_code as default
-        initializeProvider("claude_code");
+        // Try the default active provider
+        std::string defaultProvider = config->getActiveProvider();
+        if (!initializeProvider(defaultProvider)) {
+            // If default provider fails, try any available provider
+            auto availableProviders = config->getAvailableProviders();
+            for (const auto& provider : availableProviders) {
+                if (initializeProvider(provider)) {
+                    fprintf(stderr, "Fallback: Using provider '%s' instead of '%s'\n", provider.c_str(), defaultProvider.c_str());
+                    break;
+                }
+            }
+        }
     }
 }
 
 bool WibWobEngine::initializeProvider(const std::string& providerName) {
+    fprintf(stderr, "DEBUG: Attempting to initialize provider: %s\n", providerName.c_str());
+    
     // Create new provider instance
     auto provider = LLMProviderFactory::getInstance().createProvider(providerName);
     if (!provider) {
+        fprintf(stderr, "DEBUG: Failed to create provider: %s\n", providerName.c_str());
         return false;
     }
     
@@ -188,8 +258,10 @@ bool WibWobEngine::initializeProvider(const std::string& providerName) {
     
     // Check if provider is available
     if (!provider->isAvailable()) {
+        fprintf(stderr, "DEBUG: Provider %s is not available\n", providerName.c_str());
         return false;
     }
+    fprintf(stderr, "DEBUG: Provider %s is available and configured\n", providerName.c_str());
     
     // Switch to new provider
     currentProvider = std::move(provider);
@@ -232,4 +304,22 @@ std::string WibWobEngine::generateProviderConfigJson(const ProviderConfig& confi
     result += "}";
     
     return result;
+}
+
+// Tool support methods
+void WibWobEngine::initializeBuiltinTools() {
+    // Tools are auto-registered via static initializers in tool files
+    // This method ensures the tool files are linked
+}
+
+void WibWobEngine::registerTool(const Tool& tool) {
+    if (currentProvider && currentProvider->supportsTools()) {
+        currentProvider->registerTool(tool);
+    }
+}
+
+void WibWobEngine::clearTools() {
+    if (currentProvider && currentProvider->supportsTools()) {
+        currentProvider->clearTools();
+    }
 }

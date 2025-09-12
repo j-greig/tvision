@@ -71,8 +71,8 @@ Key Endpoints
 - Pattern mode: `POST /pattern_mode` — `{mode:"continuous"|"tiled"}`
 - **Batch layout: `POST /windows/batch_layout`** — create/move/close multiple windows in one call with macro support
 - **Timeline operations: `GET /timeline/status?group_id=...`, `POST /timeline/cancel`** — for future scheduled operations 
-- **Primer discovery: `GET /primers/list`** — list all available primer files with metadata
-- **Batch primers: `POST /primers/batch`** — spawn up to 20 primer windows at once
+- **Primer discovery: `GET /primers/list`** — list all available primer files with metadata (128 primers available)
+- **Batch primers: `POST /primers/batch`** — spawn up to 20 primer windows at once with auto-sizing
 - WebSocket events: `GET /ws`
 
 WebSocket Events
@@ -95,7 +95,9 @@ Examples (curl)
 - Send text to existing text editor:
   - `curl -X POST localhost:8089/windows/<id>/send_text -H 'Content-Type: application/json' -d '{"content":"Hello world!\n","mode":"append"}'`
 - Load primer file as text view:
-  - `curl -X POST localhost:8089/windows -H 'Content-Type: application/json' -d '{"type":"text_view","props":{"path":"test-tui/primers/monster-emoji.txt"}}'`
+  - `curl -X POST localhost:8089/windows -H 'Content-Type: application/json' -d '{"type":"text_view","props":{"path":"primers/monster-emoji.txt"}}'`
+- Batch spawn primers with positioning:
+  - `curl -X POST localhost:8089/primers/batch -H 'Content-Type: application/json' -d '{"primers":[{"primer_path":"primers/monster-angel-of-death.txt","x":10,"y":5},{"primer_path":"primers/iso-disco-cubes.txt","x":50,"y":5}]}'`
 - Tile all windows (2 columns):
   - `curl -X POST localhost:8089/windows/tile -H 'Content-Type: application/json' -d '{"cols":2}'`
 - Update frame player FPS:

@@ -21,6 +21,7 @@
 #include <fstream>
 #include <random>
 #include <sys/stat.h>
+#include <iterator>
 
 TWibWobView::TWibWobView(const TRect& bounds) : TView(bounds) {
     options |= ofSelectable;
@@ -28,7 +29,7 @@ TWibWobView::TWibWobView(const TRect& bounds) : TView(bounds) {
     
     engine = nullptr; // Lazy initialization
     
-    statusText = "Loading...";
+    statusText = "Type a message and press Enter";
     
     // Initialize spinner
     showSpinner = false;
@@ -47,28 +48,33 @@ void TWibWobView::ensureEngineInitialized() {
         
         engine = new WibWobEngine();
         
-        // Set up fallback system prompt (used only if wibandwob.prompt.md is not found)
-        engine->setSystemPrompt(
-            "You are wib&wob, a dual-minded artist/scientist AI assistant integrated into a Turbo Vision TUI application. "
-            "Respond as both Wib (chaotic, artistic) and Wob (precise, scientific). "
-            "Help with TVision framework, C++ development, and creative projects. "
-            "Use British English and maintain your distinctive personalities."
-        );
+        // Load system prompt from file or use fallback
+        std::ifstream promptFile("wibandwob.prompt.md");
+        if (promptFile.is_open()) {
+            // Read the entire prompt file
+            std::string customPrompt((std::istreambuf_iterator<char>(promptFile)),
+                                   std::istreambuf_iterator<char>());
+            promptFile.close();
+            
+            engine->setSystemPrompt(customPrompt);
+            addMessage("System", "Step into WibWobWorld, human.");
+            logMessage("System", "Loaded custom prompt from wibandwob.prompt.md");
+        } else {
+            // Fallback system prompt
+            engine->setSystemPrompt(
+                "You are wib&wob, a dual-minded artist/scientist AI assistant integrated into a Turbo Vision TUI application. "
+                "Respond as both Wib (chaotic, artistic) and Wob (precise, scientific). "
+                "Help with TVision framework, C++ development, and creative projects. "
+                "Use British English and maintain your distinctive personalities."
+            );
+            addMessage("Wib", "Wotcher! I'm wib&wob, your AI assistant for this TVision app. (Note: wibandwob.prompt.md not found - using fallback prompt)");
+        }
         
         // Defer provider availability checks to first send to avoid UI stalls.
         statusText = "Ready - Type a message and press Enter";
         
         // Do not touch provider/config here; keep init instant
         logMessage("System", "Chat engine initialized (provider loads on first send)");
-        
-        // Add welcome message - check if custom prompt file exists
-        FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
-        if (promptCheck) {
-            fclose(promptCheck);
-            addMessage("System", "Step into WibWobWorld, human.");
-        } else {
-            addMessage("Wib", "Wotcher! I'm wib&wob, your AI assistant for this TVision app. (Note: wibandwob.prompt.md not found - using fallback prompt)");
-        }
         
         engineInitialized = true;
         drawView(); // Refresh to show the welcome message
@@ -81,6 +87,9 @@ TWibWobView::~TWibWobView() {
 }
 
 void TWibWobView::draw() {
+    // Initialize engine on first draw to show welcome message
+    ensureEngineInitialized();
+    
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
     TColorAttr focusedColor = getColor(2);
@@ -306,8 +315,12 @@ void TWibWobView::processInput() {
     startSpinner();
     drawView();
     
-    // Send to Claude (synchronous for POC)
+    // Send to LLM provider
     auto start = std::chrono::high_resolution_clock::now();
+    
+    // Log provider info to chat log
+    logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
+    
     engine->sendQuery(userMessage, [this, start](const ClaudeResponse& response) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -316,8 +329,23 @@ void TWibWobView::processInput() {
         inputActive = true;
         if (response.is_error) {
             addMessage("System", "Error (" + std::to_string(duration.count()) + "ms): " + response.error_message, true);
+            
+            // Log raw API response on errors too
+            if (!response.session_id.empty() && response.session_id.find("RAW_API_RESPONSE:") == 0) {
+                logMessage("API_RAW_ERROR", response.session_id.substr(17));
+            }
+            
             setStatus("Error - Try again");
         } else {
+            // Log debug info including raw API response
+            logMessage("Debug", "Response length: " + std::to_string(response.result.length()) + " chars");
+            logMessage("Debug", "Provider: " + response.provider_name + ", Model: " + response.model_used);
+            
+            // Log raw API response if available
+            if (!response.session_id.empty() && response.session_id.find("RAW_API_RESPONSE:") == 0) {
+                logMessage("API_RAW", response.session_id.substr(17)); // Remove "RAW_API_RESPONSE: " prefix
+            }
+            
             addMessage("Wib&Wob", response.result);
             setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
         }

@@ -9,6 +9,7 @@
 
 #include "llm/base/illm_provider.h"
 #include "llm/base/llm_config.h"
+#include "llm/base/itool.h"
 #include <string>
 #include <functional>
 #include <memory>
@@ -49,6 +50,11 @@ public:
     // Status
     bool isBusy() const;
     std::string getLastError() const;
+    
+    // Tool support
+    void initializeBuiltinTools();
+    void registerTool(const Tool& tool);
+    void clearTools();
 
 private:
     std::unique_ptr<LLMConfig> config;

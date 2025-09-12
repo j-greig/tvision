@@ -506,3 +506,12 @@ void ClaudeCodeProvider::setError(const std::string& error) {
 void ClaudeCodeProvider::clearError() {
     lastError.clear();
 }
+
+// Tool support methods
+void ClaudeCodeProvider::registerTool(const Tool& tool) {
+    registeredTools.push_back(tool);
+}
+
+void ClaudeCodeProvider::clearTools() {
+    registeredTools.clear();
+}

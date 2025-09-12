@@ -236,6 +236,10 @@ The TUI app automatically creates a Unix socket at `/tmp/test_pattern_app.sock` 
 - `POST /windows/tile` — Tile windows: `{cols?}`
 - `POST /windows/close_all` — Close all windows
 
+##### Primer Management (NEW)
+- `GET /primers/list` — List all 128 available primer files with metadata
+- `POST /primers/batch` — Spawn up to 20 primer text windows with auto-sizing: `{primers: [{primer_path, x, y, title?}]}`
+
 ##### Application Control
 - `POST /pattern_mode` — Set pattern mode: `{mode:"continuous"|"tiled"}`
 - `POST /screenshot` — Take screenshot  
@@ -307,6 +311,15 @@ windows.append(requests.post(f"{api_base}/windows", json={
     "rect": {"x": 55, "y": 8, "w": 12, "h": 8},
     "props": {"gradient": "radial"}
 }))
+
+# Batch spawn primers with positioning
+response = requests.post(f"{api_base}/primers/batch", json={
+    "primers": [
+        {"primer_path": "primers/monster-angel-of-death.txt", "x": 5, "y": 2},
+        {"primer_path": "primers/iso-disco-cubes.txt", "x": 45, "y": 2},
+        {"primer_path": "primers/cave-os.txt", "x": 85, "y": 2}
+    ]
+})
 ```
 
 #### WebSocket Events

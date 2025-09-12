@@ -5,6 +5,7 @@
 /*---------------------------------------------------------*/
 
 #include "llm_config.h"
+#include "../../api_config_temp.h"  // TEMP: Hardcoded provider selection
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
@@ -44,7 +45,7 @@ bool ProviderConfig::getParameterBool(const std::string& key, bool defaultValue)
 
 LLMConfig::LLMConfig() {
     // Load .env file first to set environment variables
-    loadDotEnv();
+    loadDotEnv("../.env");  // Load from parent directory when running from build/
     
     // Set up default configuration
     loadFromString(getDefaultConfigJson());
@@ -65,7 +66,13 @@ bool LLMConfig::loadFromFile(const std::string& configPath) {
 
 bool LLMConfig::loadFromString(const std::string& jsonConfig) {
     validationErrors.clear();
-    return parseJson(jsonConfig);
+    bool result = parseJson(jsonConfig);
+    
+    // TEMP: Force anthropic_api as active provider regardless of config
+    activeProvider = ApiConfig::DEFAULT_PROVIDER;
+    fprintf(stderr, "DEBUG: Forced activeProvider to: %s\n", activeProvider.c_str());
+    
+    return result;
 }
 
 bool LLMConfig::saveToFile(const std::string& configPath) const {
@@ -322,8 +329,10 @@ bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, b
 }
 
 std::string LLMConfig::getDefaultConfigJson() {
+    // TEMP: Force anthropic_api as active provider
+    fprintf(stderr, "DEBUG: Forcing anthropic_api as default provider\n");
     return R"({
-  "activeProvider": "claude_code",
+  "activeProvider": "anthropic_api",
   "providers": {
     "claude_code": {
       "enabled": true,
@@ -332,7 +341,7 @@ std::string LLMConfig::getDefaultConfigJson() {
     },
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-3-haiku-20240307",
+      "model": "claude-3-5-haiku-latest",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",
@@ -349,11 +358,13 @@ std::string LLMConfig::getDefaultConfigJson() {
 }
 
 void LLMConfig::loadDotEnv(const std::string& envPath) {
+    fprintf(stderr, "DEBUG: Loading .env from: %s\n", envPath.c_str());
     std::ifstream file(envPath);
     if (!file.is_open()) {
-        // .env file is optional, so don't error if it doesn't exist
+        fprintf(stderr, "DEBUG: .env file not found at: %s\n", envPath.c_str());
         return;
     }
+    fprintf(stderr, "DEBUG: .env file loaded successfully\n");
     
     std::string line;
     while (std::getline(file, line)) {

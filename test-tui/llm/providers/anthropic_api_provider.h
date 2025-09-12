@@ -34,6 +34,11 @@ public:
     
     // Session management
     void resetSession() override;
+    
+    // Tool support
+    bool supportsTools() const override { return true; }
+    void registerTool(const Tool& tool) override;
+    void clearTools() override;
 
 private:
     bool busy = false;
@@ -47,25 +52,23 @@ private:
     
     std::vector<std::pair<std::string, std::string>> conversationHistory;
     
-    // Async execution state
-    FILE* activePipe = nullptr;
-    std::string outputBuffer;
-    ResponseCallback pendingCallback;
-    LLMRequest pendingRequest;
+    // Tool support
+    std::vector<Tool> registeredTools;
+    
+    // Simple synchronous execution
     
     // API communication
-    LLMResponse makeAPIRequest(const LLMRequest& request);
-    bool startAsyncAPIRequest(const LLMRequest& request, ResponseCallback callback);
-    void pollAsyncRequest();
-    std::string buildRequestJson(const LLMRequest& request) const;
-    LLMResponse parseAPIResponse(const std::string& response) const;
+    LLMResponse makeSimpleAPIRequest(const LLMRequest& request);
+    std::string buildSimpleRequestJson(const LLMRequest& request) const;
+    LLMResponse parseSimpleResponse(const std::string& response) const;
     
-    // HTTP utilities
-    std::string performHttpRequest(const std::string& url, const std::string& headers, const std::string& payload) const;
+    // Utilities
     
     // Error handling
     void setError(const std::string& error);
     void clearError();
+
+    // (No state kept between calls for tool_use; conversationHistory stores text only.)
 };
 
 #endif // ANTHROPIC_API_PROVIDER_H

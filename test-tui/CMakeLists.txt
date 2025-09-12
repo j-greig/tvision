@@ -44,6 +44,8 @@ add_executable(test_pattern
     generative_monster_portal_view.cpp
     generative_cube_view.cpp
     generative_monster_verse_view.cpp
+    generative_monster_cam_view.cpp
+    text_editor_view.cpp
     ansi_view.cpp
 )
 target_link_libraries(test_pattern PRIVATE tvision)

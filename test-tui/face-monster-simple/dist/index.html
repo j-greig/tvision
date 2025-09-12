@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Face Monster Mirror - Simplified</title>
+    <style>
+      /* 
+       * Minimal styling for the simplified face monster mirror
+       * - Black background for projection/display
+       * - Full viewport coverage for immersive experience
+       * - Hidden cursor to avoid distraction during use
+       */
+      body {
+        margin: 0;
+        padding: 0;
+        background: black;
+        overflow: hidden; /* Hide scrollbars for clean display */
+        font-family: 'Courier New', monospace; /* Monospace for ASCII art */
+      }
+      
+      /* 
+       * Video element: Shows the camera feed
+       * - Positioned behind the canvas (z-index: 1)
+       * - Very low opacity so it's barely visible but helps with debugging
+       * - Covers full viewport with object-fit: cover to maintain aspect ratio
+       */
+      #video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        opacity: 0.05; /* Nearly invisible, just for reference */
+        z-index: 1;
+      }
+      
+      /* 
+       * Canvas element: Where the ASCII art monster is drawn
+       * - Positioned in front of video (z-index: 2)
+       * - Covers full viewport for projection mapping
+       * - Cursor hidden for clean exhibition experience
+       */
+      #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 2;
+        cursor: none; /* Hide mouse cursor */
+      }
+
+      /* 
+       * Status display: Shows initialization and error messages
+       * - Positioned in bottom-left corner
+       * - Semi-transparent background for readability
+       * - Can be removed or hidden for production exhibition
+       */
+      #status {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        z-index: 3;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-family: 'Courier New', monospace;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-BzhszJ4y.js"></script>
+  </head>
+  <body>
+    <!-- 
+      Camera video feed
+      - autoplay: Starts playing immediately when camera access is granted
+      - muted: Required for autoplay to work in modern browsers
+      - playsinline: Prevents fullscreen video on mobile devices
+    -->
+    <video id="video" autoplay muted playsinline></video>
+    
+    <!-- 
+      Canvas for ASCII art rendering
+      - This is where the detected face position will be replaced with the monster
+      - Size will be set dynamically to match window dimensions
+    -->
+    <canvas id="canvas"></canvas>
+    
+    <!-- 
+      Status text for user feedback
+      - Shows initialization progress, errors, and current state
+      - Can be hidden or removed for production exhibition
+    -->
+    <div id="status">
+      <div id="status-text">Initializing...</div>
+    </div>
+    
+    <!-- Load the main TypeScript application -->
+  </body>
+</html>

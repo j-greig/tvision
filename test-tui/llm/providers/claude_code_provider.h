@@ -34,12 +34,20 @@ public:
     
     // Session management
     void resetSession() override;
+    
+    // Tool support
+    bool supportsTools() const override { return true; }
+    void registerTool(const Tool& tool) override;
+    void clearTools() override;
 
 private:
     bool busy = false;
     std::string claudePath = "claude";
     std::string lastError;
     std::string currentSessionId;
+    
+    // Tool support
+    std::vector<Tool> registeredTools;
     
     // Async execution state  
     FILE* activePipe = nullptr;

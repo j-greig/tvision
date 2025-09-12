@@ -55,6 +55,10 @@
 perf.data*
 callgrind.out*
 
+# Temporary API config files - DO NOT COMMIT
+test-tui/api_config_temp.h
+**/api_config_temp.*
+
 *.kdev4
 *.vcxproj*
 *.sln

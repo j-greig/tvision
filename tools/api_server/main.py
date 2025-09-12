@@ -332,7 +332,7 @@ def make_app() -> FastAPI:
         import os
         import glob
         
-        primers_dir = "../../test-tui/primers/"
+        primers_dir = "test-tui/primers/"
         primers = []
         
         if os.path.exists(primers_dir):
@@ -340,9 +340,11 @@ def make_app() -> FastAPI:
                 try:
                     stat = os.stat(primer_path)
                     name = os.path.basename(primer_path).replace('.txt', '')
+                    # Convert path to be relative to TUI app working directory
+                    relative_path = "primers/" + os.path.basename(primer_path)
                     primers.append(PrimerInfo(
                         name=name,
-                        path=primer_path,
+                        path=relative_path,
                         size_kb=round(stat.st_size / 1024, 1)
                     ))
                 except Exception:

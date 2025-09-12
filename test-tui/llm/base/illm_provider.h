@@ -10,6 +10,8 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <vector>
+#include "itool.h"
 
 struct LLMResponse {
     std::string result;
@@ -22,6 +24,10 @@ struct LLMResponse {
     // Additional metadata
     std::string model_used;
     std::string provider_name;
+    
+    // Tool calling support
+    std::vector<ToolCall> tool_calls;
+    bool needs_tool_execution = false;
 };
 
 struct LLMRequest {
@@ -33,6 +39,10 @@ struct LLMRequest {
     double temperature = 0.7;
     int max_tokens = 4096;
     bool stream = false;
+    
+    // Tool support
+    std::vector<Tool> tools;
+    std::vector<ToolResult> tool_results;
 };
 
 class ILLMProvider {
@@ -60,6 +70,11 @@ public:
     
     // Session management
     virtual void resetSession() = 0;
+    
+    // Tool support
+    virtual bool supportsTools() const = 0;
+    virtual void registerTool(const Tool& tool) = 0;
+    virtual void clearTools() = 0;
 };
 
 #endif // ILLM_PROVIDER_H

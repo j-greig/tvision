@@ -76,8 +76,10 @@ void TGenerativeMonsterVerseView::draw(){
     float cx=(W-1)*0.5f, cy=(H-1)*0.5f; float invW=W?1.f/W:1.f, invH=H?1.f/H:1.f;
 
     for(int y=0;y<H;++y){
-        std::string s; s.reserve((size_t)W*4);
-        for(int x=0;x<W;++x){
+        // Column-accurate emitter: decide on a stable 1-col grid (x), emit at running column (col).
+        TDrawBuffer b; TAttrPair ap{TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12)), TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12))};
+        int col = 0;
+        for (int x = 0; x < W && col < W; ++x){
             float u=(x-cx)*invW*2.f, v=(y-cy)*invH*2.f; float r=std::sqrt(u*u+v*v)+1e-6f; float ang=std::atan2(v,u);
 
             float f=0.f;
@@ -154,33 +156,64 @@ void TGenerativeMonsterVerseView::draw(){
                     out = ((tx + frame/8) % 2 == 0) ? u8"╱" : u8"╲";
                 if (ty == 2) { int cx2=tileW/2; if (tx==cx2-5) out=u8"👁️"; else if (tx>=cx2-2 && tx<=cx2+2) out=u8"═"; else if (tx==cx2+5) out=u8"👁️"; }
             }
-            // Eyes-in-blank-patch overlay: if tile center is blankish, always place eyes at center row
+            // Dynamic eyes that follow dark spots and move
             {
-                // Evaluate field at tile center
-                int xC = gx*tileW + tileW/2;
-                int yC = gy*tileH + tileH/2;
-                float uC = (xC - cx) * invW * 2.f;
-                float vC = (yC - cy) * invH * 2.f;
-                float fC=0.f;
-                switch(mode){
-                    case mdFlow:
-                        fC = 0.55f + 0.45f * std::sin( (uC*3.0f + std::sin(vC*2.2f + t)) * 1.15f + t );
-                        fC += 0.25f * std::sin( (vC*4.0f + std::cos(uC*1.6f - t*1.2f)) * 1.05f - t2 );
-                        break;
-                    case mdSwirl:
-                        { float rC=std::sqrt(uC*uC+vC*vC)+1e-6f; float angC=std::atan2(vC,uC);
-                          fC = 0.5f + 0.5f * std::sin( (angC*3.3f + rC*4.7f) - t*1.8f );
-                          fC = 0.7f*fC + 0.3f*std::sin(rC*7.5f - t*1.3f); }
-                        break;
-                    case mdWeave:
-                        fC = 0.5f + 0.5f * ( std::sin(uC*5.6f + t*1.6f) * std::cos(vC*5.6f - t*1.1f) );
-                        fC = 0.6f*fC + 0.4f*std::sin((uC+vC)*3.6f + t*0.9f);
-                        break;
+                // Sample multiple positions in tile to find darkest spot
+                float minVal = 2.0f;
+                int bestOffsetX = 0, bestOffsetY = 0;
+                
+                // Search in 5x3 grid within tile for darkest point
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -2; dx <= 2; dx++) {
+                        int xS = gx*tileW + tileW/2 + dx*3;
+                        int yS = gy*tileH + tileH/2 + dy*2;
+                        if (xS >= 0 && xS < W && yS >= 0 && yS < H) {
+                            float uS = (xS - cx) * invW * 2.f;
+                            float vS = (yS - cy) * invH * 2.f;
+                            float fS=0.f;
+                            switch(mode){
+                                case mdFlow:
+                                    fS = 0.55f + 0.45f * std::sin( (uS*3.0f + std::sin(vS*2.2f + t)) * 1.15f + t );
+                                    fS += 0.25f * std::sin( (vS*4.0f + std::cos(uS*1.6f - t*1.2f)) * 1.05f - t2 );
+                                    break;
+                                case mdSwirl:
+                                    { float rS=std::sqrt(uS*uS+vS*vS)+1e-6f; float angS=std::atan2(vS,uS);
+                                      fS = 0.5f + 0.5f * std::sin( (angS*3.3f + rS*4.7f) - t*1.8f );
+                                      fS = 0.7f*fS + 0.3f*std::sin(rS*7.5f - t*1.3f); }
+                                    break;
+                                case mdWeave:
+                                    fS = 0.5f + 0.5f * ( std::sin(uS*5.6f + t*1.6f) * std::cos(vS*5.6f - t*1.1f) );
+                                    fS = 0.6f*fS + 0.4f*std::sin((uS+vS)*3.6f + t*0.9f);
+                                    break;
+                            }
+                            float nS = fbm(uS*2.6f + t*0.5f, vS*2.6f - t*0.45f, 3);
+                            float valS = clampf(fS*0.75f + nS*0.35f);
+                            if (valS < minVal) {
+                                minVal = valS;
+                                bestOffsetX = dx*3;
+                                bestOffsetY = dy*2;
+                            }
+                        }
+                    }
                 }
-                float nC = fbm(uC*2.6f + t*0.5f, vC*2.6f - t*0.45f, 3);
-                float valC = clampf(fC*0.75f + nC*0.35f);
-                if (valC < whitespaceBias + 0.08f && ty == tileH/2) {
-                    int cx2 = tileW/2; if (tx==cx2-5) out=u8"👁️"; else if (tx>=cx2-2 && tx<=cx2+2) out=u8"═"; else if (tx==cx2+5) out=u8"👁️";
+                
+                // Place eyes only if we found a sufficiently dark spot
+                if (minVal < whitespaceBias + 0.12f) {
+                    // Add gentle oscillation to eye position
+                    float eyeWobble = std::sin(t*1.3f + gx*2.1f + gy*1.7f) * 1.5f;
+                    int eyeCenterX = tileW/2 + bestOffsetX + (int)eyeWobble;
+                    int eyeCenterY = tileH/2 + bestOffsetY;
+                    
+                    // Only render if we're in the right row
+                    if (ty == eyeCenterY) {
+                        // Eye pattern with slight asymmetry for more organic feel
+                        int leftEyeX = eyeCenterX - 5;
+                        int rightEyeX = eyeCenterX + 5 + (int)(std::sin(t*0.8f + gx*1.1f) * 0.7f);
+                        
+                        if (tx == leftEyeX) out = u8"👁️";
+                        else if (tx >= eyeCenterX-2 && tx <= eyeCenterX+2) out = u8"═";
+                        else if (tx == rightEyeX) out = u8"👁️";
+                    }
                 }
             }
 
@@ -190,15 +223,12 @@ void TGenerativeMonsterVerseView::draw(){
             if (stripes1 < 0.04f && val > punct && val < geom) out = u8"╱";
             if (stripes2 < 0.04f && val > punct && val < geom) out = u8"╲";
 
-            // Append glyph string (UTF-8 safe)
-            s += out;
+            // Emit respecting glyph width
+            ushort w = b.moveCStr(col, out, ap, W - col);
+            col += (w>0 ? w : 1);
         }
-        // Render row with a uniform attribute (keeps focus on motion/glyphs)
-        // Use a calm foreground on dark background.
-        TDrawBuffer b; TAttrPair ap{TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12)), TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12))};
-        ushort written = b.moveCStr(0, s.c_str(), ap, W);
-        if (written < (ushort)W) b.moveChar(written, ' ', TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12)), (ushort)(W - written));
-        writeLine(0,y,W,1,b);
+        if (col < W) b.moveChar(col, ' ', TColorAttr(TColorRGB(210,210,210), TColorRGB(10,10,12)), (ushort)(W - col));
+        writeLine(0, y, W, 1, b);
     }
 }
 

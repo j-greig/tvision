@@ -37,6 +37,15 @@ public:
 
     void setSpeed(unsigned periodMs_);
 
+    // Optional external control: set foreground/background colors.
+    // If not called, defaults to light gray on black.
+    void setTextColors(const TColorAttr &attr) { textAttr = attr; drawView(); }
+    void setBackgroundRGB(uchar r, uchar g, uchar b);
+    void cycleBackground(int delta = 1);
+    void setBackgroundIndex(int idx);
+    int backgroundIndex() const { return bgIndex; }
+    bool openBackgroundPaletteDialog();
+
 private:
     void startTimer();
     void stopTimer();
@@ -45,9 +54,12 @@ private:
     unsigned periodMs;
     TTimerId timerId {0};
     int phase {0};
+
+    // Rendering colors (normal + highlighted are the same for this view).
+    TColorAttr textAttr { TColorAttr{0x07} }; // default BIOS 0x07 (light gray on black)
+    int bgIndex {0}; // index into built-in ANSI-like BG palette
 };
 
 class TWindow; TWindow* createAnimatedScoreWindow(const TRect &bounds);
 
 #endif // ANIMATED_SCORE_VIEW_H
-

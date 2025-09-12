@@ -20,6 +20,12 @@
 
 #define Uses_TWindow
 #define Uses_TFrame
+#define Uses_TDialog
+#define Uses_TButton
+#define Uses_TKeys
+#define Uses_TProgram
+#define Uses_TDeskTop
+#define Uses_TGroup
 #include <tvision/tv.h>
 
 #include <string>
@@ -116,11 +122,16 @@ static std::string headerBeats(int phase) {
 
 } // namespace
 
+// Forward decl for local dialog helper.
+static ushort runBgPaletteDialog(int &index);
+
 TAnimatedScoreView::TAnimatedScoreView(const TRect &bounds, unsigned periodMs)
     : TView(bounds), periodMs(periodMs)
 {
+    options |= ofSelectable;
     growMode = gfGrowHiX | gfGrowHiY;
     eventMask |= evBroadcast;
+    eventMask |= evKeyboard; // enable key handling for palette changes
 }
 
 TAnimatedScoreView::~TAnimatedScoreView() {
@@ -158,8 +169,11 @@ void TAnimatedScoreView::draw() {
 
     TDrawBuffer b;
     auto put = [&](int y, const std::string &line) {
-        // Move CStr with attributes; it will clip to W.
-        b.moveCStr(0, line.c_str(), TAttrPair{TColorAttr{0x07}, TColorAttr{0x07}}, W);
+        // Move CStr with current textAttr; then pad to end with spaces
+        TAttrPair ap{textAttr, textAttr};
+        ushort written = b.moveCStr(0, line.c_str(), ap, W);
+        if (written < (ushort)W)
+            b.moveChar(written, ' ', textAttr, (ushort)(W - written));
         writeLine(0, y, W, 1, b);
     };
 
@@ -314,6 +328,30 @@ void TAnimatedScoreView::handleEvent(TEvent &ev) {
             clearEvent(ev);
         }
     }
+    else if (ev.what == evKeyDown) {
+        char ch = ev.keyDown.charScan.charCode;
+        bool handled = false;
+        switch (ch) {
+            // Simple palette cycling: press 'c' or 'C'
+            case 'c': case 'C': cycleBackground(+1); handled = true; break;
+            // Reverse cycle with 'x' or 'X'
+            case 'x': case 'X': cycleBackground(-1); handled = true; break;
+            // Open palette dialog
+            case 'p': case 'P': {
+                int idx = bgIndex;
+                if (runBgPaletteDialog(idx) != cmCancel) {
+                    int delta = (idx - bgIndex);
+                    if (delta != 0) cycleBackground(delta);
+                }
+                handled = true; break;
+            }
+            default: break;
+        }
+        if (handled) {
+            drawView();
+            clearEvent(ev);
+        }
+    }
 }
 
 void TAnimatedScoreView::setState(ushort aState, Boolean enable) {
@@ -364,3 +402,139 @@ TWindow* createAnimatedScoreWindow(const TRect &bounds) {
     return w;
 }
 
+// --- Color helpers ---
+
+namespace {
+// ANSI-like spectrum backgrounds (same order as common 16-color palettes)
+static const TColorRGB kAnsiBg[16] = {
+    TColorRGB(0x00,0x00,0x00), // Black
+    TColorRGB(0x00,0x00,0x80), // Blue
+    TColorRGB(0x00,0x80,0x00), // Green
+    TColorRGB(0x00,0x80,0x80), // Cyan
+    TColorRGB(0x80,0x00,0x00), // Red
+    TColorRGB(0x80,0x00,0x80), // Magenta
+    TColorRGB(0x80,0x80,0x00), // Brown/Olive
+    TColorRGB(0xC0,0xC0,0xC0), // Light gray
+    TColorRGB(0x80,0x80,0x80), // Dark gray
+    TColorRGB(0x00,0x00,0xFF), // Light blue
+    TColorRGB(0x00,0xFF,0x00), // Light green
+    TColorRGB(0x00,0xFF,0xFF), // Light cyan
+    TColorRGB(0xFF,0x00,0x00), // Light red
+    TColorRGB(0xFF,0x00,0xFF), // Light magenta
+    TColorRGB(0xFF,0xFF,0x00), // Yellow
+    TColorRGB(0xFF,0xFF,0xFF), // White
+};
+}
+
+void TAnimatedScoreView::setBackgroundRGB(uchar r, uchar g, uchar b)
+{
+    // Keep foreground light for readability; background is dynamic.
+    TColorRGB fg(0xFF, 0xFF, 0xFF);
+    textAttr = TColorAttr(fg, TColorRGB(r,g,b));
+}
+
+void TAnimatedScoreView::cycleBackground(int delta)
+{
+    if (delta == 0) delta = 1;
+    int n = 16;
+    bgIndex = (bgIndex + delta) % n; if (bgIndex < 0) bgIndex += n;
+    // Use a light FG on dark BGs, and dark FG on bright BGs for contrast.
+    const TColorRGB &bg = kAnsiBg[bgIndex];
+    // Compute simple perceived brightness to pick FG
+    int bright = (int)bg.r * 299 + (int)bg.g * 587 + (int)bg.b * 114; // 0..~255000
+    TColorRGB fg = bright > 128000 ? TColorRGB(0x20,0x20,0x20) : TColorRGB(0xFF,0xFF,0xFF);
+    textAttr = TColorAttr(fg, bg);
+}
+
+void TAnimatedScoreView::setBackgroundIndex(int idx)
+{
+    if (idx < 0) idx = 0; if (idx > 15) idx = 15;
+    bgIndex = idx;
+    const TColorRGB &bg = kAnsiBg[bgIndex];
+    int bright = (int)bg.r * 299 + (int)bg.g * 587 + (int)bg.b * 114;
+    TColorRGB fg = bright > 128000 ? TColorRGB(0x20,0x20,0x20) : TColorRGB(0xFF,0xFF,0xFF);
+    textAttr = TColorAttr(fg, bg);
+}
+
+bool TAnimatedScoreView::openBackgroundPaletteDialog()
+{
+    int idx = bgIndex;
+    if (runBgPaletteDialog(idx) == cmCancel)
+        return false;
+    setBackgroundIndex(idx);
+    drawView();
+    return true;
+}
+
+// Small modal palette picker dialog with a 4x4 color grid.
+namespace {
+class TColorGridView : public TView {
+public:
+    int selected {0};
+    TColorGridView(const TRect &r, int initial=0) : TView(r), selected(initial) { options |= ofSelectable; }
+    virtual void draw() override {
+        const int cols = 4, rows = 4; int cellW = size.x / cols; if (cellW < 8) cellW = 8;
+        TDrawBuffer b;
+        for (int ry = 0; ry < rows; ++ry) {
+            std::string line; line.reserve((size_t)size.x);
+            int y = ry;
+            b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+            int xPos = 0;
+            for (int cx = 0; cx < cols; ++cx) {
+                int idx = ry*cols + cx;
+                if (idx >= 16) break;
+                const TColorRGB &bg = kAnsiBg[idx];
+                // Contrast FG for swatch label
+                int bright = (int)bg.r * 299 + (int)bg.g * 587 + (int)bg.b * 114;
+                TColorRGB fg = bright > 128000 ? TColorRGB(0x20,0x20,0x20) : TColorRGB(0xFF,0xFF,0xFF);
+                TColorAttr attr(fg, bg);
+                // Fill swatch area
+                int sw = std::min(cellW-1, 12);
+                if (xPos < size.x) b.moveChar(xPos, ' ', attr, std::min(sw, size.x - xPos));
+                // Selection marker
+                if (idx == selected && xPos < size.x) {
+                    // Simple left bracket marker with strong contrast
+                    TColorAttr mk(TColorRGB(0xFF,0xFF,0xFF), TColorRGB(0x00,0x00,0x00));
+                    b.moveChar(xPos, '>', mk, 1);
+                }
+                xPos += cellW;
+            }
+            writeLine(0, y, size.x, 1, b);
+        }
+    }
+    virtual void handleEvent(TEvent &ev) override {
+        TView::handleEvent(ev);
+        if (ev.what == evKeyDown) {
+            int old = selected;
+            switch (ev.keyDown.keyCode) {
+                case kbLeft: if ((selected % 4) > 0) selected--; break;
+                case kbRight: if ((selected % 4) < 3) selected++; break;
+                case kbUp: if (selected >= 4) selected -= 4; break;
+                case kbDown: if (selected < 12) selected += 4; break;
+                case kbHome: selected = 0; break;
+                case kbEnd: selected = 15; break;
+                default: break;
+            }
+            if (selected != old) { drawView(); clearEvent(ev); }
+        }
+    }
+};
+}
+
+static ushort runBgPaletteDialog(int &index)
+{
+    // Dialog size: 4 rows, with some padding and buttons
+    TRect r(0, 0, 56, 10);
+    TDialog *d = new TDialog(r, "Background Palette");
+    // Place grid
+    TRect gr(2, 2, r.b.x - r.a.x - 2, 6); // four rows
+    auto *grid = new TColorGridView(gr, index);
+    d->insert(grid);
+    // Buttons
+    d->insert(new TButton(TRect(r.b.x - 20, r.b.y - 3, r.b.x - 11, r.b.y - 1), "~O~K", cmOK, bfDefault));
+    d->insert(new TButton(TRect(r.b.x - 10, r.b.y - 3, r.b.x - 2, r.b.y - 1), "Cancel", cmCancel, 0));
+    ushort code = TProgram::deskTop->execView(d);
+    if (code != cmCancel) index = grid->selected;
+    TObject::destroy(d);
+    return code;
+}
