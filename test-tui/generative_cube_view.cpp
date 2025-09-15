@@ -7,6 +7,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_cube_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -116,7 +117,7 @@ void TGenerativeCubeView::changeBounds(const TRect& b){ TView::changeBounds(b); 
 
 class TGenerativeCubeWindow : public TWindow{
 public:
-    explicit TGenerativeCubeWindow(const TRect &r):TWindow(r,"Cube Spinner (Generative)",wnNoNumber),TWindowInit(&TGenerativeCubeWindow::initFrame){}
+    explicit TGenerativeCubeWindow(const TRect &r):TWindow(r,"",wnNoNumber),TWindowInit(&TGenerativeCubeWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); view = new TGenerativeCubeView(c,ms); insert(view); }
     virtual void changeBounds(const TRect& b) override { 
         TWindow::changeBounds(b);
@@ -124,7 +125,7 @@ public:
         setState(sfExposed, True); redraw(); 
     }
 private: 
-    static TFrame* initFrame(TRect r){ return new TFrame(r);} 
+    static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} 
     TGenerativeCubeView* view {nullptr};
 };
 

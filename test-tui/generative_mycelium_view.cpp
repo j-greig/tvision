@@ -7,6 +7,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_mycelium_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -105,10 +106,10 @@ void TGenerativeMyceliumView::changeBounds(const TRect& b){ TView::changeBounds(
 
 class TGenerativeMyceliumWindow : public TWindow{
 public:
-    explicit TGenerativeMyceliumWindow(const TRect &r):TWindow(r,"Mycelium Field (Generative)",wnNoNumber),TWindowInit(&TGenerativeMyceliumWindow::initFrame){}
+    explicit TGenerativeMyceliumWindow(const TRect &r):TWindow(r,"",wnNoNumber),TWindowInit(&TGenerativeMyceliumWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); insert(new TGenerativeMyceliumView(c,ms)); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); setState(sfExposed, True); redraw(); }
-private: static TFrame* initFrame(TRect r){ return new TFrame(r);} };
+private: static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} };
 
 TWindow* createGenerativeMyceliumWindow(const TRect &bounds){ auto *w=new TGenerativeMyceliumWindow(bounds); w->setup(55); return w; }
 

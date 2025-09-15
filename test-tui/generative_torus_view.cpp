@@ -8,6 +8,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_torus_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -147,7 +148,7 @@ void TGenerativeTorusView::changeBounds(const TRect& b){ TView::changeBounds(b);
 
 class TGenerativeTorusWindow : public TWindow{
 public:
-    explicit TGenerativeTorusWindow(const TRect &r):TWindow(r,"Torus Field (Generative)",wnNoNumber),TWindowInit(&TGenerativeTorusWindow::initFrame){}
+    explicit TGenerativeTorusWindow(const TRect &r):TWindow(r,"",wnNoNumber),TWindowInit(&TGenerativeTorusWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); view = new TGenerativeTorusView(c,ms); insert(view); }
     virtual void changeBounds(const TRect& b) override {
         TWindow::changeBounds(b);
@@ -156,7 +157,7 @@ public:
         setState(sfExposed, True); redraw();
     }
 private:
-    static TFrame* initFrame(TRect r){ return new TFrame(r);} 
+    static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} 
     TGenerativeTorusView* view {nullptr};
 };
 

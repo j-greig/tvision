@@ -18,6 +18,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_monster_cam_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -317,9 +318,9 @@ void TGenerativeMonsterCamView::changeBounds(const TRect& b){ TView::changeBound
 
 class TGenerativeMonsterCamWindow : public TWindow{
 public:
-    explicit TGenerativeMonsterCamWindow(const TRect &r):TWindow(r, "Monster Cam (Emoji)", wnNoNumber), TWindowInit(&TGenerativeMonsterCamWindow::initFrame){}
+    explicit TGenerativeMonsterCamWindow(const TRect &r):TWindow(r, "", wnNoNumber), TWindowInit(&TGenerativeMonsterCamWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); insert(new TGenerativeMonsterCamView(c, ms)); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); setState(sfExposed, True); redraw(); }
-private: static TFrame* initFrame(TRect r){ return new TFrame(r);} };
+private: static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} };
 
 TWindow* createGenerativeMonsterCamWindow(const TRect &bounds){ auto *w=new TGenerativeMonsterCamWindow(bounds); w->setup(80); return w; }

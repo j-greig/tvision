@@ -9,6 +9,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_monster_verse_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -253,9 +254,9 @@ void TGenerativeMonsterVerseView::changeBounds(const TRect& b){ TView::changeBou
 
 class TGenerativeMonsterVerseWindow : public TWindow{
 public:
-    explicit TGenerativeMonsterVerseWindow(const TRect &r):TWindow(r, u8"👁️  ═══  👁️", wnNoNumber), TWindowInit(&TGenerativeMonsterVerseWindow::initFrame){}
+    explicit TGenerativeMonsterVerseWindow(const TRect &r):TWindow(r, "", wnNoNumber), TWindowInit(&TGenerativeMonsterVerseWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); insert(new TGenerativeMonsterVerseView(c,ms)); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); setState(sfExposed, True); redraw(); }
-private: static TFrame* initFrame(TRect r){ return new TFrame(r);} };
+private: static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} };
 
 TWindow* createGenerativeMonsterVerseWindow(const TRect &bounds){ auto *w=new TGenerativeMonsterVerseWindow(bounds); w->setup(60); return w; }

@@ -8,6 +8,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_verse_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -200,11 +201,15 @@ void TGenerativeVerseView::changeBounds(const TRect& bounds) { TView::changeBoun
 class TGenerativeVerseWindow : public TWindow {
 public:
     explicit TGenerativeVerseWindow(const TRect &bounds)
-        : TWindow(bounds, "Verse Field (Generative)", wnNoNumber)
+        : TWindow(bounds, "", wnNoNumber)
         , TWindowInit(&TGenerativeVerseWindow::initFrame) {}
     void setup(unsigned periodMs) { options |= ofTileable; TRect c=getExtent(); c.grow(-1,-1); insert(new TGenerativeVerseView(c, periodMs)); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); setState(sfExposed, True); redraw(); }
-private: static TFrame* initFrame(TRect r) { return new TFrame(r); }
+private: 
+    static TFrame* initFrame(TRect r) { 
+        // Use the same custom frame that handles empty titles properly
+        return new TNoTitleFrame(r); 
+    }
 };
 
 TWindow* createGenerativeVerseWindow(const TRect &bounds) { auto *w = new TGenerativeVerseWindow(bounds); w->setup(/*periodMs=*/50); return w; }

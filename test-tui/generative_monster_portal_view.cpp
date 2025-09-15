@@ -14,6 +14,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_monster_portal_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -246,11 +247,11 @@ void TGenerativeMonsterPortalView::changeBounds(const TRect& b){ TView::changeBo
 
 class TGenerativeMonsterPortalWindow : public TWindow{
 public:
-    explicit TGenerativeMonsterPortalWindow(const TRect &r):TWindow(r,"Monster Portal (Generative)",wnNoNumber),TWindowInit(&TGenerativeMonsterPortalWindow::initFrame){}
+    explicit TGenerativeMonsterPortalWindow(const TRect &r):TWindow(r,"",wnNoNumber),TWindowInit(&TGenerativeMonsterPortalWindow::initFrame){}
     void setup(unsigned ms){ options|=ofTileable; TRect c=getExtent(); c.grow(-1,-1); view = new TGenerativeMonsterPortalView(c,ms); insert(view); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); if (view){ TRect c=getExtent(); c.grow(-1,-1); view->locate(c); view->drawView(); } setState(sfExposed, True); redraw(); }
 private:
-    static TFrame* initFrame(TRect r){ return new TFrame(r);} 
+    static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} 
     TGenerativeMonsterPortalView* view {nullptr};
 };
 

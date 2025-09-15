@@ -65,6 +65,8 @@
 #include "text_editor_view.h"
 // Wib&Wob AI chat interface
 #include "wibwob_view.h"
+// Custom frame for windows without titles
+#include "notitle_frame.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -351,6 +353,7 @@ public:
 /*---------------------------------------------------------*/
 /* TFrameAnimationWindow - Window containing animation    */
 /*---------------------------------------------------------*/
+
 class TFrameAnimationWindow : public TWindow
 {
 public:
@@ -393,6 +396,12 @@ public:
         }, nullptr);
         
         redraw();
+    }
+    
+    // Custom frame initializer
+    static TFrame *initFrame(TRect r)
+    {
+        return new TNoTitleFrame(r);
     }
 };
 
@@ -1127,24 +1136,12 @@ void TTestPatternApp::openAnimationFile()
     TFileDialog* dialog = new TFileDialog("primers/*.txt", "Open Text/Animation File", "~N~ame", fdOpenButton, 100);
     if (executeDialog(dialog, fileName) != cmCancel)
     {
-        // Determine file type and create appropriate title
         windowNumber++;
-        std::stringstream title;
-        
-        if (hasFrameDelimiters(fileName)) {
-            title << "Animation " << windowNumber;
-        } else {
-            // Extract filename without path for text files
-            std::string fileStr(fileName);
-            size_t lastSlash = fileStr.find_last_of("/\\");
-            std::string baseName = (lastSlash != std::string::npos) ? fileStr.substr(lastSlash + 1) : fileStr;
-            title << baseName << " - Text " << windowNumber;
-        }
         
         // Auto-size window to file content
         TRect bounds = calculateWindowBounds(fileName);
-        // Create and insert window with selected file
-        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), fileName);
+        // Create window without title (empty string)
+        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", fileName);
         deskTop->insert(window);
         registerWindow(window);
     }

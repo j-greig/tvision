@@ -8,6 +8,7 @@
 /*---------------------------------------------------------*/
 
 #include "generative_orbit_view.h"
+#include "notitle_frame.h"
 
 #define Uses_TWindow
 #define Uses_TFrame
@@ -126,11 +127,11 @@ void TGenerativeOrbitView::changeBounds(const TRect& b){ TView::changeBounds(b);
 class TGenerativeOrbitWindow : public TWindow {
 public:
     explicit TGenerativeOrbitWindow(const TRect &r)
-        : TWindow(r, "Orbit Field (Generative)", wnNoNumber)
+        : TWindow(r, "", wnNoNumber)
         , TWindowInit(&TGenerativeOrbitWindow::initFrame) {}
     void setup(unsigned ms){ options |= ofTileable; TRect c=getExtent(); c.grow(-1,-1); insert(new TGenerativeOrbitView(c, ms)); }
     virtual void changeBounds(const TRect& b) override { TWindow::changeBounds(b); setState(sfExposed, True); redraw(); }
-private: static TFrame* initFrame(TRect r){ return new TFrame(r);} };
+private: static TFrame* initFrame(TRect r){ return new TNoTitleFrame(r);} };
 
 TWindow* createGenerativeOrbitWindow(const TRect &bounds){ auto *w=new TGenerativeOrbitWindow(bounds); w->setup(50); return w; }
 
