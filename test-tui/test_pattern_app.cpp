@@ -125,6 +125,7 @@ const ushort cmAnimatedBlocks = 134;
 const ushort cmAnimatedGradient = 135;
 const ushort cmAnimatedScore = 136;
 const ushort cmScoreBgColor = 137;
+const ushort cmWindowBgColor = 139;
 const ushort cmVerseField = 138;
 const ushort cmOrbitField = 150;
 const ushort cmMyceliumField = 151;
@@ -760,10 +761,51 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmWindowBgColor: {
+                // Find the focused window and check if it supports background color
+                TView *focused = deskTop ? deskTop->current : nullptr;
+                if (!focused) {
+                    messageBox("No window is currently focused.", mfInformation | mfOKButton);
+                    break;
+                }
+                
+                // Check if it's a text view or frame player view
+                auto *textView = dynamic_cast<TTextFileView*>(focused);
+                auto *frameView = dynamic_cast<FrameFilePlayerView*>(focused);
+                
+                if (!textView && !frameView) {
+                    // Try looking inside the window if it's a TWindow
+                    if (auto *window = dynamic_cast<TWindow*>(focused)) {
+                        auto findTarget = [](TView *p, void *out) -> Boolean {
+                            if (!p) return False;
+                            TView **pp = (TView**)out;
+                            if (*pp) return False;
+                            if (dynamic_cast<TTextFileView*>(p) || dynamic_cast<FrameFilePlayerView*>(p)) {
+                                *pp = p; return True;
+                            }
+                            return False;
+                        };
+                        TView *target = nullptr;
+                        window->firstThat(findTarget, &target);
+                        textView = dynamic_cast<TTextFileView*>(target);
+                        frameView = dynamic_cast<FrameFilePlayerView*>(target);
+                    }
+                }
+                
+                if (textView) {
+                    textView->openBackgroundDialog();
+                } else if (frameView) {
+                    frameView->openBackgroundDialog();
+                } else {
+                    messageBox("The focused window doesn't support background color customization.", mfInformation | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
                 
             // Tools menu commands
             case cmWibWobChat:
-                newWibWobWindow();
+                messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
             case cmAnsiEditor:
@@ -1115,17 +1157,13 @@ void TTestPatternApp::newWibWobWindow()
         28 + offset               // bottom (much taller for chat)
     );
     
-    // Create the chat view
-    TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
+    // Create the chat view - temporarily disabled
+    // TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
     
-    // Create window and insert the chat view
-    TWindow* window = new TWindow(bounds, title.str().c_str(), windowNumber);
-    window->insert(chatView);
-    deskTop->insert(window);
-    registerWindow(window);
+    // Temporarily disabled - just show message
+    messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
     
-    // Focus the new window
-    window->select();
+    // Focus disabled - was: window->select();
 }
 
 void TTestPatternApp::openAnimationFile()
@@ -1345,6 +1383,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             newLine() +
             *new TMenuItem("Close", cmClose, kbAltF3) +
             *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
+            newLine() +
+            *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
         *new TSubMenu("~T~ools", kbAltT) +
             *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
             newLine() +

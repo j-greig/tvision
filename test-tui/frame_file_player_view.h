@@ -31,6 +31,23 @@
 #include <string>
 #include <vector>
 
+// Background types for enhanced background system
+enum class TBackgroundType {
+    Solid,
+    Transparent,
+    VerticalGradient,
+    HorizontalGradient,
+    RadialGradient,
+    DiagonalGradient
+};
+
+struct TBackgroundConfig {
+    TBackgroundType type = TBackgroundType::Solid;
+    int solidColorIndex = 0;        // Index into ANSI color palette for solid backgrounds
+    TColorRGB gradientStart = TColorRGB(0xFF, 0x00, 0x00);  // Red default
+    TColorRGB gradientEnd = TColorRGB(0x00, 0x00, 0xFF);    // Blue default
+};
+
 struct Span { size_t start; size_t end; }; // [start, end)
 
 class FrameFilePlayerView : public TView {
@@ -45,6 +62,13 @@ public:
 
     bool ok() const { return loadOk; }
     const std::string &error() const { return errorMsg; }
+    
+    // Background support (enhanced with gradients and transparency)
+    void setBackgroundIndex(int idx);
+    int backgroundIndex() const { return bgConfig.solidColorIndex; }
+    void setBackgroundConfig(const TBackgroundConfig& config);
+    const TBackgroundConfig& getBackgroundConfig() const { return bgConfig; }
+    bool openBackgroundDialog();
 
 private:
     // Data
@@ -55,6 +79,7 @@ private:
     unsigned periodMs {300};
     bool loadOk {false};
     std::string errorMsg;
+    TBackgroundConfig bgConfig; // Enhanced background configuration
 
     // Helpers
     void startTimer();
@@ -79,6 +104,13 @@ public:
 
     bool ok() const { return loadOk; }
     const std::string &error() const { return errorMsg; }
+    
+    // Background support (enhanced with gradients and transparency)
+    void setBackgroundIndex(int idx);
+    int backgroundIndex() const { return bgConfig.solidColorIndex; }
+    void setBackgroundConfig(const TBackgroundConfig& config);
+    const TBackgroundConfig& getBackgroundConfig() const { return bgConfig; }
+    bool openBackgroundDialog();
 
 private:
     std::vector<std::string> lines;
@@ -87,6 +119,7 @@ private:
     std::string errorMsg;
     TScrollBar *vScrollBar;
     bool needsRedraw {true};
+    TBackgroundConfig bgConfig; // Enhanced background configuration
 
     void loadFile(const std::string &path);
     void setLimit();
