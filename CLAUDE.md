@@ -380,6 +380,39 @@ cd test-tui && ./build/test_pattern
 
 The API provides full programmatic control over TUI applications, enabling powerful automation and integration capabilities while maintaining real-time responsiveness.
 
+### Quick Commands for Common Tasks
+
+When the user requests common primer operations, use these shortcuts:
+
+#### "Launch API and open all primers starting with X"
+```bash
+# 1. Launch API server (background)
+python -m tools.api_server.main --port=8089 &
+
+# 2. Find matching primers and batch spawn
+curl -X POST "http://127.0.0.1:8089/primers/batch" \
+  -H "Content-Type: application/json" \
+  -d '{"primers": [array of {primer_path, x, y}]}'
+```
+
+#### Primer Patterns
+- **monster** primers: Grid layout starting at (5,2), spacing x+40, y+10
+- **iso** primers: Horizontal line at y=5, spacing x+35  
+- **cave** primers: Cascade from (10,3)
+- **generative** primers: Scattered placement for variety
+
+#### Common Grid Layouts
+```json
+// 4x3 grid for up to 12 items
+{"x": 5 + (col * 40), "y": 2 + (row * 10)}
+
+// Horizontal strip
+{"x": 5 + (i * 35), "y": 5}
+
+// Cascade pattern  
+{"x": 5 + (i * 3), "y": 2 + (i * 2)}
+```
+
 ## MCP Integration for AI Agents
 
 The API server includes **Model Context Protocol (MCP)** support, enabling AI agents like Claude Code to directly control TUI applications through standardized tool interfaces.

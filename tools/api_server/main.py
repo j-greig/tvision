@@ -28,6 +28,8 @@ from .schemas import (
     CanvasInfo,
     Capabilities,
     MenuCommand,
+    MonodrawLoadRequest,
+    MonodrawParseRequest,
     PatternMode,
     PrimerInfo,
     PrimersListResponse,
@@ -43,6 +45,7 @@ from .schemas import (
     WorkspaceSave,
     RectModel,
 )
+from pydantic import BaseModel
 
 
 def make_app() -> FastAPI:
@@ -362,6 +365,24 @@ def make_app() -> FastAPI:
     @app.get("/timeline/status")
     async def timeline_status(group_id: str) -> Dict[str, Any]:
         return await ctl.get_timeline_status(group_id)
+
+    # ----- Monodraw Integration -----
+
+    @app.post("/monodraw/load")
+    async def monodraw_load(payload: MonodrawLoadRequest) -> Dict[str, Any]:
+        """Load Monodraw JSON file and spawn corresponding TUI windows."""
+        return await ctl.load_monodraw_file(
+            file_path=payload.file_path,
+            scale=payload.scale,
+            offset_x=payload.offset_x,
+            offset_y=payload.offset_y,
+            window_types=payload.window_types
+        )
+
+    @app.post("/monodraw/parse")
+    async def monodraw_parse(payload: MonodrawParseRequest) -> Dict[str, Any]:
+        """Parse Monodraw file without creating windows (preview mode)."""
+        return await ctl.parse_monodraw_file(payload.file_path)
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:

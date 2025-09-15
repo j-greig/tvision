@@ -15,7 +15,10 @@ from .schemas import (
     BoundsModel, 
     TimelineSummary,
 )
+from .monodraw_parser import MonodrawParser, MonodrawLayer, scale_coordinates
 import json
+import tempfile
+import os
 
 
 class Controller:
@@ -563,3 +566,159 @@ class Controller:
             "pending": 0,
             "applied": 0
         }
+
+    # ----- Monodraw Integration -----
+    async def load_monodraw_file(
+        self,
+        file_path: str,
+        scale: float = 1.0,
+        offset_x: int = 0,
+        offset_y: int = 0,
+        window_types: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """Load Monodraw JSON file and spawn corresponding TUI windows."""
+        try:
+            # Parse Monodraw file
+            layers = MonodrawParser.parse_file(file_path)
+            
+            if not layers:
+                return {
+                    "ok": False,
+                    "error": "No named layers found in Monodraw file",
+                    "windows_created": [],
+                    "total_layers": 0
+                }
+            
+            # Get terminal size for scaling
+            await self._sync_state()
+            terminal_size = (self._state.canvas_width, self._state.canvas_height)
+            
+            # Scale coordinates to fit terminal
+            if scale != 1.0 or terminal_size != (80, 24):
+                layers = scale_coordinates(layers, scale, terminal_size)
+            
+            # Apply offset
+            if offset_x != 0 or offset_y != 0:
+                for layer in layers:
+                    layer.origin = (
+                        layer.origin[0] + offset_x,
+                        layer.origin[1] + offset_y
+                    )
+            
+            # Create windows for each layer
+            windows_created = []
+            errors = []
+            
+            for layer in layers:
+                try:
+                    # Determine window type
+                    window_type = self._infer_window_type(layer, window_types or {})
+                    
+                    # Create window rect
+                    rect = Rect(
+                        x=layer.origin[0],
+                        y=layer.origin[1], 
+                        w=layer.frame_size[0],
+                        h=layer.frame_size[1]
+                    )
+                    
+                    # Set window properties based on content
+                    props = {"monodraw_layer": layer.name}
+                    if window_type == WindowType.text_view:
+                        # Create temporary file with layer content
+                        temp_file = tempfile.NamedTemporaryFile(
+                            mode='w', 
+                            suffix=f'_{layer.name}.txt',
+                            delete=False,
+                            encoding='utf-8'
+                        )
+                        temp_file.write(layer.text_content)
+                        temp_file.close()
+                        props["path"] = temp_file.name
+                    
+                    # Create the window
+                    window = await self.create_window(
+                        wtype=window_type,
+                        title=layer.name,
+                        rect=rect,
+                        props=props
+                    )
+                    
+                    windows_created.append({
+                        "id": window.id,
+                        "type": window.type.value,
+                        "title": window.title,
+                        "rect": {
+                            "x": window.rect.x,
+                            "y": window.rect.y, 
+                            "w": window.rect.w,
+                            "h": window.rect.h
+                        },
+                        "monodraw_layer": layer.name
+                    })
+                    
+                except Exception as e:
+                    errors.append(f"Failed to create window for layer '{layer.name}': {str(e)}")
+            
+            return {
+                "ok": True,
+                "windows_created": windows_created,
+                "errors": errors,
+                "total_layers": len(layers),
+                "windows_spawned": len(windows_created)
+            }
+            
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"Failed to load Monodraw file: {str(e)}",
+                "windows_created": [],
+                "total_layers": 0
+            }
+    
+    def _infer_window_type(self, layer: MonodrawLayer, explicit_types: Dict[str, str]) -> WindowType:
+        """Infer appropriate window type from layer content."""
+        # Check for explicit type mapping first
+        if layer.name in explicit_types:
+            try:
+                return WindowType(explicit_types[layer.name])
+            except ValueError:
+                pass  # Fall back to inference
+        
+        # For now, treat all content as text_view
+        # TODO: Add pattern detection for other window types
+        return WindowType.text_view
+    
+    async def parse_monodraw_file(self, file_path: str) -> Dict[str, Any]:
+        """Parse Monodraw file without creating windows (preview mode)."""
+        try:
+            layers = MonodrawParser.parse_file(file_path)
+            canvas_w, canvas_h = MonodrawParser.get_canvas_bounds(layers)
+            
+            layer_previews = []
+            for layer in layers:
+                preview_text = layer.text_content[:100] + "..." if len(layer.text_content) > 100 else layer.text_content
+                layer_previews.append({
+                    "name": layer.name,
+                    "position": {"x": layer.origin[0], "y": layer.origin[1]},
+                    "size": {"w": layer.frame_size[0], "h": layer.frame_size[1]},
+                    "content_preview": preview_text.replace('\n', ' '),
+                    "suggested_type": "text_view",
+                    "confidence": 1.0
+                })
+            
+            return {
+                "ok": True,
+                "layers": layer_previews,
+                "canvas_bounds": {"w": canvas_w, "h": canvas_h},
+                "total_layers": len(layers)
+            }
+            
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"Failed to parse Monodraw file: {str(e)}",
+                "layers": [],
+                "canvas_bounds": {"w": 0, "h": 0},
+                "total_layers": 0
+            }

@@ -50,6 +50,18 @@ class PatternMode(BaseModel):
     mode: Literal["continuous", "tiled"]
 
 
+class MonodrawLoadRequest(BaseModel):
+    file_path: str
+    scale: float = 1.0
+    offset_x: int = 0
+    offset_y: int = 0
+    window_types: Optional[Dict[str, str]] = None
+
+
+class MonodrawParseRequest(BaseModel):
+    file_path: str
+
+
 class WorkspaceSave(BaseModel):
     path: str
 
