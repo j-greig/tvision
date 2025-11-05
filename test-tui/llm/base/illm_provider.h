@@ -70,7 +70,8 @@ public:
     
     // Session management
     virtual void resetSession() = 0;
-    
+    virtual std::string getSessionId() const { return ""; }  // Optional, returns empty if not applicable
+
     // Tool support
     virtual bool supportsTools() const = 0;
     virtual void registerTool(const Tool& tool) = 0;

@@ -12,6 +12,15 @@ cmake --build ./build
 ./build/simple_tui    # Basic TUI demo
 ```
 
+**Debug Logging**: Capture stderr debug output (session IDs, raw JSON, IPC logs):
+```bash
+cd test-tui
+./run_test_pattern_logged.sh        # Logs to test_pattern_debug.log
+tail -f test_pattern_debug.log      # Watch logs live (separate terminal)
+```
+
+**Programmatic Control**: The `test_pattern` app can be controlled via REST API + MCP for AI agents. See [tools/api_server/README.md](tools/api_server/README.md) and [CLAUDE.md](CLAUDE.md) for setup.
+
 ![tvedit in Konsole](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)
 
 I started this as a personal project at the very end of 2018. By May 2020 I considered it was very close to feature parity with the original, and decided to make it open.

@@ -46,6 +46,12 @@ public:
     void setStatus(const std::string& status);
     void clearChat();
 
+    // Scrollbar synchronization (public for parent window access)
+    int calculateTotalWrappedLines() const;
+    int getMessageAreaHeight() const;
+    int getScrollOffset() const { return scrollOffset; }
+    void notifyScrollBarUpdate();
+
 private:
     // UI state
     std::vector<ChatMessage> messages;
@@ -100,7 +106,6 @@ private:
     std::string getCurrentTime() const;
     
     // Layout calculations
-    int getMessageAreaHeight() const;
     int getInputAreaHeight() const { return 1; }
     int getStatusAreaHeight() const { return 1; }
 };
@@ -110,11 +115,14 @@ public:
     TWibWobWindow(const TRect& bounds, const std::string& title);
 
     virtual void changeBounds(const TRect& bounds) override;
+    void updateTitleWithSession(const std::string& sessionId);
+    void updateScrollBarLimit();
 
 private:
     static TFrame* initFrame(TRect r);
     TWibWobView* chatView {nullptr};
     TScrollBar* vScrollBar {nullptr};
+    std::string baseTitle;
 };
 
 TWindow* createWibWobWindow(const TRect& bounds, const std::string& title);

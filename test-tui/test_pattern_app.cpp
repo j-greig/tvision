@@ -67,6 +67,8 @@
 #include "wibwob_view.h"
 // Custom frame for windows without titles
 #include "notitle_frame.h"
+// Transparent background text view
+#include "transparent_text_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -106,6 +108,10 @@ const ushort cmOpenWorkspace = 115;
 const ushort cmOpenAnsiArt = 112;
 const ushort cmNewPaintCanvas = 113;
 const ushort cmOpenImageFile = 114;
+
+// Window menu commands
+const ushort cmOpenTransparentText = 116;
+const ushort cmOpenMonodraw = 118;
 
 // Edit menu commands
 const ushort cmScreenshot = 101;
@@ -168,50 +174,117 @@ class TCustomMenuBar;
 class TCustomStatusLine;
 
 /*---------------------------------------------------------*/
-/* TCustomMenuBar - Menu bar with right-aligned kaomoji   */
+/* TCustomMenuBar - Menu bar with animated kaomoji        */
 /*---------------------------------------------------------*/
 class TCustomMenuBar : public TMenuBar
 {
 public:
-    TCustomMenuBar(const TRect& bounds, TMenu* aMenu) : TMenuBar(bounds, aMenu) {}
-    TCustomMenuBar(const TRect& bounds, TSubMenu& aMenu) : TMenuBar(bounds, aMenu) {}
-    
+    enum KaomojiMood {
+        NEUTRAL,      // つ◕‿◕‿◕༽つ - Default
+        EXCITED,      // つ◉‿◉‿◉༽つ - Tool use, window spawning
+        THINKING,     // つ●‿●‿●༽つ - LLM processing
+        SLEEPY,       // つ◡‿◡‿◡༽つ - Idle, blinking
+        CURIOUS,      // つ○‿○‿○༽つ - User input
+        MEMORY,       // つ■‿■‿■༽つ - Symbient memory tool
+        GEOMETRIC,    // つ□‿□‿□༽つ - Geometric tool/pattern mode
+        SURPRISED     // つ◎‿◎‿◎༽つ - Errors, unexpected events
+    };
+
+    TCustomMenuBar(const TRect& bounds, TMenu* aMenu) : TMenuBar(bounds, aMenu) {
+        // Start blink timer (3-6 seconds between blinks)
+        scheduleNextBlink();
+    }
+    TCustomMenuBar(const TRect& bounds, TSubMenu& aMenu) : TMenuBar(bounds, aMenu) {
+        scheduleNextBlink();
+    }
+
     virtual TColorAttr mapColor(uchar index) noexcept override
     {
         TColorRGB trueBlack(0, 0, 0);
         TColorRGB trueWhite(255, 255, 255);
-        
-        // Experiment with different indices to find which controls hotkeys
-        // getColor(0x0301) uses indices 1 and 3, getColor(0x0604) uses indices 4 and 6
+
         switch(index) {
-            case 1:  // First try index 1 (might be hotkey for getColor(0x0301))
-            case 3:  // Or index 3 (might be hotkey for getColor(0x0301)) 
-            case 4:  // Or index 4 (might be hotkey for getColor(0x0604))
-            case 6:  // Or index 6 (might be hotkey for getColor(0x0604))
-                return TColorAttr(trueBlack, trueWhite);  // BLACK ON TRUE WHITE
+            case 1:  case 3:  case 4:  case 6:
+                return TColorAttr(trueBlack, trueWhite);
             default:
-                return TMenuBar::mapColor(index);  // Use parent's mapping for others
+                return TMenuBar::mapColor(index);
         }
     }
-    
+
     virtual void draw() override
     {
-        // Use standard TMenuBar drawing with our custom palette
         TMenuBar::draw();
-        
-        // Add kaomoji at right side with proper background fill
-        TDrawBuffer b;
-        const char* kaomoji = "つ◕‿◕‿◕༽つ";
+
+        // Update blink state
+        auto now = std::chrono::steady_clock::now();
+        if (now >= nextBlinkTime && currentMood == NEUTRAL) {
+            isBlinking = true;
+            blinkStartTime = now;
+        }
+
+        // End blink after 150ms
+        if (isBlinking && std::chrono::duration_cast<std::chrono::milliseconds>(now - blinkStartTime).count() > 150) {
+            isBlinking = false;
+            scheduleNextBlink();
+        }
+
+        // Get kaomoji based on current mood and blink state
+        const char* kaomoji = getKaomojiForState();
         int kaomojiWidth = 12;
         int xPos = size.x - kaomojiWidth;
-        
-        if (xPos > 1) { // Only draw if there's space
+
+        if (xPos > 1) {
+            TDrawBuffer b;
             TAttrPair cNormal = getColor(0x0301);
-            // Fill entire kaomoji area with background first
             b.moveChar(0, ' ', cNormal, kaomojiWidth);
-            // Then write kaomoji text
             b.moveStr(0, kaomoji, cNormal);
             writeBuf(xPos, 0, kaomojiWidth, 1, b);
+        }
+    }
+
+    void setMood(KaomojiMood mood, int durationMs = 2000) {
+        currentMood = mood;
+        if (durationMs > 0) {
+            moodEndTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(durationMs);
+        }
+    }
+
+    void update() {
+        // Revert to neutral after mood duration
+        auto now = std::chrono::steady_clock::now();
+        if (currentMood != NEUTRAL && now >= moodEndTime) {
+            currentMood = NEUTRAL;
+        }
+        drawView();
+    }
+
+private:
+    KaomojiMood currentMood = NEUTRAL;
+    bool isBlinking = false;
+    std::chrono::steady_clock::time_point blinkStartTime;
+    std::chrono::steady_clock::time_point nextBlinkTime;
+    std::chrono::steady_clock::time_point moodEndTime;
+
+    void scheduleNextBlink() {
+        // Random blink interval: 3-6 seconds
+        int interval = 3000 + (rand() % 3000);
+        nextBlinkTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval);
+    }
+
+    const char* getKaomojiForState() {
+        // Blink overrides mood
+        if (isBlinking) return "つ-‿-‿-༽つ";
+
+        switch(currentMood) {
+            case EXCITED:    return "つ◉‿◉‿◉༽つ";
+            case THINKING:   return "つ●‿●‿●༽つ";
+            case SLEEPY:     return "つ◡‿◡‿◡༽つ";
+            case CURIOUS:    return "つ○‿○‿○༽つ";
+            case MEMORY:     return "つ■‿■‿■༽つ";
+            case GEOMETRIC:  return "つ□‿□‿□༽つ";
+            case SURPRISED:  return "つ◎‿◎‿◎༽つ";
+            case NEUTRAL:
+            default:         return "つ◕‿◕‿◕༽つ";
         }
     }
 };
@@ -287,7 +360,7 @@ private:
     
 public:
     TTestPatternWindow(const TRect& bounds, const char* aTitle) :
-        TWindow(bounds, aTitle, wnNoNumber),
+        TWindow(bounds, "", wnNoNumber),
         TWindowInit(&TTestPatternWindow::initFrame)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
@@ -302,6 +375,11 @@ public:
     }
     
     TTestPatternView* getPatternView() { return patternView; }
+    
+    static TFrame* initFrame(TRect r)
+    {
+        return new TNoTitleFrame(r);
+    }
     
 };
 
@@ -319,7 +397,7 @@ public:
     };
     
     TGradientWindow(const TRect& bounds, const char* aTitle, GradientType type) :
-        TWindow(bounds, aTitle, wnNoNumber),
+        TWindow(bounds, "", wnNoNumber),
         TWindowInit(&TGradientWindow::initFrame)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
@@ -348,6 +426,11 @@ public:
         
         if (gradientView)
             insert(gradientView);
+    }
+
+    static TFrame* initFrame(TRect r)
+    {
+        return new TNoTitleFrame(r);
     }
 };
 
@@ -432,6 +515,8 @@ private:
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
     void openAnimationFilePath(const std::string& path, const TRect& bounds);
+    void openTransparentTextFile();
+    void openMonodrawFile(const char* fileName);
     void openWorkspace();
     bool openWorkspacePath(const std::string& path);
     void cascade();
@@ -455,7 +540,17 @@ private:
     
     int windowNumber;
     static const int maxWindows = 99;
-    
+
+    // Kaomoji mood helper
+    void setKaomojiMood(TCustomMenuBar::KaomojiMood mood, int durationMs = 2000) {
+        if (menuBar) {
+            auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+            if (customMenuBar) {
+                customMenuBar->setMood(mood, durationMs);
+            }
+        }
+    }
+
     // API/IPC registry for per-window control
     int apiIdCounter = 1;
     std::map<TWindow*, std::string> winToId;
@@ -578,6 +673,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmOpenAnimation:
                 openAnimationFile();
+                clearEvent(event);
+                break;
+            case cmOpenTransparentText:
+                openTransparentTextFile();
                 clearEvent(event);
                 break;
             case cmOpenWorkspace:
@@ -805,7 +904,7 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 
             // Tools menu commands
             case cmWibWobChat:
-                messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
+                newWibWobWindow();
                 clearEvent(event);
                 break;
             case cmAnsiEditor:
@@ -959,7 +1058,18 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
-                
+
+            case cmOpenMonodraw: {
+                char fileName[MAXPATH];
+                strcpy(fileName, "*.monojson");
+                TFileDialog* dialog = new TFileDialog("*.monojson", "Open Monodraw File", "~N~ame", fdOpenButton, 101);
+                if (executeDialog(dialog, fileName) != cmCancel) {
+                    openMonodrawFile(fileName);
+                }
+                clearEvent(event);
+                break;
+            }
+
             default:
                 break;
         }
@@ -1135,8 +1245,8 @@ void TTestPatternApp::newDonutWindow()
         15 + offset               // bottom
     );
     
-    // Create and insert window with donut.txt file
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), "donut.txt");
+    // Create and insert window with donut.txt file (no title for minimalist aesthetic)
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "donut.txt");
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -1156,14 +1266,17 @@ void TTestPatternApp::newWibWobWindow()
         82 + offset * 2,          // right (much wider for chat)
         28 + offset               // bottom (much taller for chat)
     );
-    
-    // Create the chat view - temporarily disabled
-    // TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
-    
-    // Temporarily disabled - just show message
-    messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
-    
-    // Focus disabled - was: window->select();
+
+    std::string windowTitle = title.str();
+    TWindow* window = createWibWobWindow(bounds, windowTitle);
+    if (!window) {
+        messageBox("Failed to create Wib&Wob Chat window.", mfError | mfOKButton);
+        return;
+    }
+
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
 }
 
 void TTestPatternApp::openAnimationFile()
@@ -1203,7 +1316,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     // Auto-size window to file content
     TRect bounds = calculateWindowBounds(filePath);
     // Create and insert window with selected file
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -1224,18 +1337,72 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const T
     }
     
     // Create and insert window with provided bounds
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.str().c_str(), filePath);
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath);
     deskTop->insert(window);
     registerWindow(window);
 }
 
+void TTestPatternApp::openTransparentTextFile()
+{
+    char fileName[MAXPATH];
+    strcpy(fileName, "primers/*.txt");
 
+    TFileDialog* dialog = new TFileDialog("primers/*.txt", "Open Text File (Transparent BG)", "~N~ame", fdOpenButton, 100);
+    if (executeDialog(dialog, fileName) != cmCancel)
+    {
+        windowNumber++;
 
+        // Extract filename without path for title
+        std::string filePath(fileName);
+        size_t lastSlash = filePath.find_last_of("/\\");
+        std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+
+        std::stringstream title;
+        title << baseName << " (Transparent)";
+
+        // Calculate window position (cascade effect)
+        int offset = (windowNumber - 1) % 10;
+        TRect bounds(
+            2 + offset * 2,           // left
+            1 + offset,               // top
+            82 + offset * 2,          // right (80 cols + frame)
+            25 + offset               // bottom (24 rows + frame)
+        );
+
+        // Create transparent background text window
+        TTransparentTextWindow* window = new TTransparentTextWindow(bounds, title.str(), filePath);
+        deskTop->insert(window);
+        registerWindow(window);
+    }
+}
+
+void TTestPatternApp::openMonodrawFile(const char* fileName)
+{
+    // Use curl to call the Monodraw API endpoint
+    std::stringstream cmd;
+    cmd << "curl -s -X POST 'http://127.0.0.1:8089/monodraw/load' "
+        << "-H 'Content-Type: application/json' "
+        << "-d '{\"file_path\": \"" << fileName << "\", "
+        << "\"target\": \"text_editor\", "
+        << "\"mode\": \"replace\", "
+        << "\"flatten\": true, "
+        << "\"insert_header\": true}' "
+        << "> /dev/null 2>&1 &";  // Background, suppress output
+
+    int result = std::system(cmd.str().c_str());
+
+    if (result == 0) {
+        std::string msg = "Importing Monodraw file to text editor...";
+        messageBox(msg.c_str(), mfInformation | mfOKButton);
+    } else {
+        messageBox("Failed to import Monodraw file. Is API server running?", mfError | mfOKButton);
+    }
+}
 
 void TTestPatternApp::setPatternMode(bool continuous)
 {
     USE_CONTINUOUS_PATTERN = continuous;
-    
+
     // Show confirmation message
     std::string mode = continuous ? "Continuous (Diagonal)" : "Tiled (Cropped)";
     std::stringstream msg;
@@ -1338,6 +1505,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
+            *new TMenuItem("Open Monodra~w~...", cmOpenMonodraw, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
             *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
@@ -1373,6 +1541,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+            newLine() +
+            *new TMenuItem("~O~pen Text File (Transparent BG)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
             *new TMenuItem("~T~ile", cmTile, kbNoKey) +
@@ -1547,6 +1717,14 @@ void TTestPatternApp::idle()
     TApplication::idle();
     // Poll IPC server for incoming API commands
     if (ipcServer) ipcServer->poll();
+
+    // Update animated kaomoji in menu bar
+    if (menuBar) {
+        auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+        if (customMenuBar) {
+            customMenuBar->update();
+        }
+    }
 
     // Idle: no default content window or wallpaper.
 }
@@ -1968,7 +2146,7 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
 
         TWindow *win = nullptr;
         if (type == "test_pattern") {
-            win = new TTestPatternWindow(bounds, title.c_str());
+            win = new TTestPatternWindow(bounds, "");
         } else if (type == "gradient") {
             std::string gtype; // props.gradientType preferred
             size_t propsPos = obj.find("\"props\"");
@@ -1981,7 +2159,7 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
             if (gtype == "vertical") gt = TGradientWindow::gtVertical;
             else if (gtype == "radial") gt = TGradientWindow::gtRadial;
             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
-            win = new TGradientWindow(bounds, title.c_str(), gt);
+            win = new TGradientWindow(bounds, "", gt);
         } else {
             continue;
         }
@@ -2220,47 +2398,71 @@ void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
     TProgram::deskTop->insert(window);
 }
 
-std::string api_send_text(TTestPatternApp& app, const std::string& id, 
-                         const std::string& content, const std::string& mode, 
+std::string api_send_text(TTestPatternApp& app, const std::string& id,
+                         const std::string& content, const std::string& mode,
                          const std::string& position) {
+    fprintf(stderr, "[api_send_text] START: id=%s, content_len=%zu, mode=%s\n",
+            id.c_str(), content.size(), mode.c_str());
+
     // Special case: if id is "auto" or no text editor exists, create one
     bool autoSpawn = (id == "auto" || id == "text_editor");
-    
+    fprintf(stderr, "[api_send_text] autoSpawn=%d\n", autoSpawn);
+
     // Find existing text editor windows
+    fprintf(stderr, "[api_send_text] Searching for existing text editor...\n");
     TView* view = app.deskTop->first();
     TTextEditorWindow* editorWindow = nullptr;
-    
-    while (view) {
-        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(view);
+
+    // Use nextView() to avoid infinite loop on circular linked list
+    for (TView* v = view; v; v = v->nextView()) {
+        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(v);
         if (candidate) {
             editorWindow = candidate;
+            fprintf(stderr, "[api_send_text] Found existing text editor\n");
             break; // Found a text editor
         }
-        view = view->next;
     }
-    
+
     // If no text editor found and auto-spawn is enabled, create one
     if (!editorWindow && autoSpawn) {
+        fprintf(stderr, "[api_send_text] Creating new text editor window...\n");
         TRect r = app.deskTop->getBounds();
         r.grow(-5, -3);
+        fprintf(stderr, "[api_send_text] Window bounds: (%d,%d)-(%d,%d)\n",
+                r.a.x, r.a.y, r.b.x, r.b.y);
+
+        fprintf(stderr, "[api_send_text] Calling createTextEditorWindow...\n");
         TWindow* newWindow = createTextEditorWindow(r);
+        fprintf(stderr, "[api_send_text] Window created, inserting into desktop...\n");
+
         app.deskTop->insert(newWindow);
+        fprintf(stderr, "[api_send_text] Window inserted\n");
+
         editorWindow = dynamic_cast<TTextEditorWindow*>(newWindow);
+        fprintf(stderr, "[api_send_text] Cast to TTextEditorWindow: %p\n", (void*)editorWindow);
     }
-    
+
     // If we have a text editor, send the text
     if (editorWindow) {
+        fprintf(stderr, "[api_send_text] Focusing window...\n");
         // Focus the window
         editorWindow->select();
-        
+        fprintf(stderr, "[api_send_text] Window focused\n");
+
         // Send the text
+        fprintf(stderr, "[api_send_text] Getting editor view...\n");
         TTextEditorView* editorView = editorWindow->getEditorView();
+        fprintf(stderr, "[api_send_text] Editor view: %p\n", (void*)editorView);
+
         if (editorView) {
+            fprintf(stderr, "[api_send_text] Calling sendText with %zu chars...\n", content.size());
             editorView->sendText(content, mode, position);
+            fprintf(stderr, "[api_send_text] sendText completed\n");
             return "ok";
         }
     }
-    
+
+    fprintf(stderr, "[api_send_text] FAILED: no text editor available\n");
     return "err no text editor available";
 }
 
@@ -2272,14 +2474,14 @@ std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const s
     // Find existing text editor windows
     TView* view = app.deskTop->first();
     TTextEditorWindow* editorWindow = nullptr;
-    
-    while (view) {
-        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(view);
+
+    // Use nextView() to avoid infinite loop on circular linked list
+    for (TView* v = view; v; v = v->nextView()) {
+        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(v);
         if (candidate) {
             editorWindow = candidate;
             break; // Found a text editor
         }
-        view = view->next;
     }
     
     // If no text editor found and auto-spawn is enabled, create one

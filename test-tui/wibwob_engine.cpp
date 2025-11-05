@@ -181,6 +181,13 @@ std::string WibWobEngine::getLastError() const {
     return "No provider initialized";
 }
 
+std::string WibWobEngine::getSessionId() const {
+    if (currentProvider) {
+        return currentProvider->getSessionId();
+    }
+    return "";
+}
+
 void WibWobEngine::loadConfiguration() {
     config = std::make_unique<LLMConfig>();
     

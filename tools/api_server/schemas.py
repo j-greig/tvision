@@ -57,6 +57,18 @@ class MonodrawLoadRequest(BaseModel):
     offset_y: int = 0
     window_types: Optional[Dict[str, str]] = None
 
+    # NEW: Target destination for imported content
+    target: Literal["windows", "text_editor"] = "windows"
+
+    # NEW: Layer filtering (for text_editor target)
+    layers: Optional[List[str]] = None  # Layer names to import, None = all
+
+    # NEW: Text editor behaviour
+    mode: Literal["replace", "append", "insert"] = "replace"
+    flatten: bool = True  # Merge multiple layers into single document
+    insert_position: Literal["start", "end", "cursor"] = "end"
+    insert_header: bool = True  # Add "// Imported from {filename}" comment
+
 
 class MonodrawParseRequest(BaseModel):
     file_path: str

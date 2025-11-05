@@ -217,20 +217,44 @@ void TWibWobView::drawInputLine() {
 
 void TWibWobView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
-    
+
     if (event.what == evKeyDown) {
         handleKeyDown(event);
         clearEvent(event);
-    } else if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
-        if (event.message.infoPtr == spinnerTimerId) {
-            updateSpinner();
-            
-            // Also poll engine for async responses
-            if (engineInitialized && engine) {
-                engine->poll();
+    } else if (event.what == evBroadcast) {
+        if (event.message.command == cmTimerExpired) {
+            if (event.message.infoPtr == spinnerTimerId) {
+                updateSpinner();
+
+                // Also poll engine for async responses
+                if (engineInitialized && engine) {
+                    engine->poll();
+                }
+
+                clearEvent(event);
             }
-            
-            clearEvent(event);
+        } else if (event.message.command == cmScrollBarChanged) {
+            // Handle scrollbar interaction
+            // Find the parent window's scrollbar
+            TView* parent = owner;
+            while (parent) {
+                auto* window = dynamic_cast<TWibWobWindow*>(parent);
+                if (window) {
+                    TScrollBar* vScrollBar = nullptr;
+                    // We need to get the scrollbar from the window somehow
+                    // For now, we'll infer from the scrollbar value
+                    // The scrollbar value represents absolute position
+                    if (event.message.infoPtr) {
+                        TScrollBar* sb = (TScrollBar*)event.message.infoPtr;
+                        // Update scroll offset based on scrollbar value
+                        scrollOffset = -sb->value;
+                        drawView();
+                        clearEvent(event);
+                        break;
+                    }
+                }
+                parent = parent->owner;
+            }
         }
     }
 }
@@ -311,7 +335,11 @@ void TWibWobView::processInput() {
     // Set status and start spinner with provider info
     std::string providerName = engine->getCurrentProvider();
     std::string modelName = engine->getCurrentModel();
-    std::string statusMsg = "Thinking with " + modelName + " (" + providerName + ")...";
+    static const char* statusOptions[] = {
+        "Wibbling ...", "Wobbling ...", "Scrambling ...", "Reticulating ...", "Whizzing ...", "Puttering ..."
+    };
+    std::string statusMsg = statusOptions[rand() % (sizeof(statusOptions) / sizeof(statusOptions[0]))];
+    //std::string statusMsg = "Thinking with " + modelName + " (" + providerName + ")...";
     setStatus(statusMsg);
     inputActive = false;
     startSpinner();
@@ -353,6 +381,13 @@ void TWibWobView::processInput() {
         }
         drawView();
         setState(sfExposed, True);  // Force redraw to ensure UI updates
+
+        // Bring chat window back to front after MCP commands complete
+        // (MCP may have spawned windows that now cover the chat)
+        if (owner && owner->owner) {
+            // owner = TWibWobWindow, owner->owner = deskTop
+            owner->select();
+        }
     });
 }
 
@@ -367,14 +402,18 @@ void TWibWobView::addMessage(const std::string& sender, const std::string& conte
     msg.content = content;
     msg.timestamp = getCurrentTime();
     msg.is_error = is_error;
-    
+
     messages.push_back(msg);
-    
+
     // Log the message
     logMessage(sender, content, is_error);
-    
+
     // Auto-scroll to bottom
     ensureInputVisible();
+
+    // Update scrollbar when message added
+    notifyScrollBarUpdate();
+    drawView();
 }
 
 void TWibWobView::setStatus(const std::string& status) {
@@ -389,16 +428,19 @@ void TWibWobView::clearChat() {
 
 void TWibWobView::scrollUp(int lines) {
     scrollOffset = std::max(scrollOffset - lines, -(int)messages.size() + 1);
+    notifyScrollBarUpdate();
     drawView();
 }
 
 void TWibWobView::scrollDown(int lines) {
     scrollOffset = std::min(scrollOffset + lines, 0);
+    notifyScrollBarUpdate();
     drawView();
 }
 
 void TWibWobView::ensureInputVisible() {
     scrollOffset = 0;  // Always show the most recent messages
+    notifyScrollBarUpdate();
 }
 
 std::vector<std::string> TWibWobView::wrapText(const std::string& text, int width) const {
@@ -482,6 +524,33 @@ std::string TWibWobView::getCurrentTime() const {
     return oss.str();
 }
 
+int TWibWobView::calculateTotalWrappedLines() const {
+    int totalLines = 0;
+    int viewWidth = size.x - 1;  // Account for scrollbar
+
+    for (const auto& msg : messages) {
+        std::string displayText = msg.sender + ": " + msg.content;
+        auto wrappedLines = wrapText(displayText, viewWidth);
+        totalLines += wrappedLines.size();
+    }
+
+    return totalLines;
+}
+
+void TWibWobView::notifyScrollBarUpdate() {
+    // Find parent window and trigger scrollbar update
+    // Walk up the parent chain to find TWibWobWindow
+    TView* parent = owner;
+    while (parent) {
+        auto* window = dynamic_cast<TWibWobWindow*>(parent);
+        if (window) {
+            window->updateScrollBarLimit();
+            break;
+        }
+        parent = parent->owner;
+    }
+}
+
 int TWibWobView::getMessageAreaHeight() const {
     return size.y - getInputAreaHeight() - getStatusAreaHeight();
 }
@@ -496,6 +565,8 @@ void TWibWobView::setState(ushort aState, Boolean enable) {
 void TWibWobView::changeBounds(const TRect& bounds) {
     TView::changeBounds(bounds);
     // Force a redraw when bounds change to handle resize
+    // Also update scrollbar limits when the view is resized
+    notifyScrollBarUpdate();
     drawView();
 }
 
@@ -595,6 +666,7 @@ std::string TWibWobView::getTimestamp() const {
 TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
     : TWindow(bounds, title.c_str(), wnNoNumber)
     , TWindowInit(&TWibWobWindow::initFrame)
+    , baseTitle(title)
 {
     options |= ofTileable;
     growMode = gfGrowHiX | gfGrowHiY;
@@ -617,18 +689,53 @@ TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
     insert(chatView);
 }
 
+void TWibWobWindow::updateTitleWithSession(const std::string& sessionId) {
+    if (!sessionId.empty()) {
+        // Show first 8 chars of session ID
+        std::string shortId = sessionId.length() > 8 ? sessionId.substr(0, 8) : sessionId;
+        std::string newTitle = baseTitle + " [" + shortId + "]";
+
+        // Update window title
+        if (frame) {
+            delete[] (char*)title;
+            title = newStr(newTitle.c_str());
+            frame->drawView();
+        }
+    }
+}
+
+void TWibWobWindow::updateScrollBarLimit()
+{
+    if (!vScrollBar || !chatView) return;
+
+    // Calculate total wrapped lines in the chat
+    int totalWrappedLines = chatView->calculateTotalWrappedLines();
+    int messageAreaHeight = chatView->getMessageAreaHeight();
+
+    // Calculate max scrollable range
+    int maxScrollableLines = std::max(0, totalWrappedLines - messageAreaHeight);
+
+    // Get current scroll offset from chatView
+    int currentScroll = -chatView->getScrollOffset();  // Negate because scrollOffset is negative
+
+    // Update scrollbar parameters
+    vScrollBar->setParams(currentScroll, 0, maxScrollableLines, messageAreaHeight, 1);
+}
+
 void TWibWobWindow::changeBounds(const TRect& bounds)
 {
     TWindow::changeBounds(bounds);
 
-    if (chatView) {
-        TRect client = getExtent();
-        client.grow(-1, -1);
-        chatView->locate(client);
-        chatView->drawView();
-    }
+    // TWindow::changeBounds() already handles child view resizing via growMode
+    // The scrollbar has growMode gfGrowLoY | gfGrowHiY (grows with bottom edge)
+    // The chatView has growMode gfGrowHiX | gfGrowHiY (grows with right and bottom edges)
+    // No manual repositioning needed - just trigger redraws
 
     setState(sfExposed, True);
+
+    // Update scrollbar limits when window is resized
+    updateScrollBarLimit();
+
     redraw();
 }
 

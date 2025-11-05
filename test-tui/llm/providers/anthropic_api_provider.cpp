@@ -73,8 +73,8 @@ std::vector<std::string> AnthropicAPIProvider::getSupportedModels() const {
 }
 
 bool AnthropicAPIProvider::configure(const std::string& config) {
-    // Use hardcoded API key for now
-    apiKey = ApiConfig::ANTHROPIC_API_KEY;
+    // Pull API key from environment (with optional local fallback).
+    apiKey = ApiConfig::anthropicApiKey();
     return !apiKey.empty();
 }
 
@@ -165,11 +165,24 @@ LLMResponse AnthropicAPIProvider::makeSimpleAPIRequest(const LLMRequest& request
 
 std::string AnthropicAPIProvider::buildSimpleRequestJson(const LLMRequest& request) const {
     std::ostringstream json;
-    
+
     json << "{\n";
     json << "  \"model\": \"" << model << "\",\n";
     json << "  \"max_tokens\": " << maxTokens << ",\n";
-    
+
+    // Add system prompt if provided
+    if (!request.system_prompt.empty()) {
+        json << "  \"system\": \"";
+        // Simple escape
+        for (char c : request.system_prompt) {
+            if (c == '"') json << "\\\"";
+            else if (c == '\\') json << "\\\\";
+            else if (c == '\n') json << "\\n";
+            else json << c;
+        }
+        json << "\",\n";
+    }
+
     // Add tools if any are registered
     std::vector<Tool> allTools = registeredTools;
     allTools.insert(allTools.end(), request.tools.begin(), request.tools.end());

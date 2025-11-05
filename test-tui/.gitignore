@@ -1,0 +1,14 @@
+# Build artifacts
+build/
+*.o
+*.a
+
+# Debug logs
+logs/
+test_pattern_debug.log
+
+# Chat session logs (timestamped in wibwob_view.cpp)
+wibwob_chat_*.log
+
+# Workspaces (contain absolute paths)
+workspaces/

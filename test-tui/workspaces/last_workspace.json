@@ -1,89 +1,105 @@
 {
   "version": 1,
   "app": "test_pattern",
-  "timestamp": "2025-09-15T11:11:45",
-  "screen": { "width": 363, "height": 98 },
+  "timestamp": "2025-11-05T15:55:05",
+  "screen": { "width": 118, "height": 60 },
   "globals": { "patternMode": "continuous" },
   "windows": [
     {
       "id": "w1",
       "type": "custom",
-      "title": "monster-hands-up-summoning.txt - Text 19",
-      "bounds": { "x": 84, "y": 62, "w": 68, "h": 32 },
+      "title": "",
+      "bounds": { "x": 18, "y": 54, "w": 16, "h": 7 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w2",
       "type": "custom",
-      "title": "monster-angel-of-death.txt - Text 14",
-      "bounds": { "x": 11, "y": 44, "w": 81, "h": 48 },
+      "title": "",
+      "bounds": { "x": 2, "y": 54, "w": 16, "h": 7 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w3",
       "type": "custom",
-      "title": "monster-bone-eye.txt - Text 12",
-      "bounds": { "x": 159, "y": 45, "w": 66, "h": 51 },
+      "title": "",
+      "bounds": { "x": 18, "y": 42, "w": 16, "h": 10 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w4",
       "type": "custom",
-      "title": "monster-many-teeth.txt - Text 16",
-      "bounds": { "x": 76, "y": 16, "w": 61, "h": 43 },
+      "title": "",
+      "bounds": { "x": 2, "y": 42, "w": 16, "h": 10 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w5",
       "type": "custom",
-      "title": "monster-death-flyer-portal.txt - Text 17",
-      "bounds": { "x": 290, "y": 58, "w": 60, "h": 38 },
+      "title": "",
+      "bounds": { "x": 18, "y": 31, "w": 16, "h": 10 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w6",
       "type": "custom",
-      "title": "monster-skull-emergence.txt - Text 13",
-      "bounds": { "x": 281, "y": 10, "w": 68, "h": 43 },
+      "title": "",
+      "bounds": { "x": 2, "y": 31, "w": 16, "h": 10 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w7",
       "type": "custom",
-      "title": "monster-squareform-batcave.txt - Text 10",
-      "bounds": { "x": 7, "y": 2, "w": 79, "h": 39 },
+      "title": "Text Editor",
+      "bounds": { "x": 30, "y": 31, "w": 83, "h": 27 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w8",
-      "type": "custom",
-      "title": "monster-wibwob-eyes-bat-death.txt - Text 18",
-      "bounds": { "x": 212, "y": 6, "w": 73, "h": 39 },
+      "type": "gradient",
+      "title": "",
+      "bounds": { "x": 2, "y": 29, "w": 100, "h": 6 },
       "zoomed": false,
-      "props": {}
+      "props": {"gradientType": "horizontal"}
     },
     {
       "id": "w9",
       "type": "custom",
-      "title": "monster-bin-lurker.txt - Text 11",
-      "bounds": { "x": 134, "y": 2, "w": 93, "h": 50 },
+      "title": "",
+      "bounds": { "x": 70, "y": 4, "w": 32, "h": 24 },
       "zoomed": false,
       "props": {}
     },
     {
       "id": "w10",
       "type": "custom",
-      "title": "monster-emoji.txt - Text 15",
-      "bounds": { "x": 235, "y": 36, "w": 60, "h": 58 },
+      "title": "",
+      "bounds": { "x": 36, "y": 4, "w": 32, "h": 24 },
       "zoomed": false,
       "props": {}
+    },
+    {
+      "id": "w11",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 2, "y": 4, "w": 32, "h": 24 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w12",
+      "type": "gradient",
+      "title": "",
+      "bounds": { "x": 2, "y": 1, "w": 100, "h": 6 },
+      "zoomed": false,
+      "props": {"gradientType": "horizontal"}
     }
   ],
   "focusedIndex": 0

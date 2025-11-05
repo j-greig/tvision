@@ -105,7 +105,46 @@ if (!currentSessionId.empty()) {
 
 ---
 
-## Current Issue: UI Freeze During LLM Request
+## RESOLVED: Scrollbar Disappears on Resize
+
+**Fixed**: Changed `TWibWobWindow::changeBounds()` in `wibwob_view.cpp:636-647` to rely on automatic `growMode` handling instead of manual repositioning.
+
+**Root Cause**: The `changeBounds()` method was manually repositioning the `chatView` with `locate()`, which overrode the automatic `growMode` resizing system. The scrollbar had correct `growMode = gfGrowLoY | gfGrowHiY` but was never updated when bounds changed, causing it to be left behind.
+
+**Fix**: Removed manual `chatView->locate()` call and let `TWindow::changeBounds()` handle child view resizing via their `growMode` flags:
+```cpp
+void TWibWobWindow::changeBounds(const TRect& bounds) {
+    TWindow::changeBounds(bounds);
+    // TWindow::changeBounds() already handles child view resizing via growMode
+    // The scrollbar has growMode gfGrowLoY | gfGrowHiY (grows with bottom edge)
+    // The chatView has growMode gfGrowHiX | gfGrowHiY (grows with right and bottom edges)
+    // No manual repositioning needed - just trigger redraws
+    setState(sfExposed, True);
+    redraw();
+}
+```
+
+---
+
+## RESOLVED: Chat Window Lost After MCP Commands
+
+**Fixed**: Added automatic window refocusing in `wibwob_view.cpp:357-362` to bring chat window to front after LLM response completes.
+
+**Root Cause**: When MCP tools spawn multiple windows (e.g., primer batch spawns), the new windows appear on top and the chat window that issued the command gets buried underneath, requiring manual F6 presses to navigate back.
+
+**Fix**: Call `owner->select()` in the response callback to bring the chat window back to front:
+```cpp
+// Bring chat window back to front after MCP commands complete
+// (MCP may have spawned windows that now cover the chat)
+if (owner && owner->owner) {
+    // owner = TWibWobWindow, owner->owner = deskTop
+    owner->select();
+}
+```
+
+---
+
+## RESOLVED: UI Freeze During LLM Request
 
 ### Symptom
 
@@ -283,11 +322,13 @@ cd test-tui && ./build/test_pattern
 
 ## Success Criteria
 
-- [ ] Chat log shows "Using provider: claude_code"
-- [ ] Tool calls appear in debug output
-- [ ] Windows spawn when requested via chat
-- [ ] Session continuity works (multi-turn conversations)
-- [ ] MCP tools (tui-control + symbient-brain) accessible
+- [x] Chat log shows "Using provider: claude_code"
+- [x] Tool calls appear in debug output
+- [x] Windows spawn when requested via chat
+- [x] Session continuity works (multi-turn conversations)
+- [x] MCP tools (tui-control + symbient-brain) accessible
+- [x] Scrollbars persist after window resize
+- [x] Chat window returns to front after MCP commands complete
 
 ---
 

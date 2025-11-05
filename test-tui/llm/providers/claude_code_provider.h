@@ -34,7 +34,8 @@ public:
     
     // Session management
     void resetSession() override;
-    
+    std::string getSessionId() const override { return currentSessionId; }
+
     // Tool support
     bool supportsTools() const override { return true; }
     void registerTool(const Tool& tool) override;

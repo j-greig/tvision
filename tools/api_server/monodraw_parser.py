@@ -38,12 +38,10 @@ class MonodrawParser:
         # Build object lookup by ID for cross-references
         objects_by_id = {obj['object_id']: obj for obj in object_list}
         
-        # Find named text frame objects (type_id 20 appears to be text frames)
+        # Find all text frame objects (type_id 20)
+        # Include both named and unnamed frames for complete composition
         for obj in object_list:
-            if (obj.get('type_id') == 20 and 
-                obj.get('name') and 
-                obj.get('name_edited', False)):
-                
+            if obj.get('type_id') == 20:
                 layer = MonodrawParser._extract_layer(obj, objects_by_id)
                 if layer:
                     layers.append(layer)
@@ -57,9 +55,15 @@ class MonodrawParser:
         origin_str = frame_obj.get('origin', '0,0')
         frame_size_str = frame_obj.get('frame_size', '10,5')
         model_text_id = frame_obj.get('model_text')
-        
-        if not all([name, model_text_id]):
+        object_id = frame_obj.get('object_id', 'unknown')
+
+        # Skip if no text content reference
+        if not model_text_id:
             return None
+
+        # Generate auto-name for unnamed frames using object_id
+        if not name or not name.strip():
+            name = f"layer_{object_id}"
         
         # Parse origin coordinates
         try:
@@ -102,11 +106,68 @@ class MonodrawParser:
         )
     
     @staticmethod
+    def compose_to_canvas(layers: List[MonodrawLayer]) -> str:
+        """
+        Composite all positioned text layers onto a 2D canvas.
+        Returns a single text string with proper spatial layout.
+        """
+        if not layers:
+            return ""
+
+        # Find minimum coordinates to normalize (Monodraw can have negative coords)
+        min_x = min(layer.origin[0] for layer in layers)
+        min_y = min(layer.origin[1] for layer in layers)
+
+        # Calculate canvas dimensions after normalization
+        max_x = max((layer.origin[0] - min_x + len(line))
+                    for layer in layers
+                    for line in layer.text_content.split('\n')) if layers else 80
+        max_y = max((layer.origin[1] - min_y + layer.text_content.count('\n') + 1)
+                    for layer in layers) if layers else 24
+
+        # Add padding
+        width = max_x + 5
+        height = max_y + 3
+
+        # Create empty canvas (list of mutable character lists)
+        canvas = [[' ' for _ in range(width)] for _ in range(height)]
+
+        # Composite each layer onto canvas at its NORMALIZED position
+        for layer in layers:
+            # Normalize coordinates by subtracting minimum values
+            x = layer.origin[0] - min_x
+            y = layer.origin[1] - min_y
+            lines = layer.text_content.split('\n')
+
+            for line_offset, line in enumerate(lines):
+                canvas_y = y + line_offset
+                if canvas_y >= height:
+                    continue
+
+                for char_offset, char in enumerate(line):
+                    canvas_x = x + char_offset
+                    if canvas_x >= width:
+                        continue
+
+                    # Overlay character (later layers overwrite earlier ones)
+                    if char not in ['\r', '\n']:
+                        canvas[canvas_y][canvas_x] = char
+
+        # Convert canvas to string, trimming trailing spaces per line
+        result_lines = [''.join(row).rstrip() for row in canvas]
+
+        # Trim trailing empty lines
+        while result_lines and not result_lines[-1].strip():
+            result_lines.pop()
+
+        return '\n'.join(result_lines)
+
+    @staticmethod
     def get_canvas_bounds(layers: List[MonodrawLayer]) -> Tuple[int, int]:
         """Calculate overall canvas bounds from all layers."""
         if not layers:
             return 80, 24
-        
+
         max_x = max(layer.origin[0] + layer.frame_size[0] for layer in layers)
         max_y = max(layer.origin[1] + layer.frame_size[1] for layer in layers)
         

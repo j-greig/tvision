@@ -120,9 +120,9 @@ bool AnthropicAPIProvider::configure(const std::string& config) {
             start++; // Skip opening quote
             size_t end = config.find("\"", start);
             if (end != std::string::npos) {
-                // TEMP: Use hardcoded API key instead of environment variable
-                apiKey = ApiConfig::ANTHROPIC_API_KEY;
-                fprintf(stderr, "DEBUG: Using hardcoded API key: %.20s...\n", apiKey.c_str());
+                // TEMP: Use environment/fallback API key helper
+                apiKey = ApiConfig::anthropicApiKey();
+                fprintf(stderr, "DEBUG: Using runtime API key: %.20s...\n", apiKey.c_str());
             }
         }
     }

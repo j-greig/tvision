@@ -11,6 +11,53 @@
 #include <cstring>
 #include <sstream>
 #include <map>
+#include <vector>
+
+// Base64 decoding function
+static const std::string base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
+static std::string base64_decode(const std::string& encoded_string) {
+    int in_len = encoded_string.size();
+    int i = 0, j = 0, in_ = 0;
+    unsigned char char_array_4[4], char_array_3[3];
+    std::string ret;
+
+    while (in_len-- && (encoded_string[in_] != '=') &&
+           (isalnum(encoded_string[in_]) || (encoded_string[in_] == '+') || (encoded_string[in_] == '/'))) {
+        char_array_4[i++] = encoded_string[in_]; in_++;
+        if (i == 4) {
+            for (i = 0; i < 4; i++)
+                char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+                ret += char_array_3[i];
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for (j = i; j < 4; j++)
+            char_array_4[j] = 0;
+
+        for (j = 0; j < 4; j++)
+            char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+        for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
+    }
+
+    return ret;
+}
 
 // Include TRect definition
 #define Uses_TRect
@@ -217,11 +264,28 @@ void ApiIpcServer::poll() {
         auto content_it = kv.find("content");
         auto mode_it = kv.find("mode");
         auto pos_it = kv.find("position");
-        
+
         if (id_it != kv.end() && content_it != kv.end()) {
             std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
             std::string position = (pos_it != kv.end()) ? pos_it->second : "end";
-            resp = api_send_text(*app_, id_it->second, content_it->second, mode, position) + "\n";
+
+            // Decode content if base64-encoded (prefix: "base64:")
+            std::string content = content_it->second;
+            fprintf(stderr, "[C++ IPC] send_text: id=%s, content_len=%zu, encoded=%s\n",
+                   id_it->second.c_str(), content.size(),
+                   (content.rfind("base64:", 0) == 0) ? "yes" : "no");
+
+            if (content.rfind("base64:", 0) == 0) {
+                // Extract base64 payload
+                std::string encoded = content.substr(7);
+                fprintf(stderr, "[C++ IPC] Decoding base64: %zu chars\n", encoded.size());
+                content = base64_decode(encoded);
+                fprintf(stderr, "[C++ IPC] Decoded to: %zu chars\n", content.size());
+            }
+
+            fprintf(stderr, "[C++ IPC] Calling api_send_text...\n");
+            resp = api_send_text(*app_, id_it->second, content, mode, position) + "\n";
+            fprintf(stderr, "[C++ IPC] api_send_text returned: %s", resp.c_str());
         } else {
             resp = "err missing id or content\n";
         }

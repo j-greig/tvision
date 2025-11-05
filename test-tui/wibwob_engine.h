@@ -50,7 +50,8 @@ public:
     // Status
     bool isBusy() const;
     std::string getLastError() const;
-    
+    std::string getSessionId() const;  // Get current session ID (empty if provider doesn't support it)
+
     // Tool support
     void initializeBuiltinTools();
     void registerTool(const Tool& tool);

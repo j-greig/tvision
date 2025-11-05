@@ -273,30 +273,37 @@ class Controller:
     async def send_text(self, win_id: str, content: str, mode: str = "append", position: str = "end") -> Dict[str, Any]:
         """Send text to a text editor window"""
         try:
+            print(f"[DEBUG] send_text called: win_id={win_id}, content_len={len(content)}, mode={mode}, position={position}")
+            print(f"[DEBUG] Content has {content.count(chr(10))} newlines")
+
             # Forward to the live app via IPC
+            print(f"[DEBUG] Calling send_cmd...")
             send_cmd("send_text", {
                 "id": win_id,
                 "content": content,
                 "mode": mode,
                 "position": position
             })
-            
+            print(f"[DEBUG] send_cmd completed successfully")
+
             # Update in-memory state (simplified)
-            async with self._lock:
-                win = self._require(win_id)
-                if win.type == WindowType.text_editor:
-                    if "content" not in win.props:
-                        win.props["content"] = ""
-                    
-                    if mode == "replace":
-                        win.props["content"] = content
-                    elif mode == "append":
-                        win.props["content"] += content
-                    # For insert mode, we'd need cursor position - simplified for MVP
-                    
+            # Skip state update for "auto" (C++ side will find/create editor)
+            if win_id != "auto":
+                async with self._lock:
+                    win = self._require(win_id)
+                    if win.type == WindowType.text_editor:
+                        if "content" not in win.props:
+                            win.props["content"] = ""
+
+                        if mode == "replace":
+                            win.props["content"] = content
+                        elif mode == "append":
+                            win.props["content"] += content
+                        # For insert mode, we'd need cursor position - simplified for MVP
+
             await self._events.emit("text.sent", {"window_id": win_id, "content": content, "mode": mode})
             return {"ok": True, "window_id": win_id}
-            
+
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -574,9 +581,15 @@ class Controller:
         scale: float = 1.0,
         offset_x: int = 0,
         offset_y: int = 0,
-        window_types: Optional[Dict[str, str]] = None
+        window_types: Optional[Dict[str, str]] = None,
+        target: str = "windows",
+        layers_filter: Optional[List[str]] = None,
+        mode: str = "replace",
+        flatten: bool = True,
+        insert_position: str = "end",
+        insert_header: bool = True
     ) -> Dict[str, Any]:
-        """Load Monodraw JSON file and spawn corresponding TUI windows."""
+        """Load Monodraw JSON file and spawn windows OR import to text editor."""
         try:
             # Parse Monodraw file
             layers = MonodrawParser.parse_file(file_path)
@@ -588,15 +601,66 @@ class Controller:
                     "windows_created": [],
                     "total_layers": 0
                 }
-            
+
+            # Filter layers if specified
+            if layers_filter:
+                layers = self._filter_layers(layers, layers_filter)
+                if not layers:
+                    return {
+                        "ok": False,
+                        "error": f"No layers matched filter: {layers_filter}",
+                        "windows_created": [],
+                        "total_layers": 0
+                    }
+
+            # ROUTE: Text Editor Import
+            if target == "text_editor":
+                print(f"[DEBUG] Text editor import: {len(layers)} layers, target={target}, flatten={flatten}")
+
+                if flatten:
+                    # Compose layers onto 2D canvas (spatial layout preserved)
+                    document_text = MonodrawParser.compose_to_canvas(layers)
+                    if insert_header:
+                        header = f"# Imported from {os.path.basename(file_path)}\n# {len(layers)} layers composited\n\n"
+                        document_text = header + document_text
+                else:
+                    # Sequential flattening (legacy, for simple text-only exports)
+                    document_text = self._flatten_layers(layers, insert_header, file_path)
+
+                print(f"[DEBUG] Composed text: {len(document_text)} chars, {document_text.count(chr(10))} newlines")
+                print(f"[DEBUG] First 100 chars: {document_text[:100]!r}")
+
+                # Calculate metadata
+                lines = document_text.count('\n') + 1
+                width = max(len(line) for line in document_text.split('\n')) if document_text else 0
+
+                print(f"[DEBUG] About to call send_text with win_id='auto', mode={mode}")
+
+                # TODO: Send to text editor via IPC
+                # For now, use send_text to "auto" which finds/creates text editor
+                result = await self.send_text("auto", document_text, mode, insert_position)
+
+                print(f"[DEBUG] send_text result: {result}")
+
+                return {
+                    "ok": True,
+                    "target": "text_editor",
+                    "window_id": result.get("window_id", "unknown"),
+                    "layers_imported": [layer.name for layer in layers],
+                    "lines": lines,
+                    "width": width,
+                    "flatten": flatten
+                }
+
+            # ROUTE: Window Spawning (original behaviour)
             # Get terminal size for scaling
             await self._sync_state()
             terminal_size = (self._state.canvas_width, self._state.canvas_height)
-            
+
             # Scale coordinates to fit terminal
             if scale != 1.0 or terminal_size != (80, 24):
                 layers = scale_coordinates(layers, scale, terminal_size)
-            
+
             # Apply offset
             if offset_x != 0 or offset_y != 0:
                 for layer in layers:
@@ -604,7 +668,7 @@ class Controller:
                         layer.origin[0] + offset_x,
                         layer.origin[1] + offset_y
                     )
-            
+
             # Create windows for each layer
             windows_created = []
             errors = []
@@ -684,10 +748,42 @@ class Controller:
                 return WindowType(explicit_types[layer.name])
             except ValueError:
                 pass  # Fall back to inference
-        
+
         # For now, treat all content as text_view
         # TODO: Add pattern detection for other window types
         return WindowType.text_view
+
+    def _filter_layers(self, layers: List[MonodrawLayer], layer_names: Optional[List[str]]) -> List[MonodrawLayer]:
+        """Filter layers by name if specified."""
+        if not layer_names:
+            return layers
+        return [layer for layer in layers if layer.name in layer_names]
+
+    def _flatten_layers(self, layers: List[MonodrawLayer], insert_header: bool = True, filename: str = "") -> str:
+        """Flatten multiple layers into single document with separators."""
+        if not layers:
+            return ""
+
+        parts = []
+
+        # Optional header comment
+        if insert_header and filename:
+            import os
+            from datetime import datetime
+            parts.append(f"# Imported from {os.path.basename(filename)}")
+            parts.append(f"# Layers: {', '.join(layer.name for layer in layers)}")
+            parts.append(f"# Timestamp: {datetime.now().isoformat()}")
+            parts.append("")
+
+        # Add each layer with separator
+        for i, layer in enumerate(layers):
+            if i > 0:
+                parts.append("")
+                parts.append(f"# ────── Layer: {layer.name} ──────")
+                parts.append("")
+            parts.append(layer.text_content)
+
+        return "\n".join(parts)
     
     async def parse_monodraw_file(self, file_path: str) -> Dict[str, Any]:
         """Parse Monodraw file without creating windows (preview mode)."""

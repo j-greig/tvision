@@ -370,13 +370,19 @@ def make_app() -> FastAPI:
 
     @app.post("/monodraw/load")
     async def monodraw_load(payload: MonodrawLoadRequest) -> Dict[str, Any]:
-        """Load Monodraw JSON file and spawn corresponding TUI windows."""
+        """Load Monodraw JSON file and spawn windows OR import to text editor."""
         return await ctl.load_monodraw_file(
             file_path=payload.file_path,
             scale=payload.scale,
             offset_x=payload.offset_x,
             offset_y=payload.offset_y,
-            window_types=payload.window_types
+            window_types=payload.window_types,
+            target=payload.target,
+            layers_filter=payload.layers,
+            mode=payload.mode,
+            flatten=payload.flatten,
+            insert_position=payload.insert_position,
+            insert_header=payload.insert_header
         )
 
     @app.post("/monodraw/parse")
