@@ -65,3 +65,26 @@ cmake --build ./build
 **Documentation:**
 - `README.md` - This file
 - `FRAME_PLAYER.md` - Animation player documentation
+
+## Programmatic Control API
+
+The test_pattern app can be controlled remotely via a REST API + MCP server:
+
+```bash
+# 1. Setup API server (one-time)
+cd ../tools/api_server
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Run API server (from project root)
+cd /path/to/tvision
+./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
+
+# 3. Run test_pattern app (separate terminal)
+cd test-tui && ./build/test_pattern
+```
+
+**API Documentation**: See [../tools/api_server/README.md](../tools/api_server/README.md)
+**Interactive Docs**: http://127.0.0.1:8089/docs
+**MCP Integration**: http://127.0.0.1:8089/mcp (for Claude Code / AI agents)

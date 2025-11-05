@@ -17,14 +17,20 @@ Structure
 
 Install and Run
 - Python: 3.9+ (3.11 recommended). The code is 3.9-compatible.
-- Create venv (from repo root): `python3 -m venv .venv`
-- Activate venv: `source .venv/bin/activate`
-- (Optional) Upgrade pip: `python -m pip install --upgrade pip`
-- Install deps: `pip install -r tools/api_server/requirements.txt`
-- Start server: `python -m tools.api_server` (binds `127.0.0.1:8089`)
+- Create venv in API server dir: `cd tools/api_server && python3 -m venv venv`
+- Activate venv: `source venv/bin/activate`
+- Install deps: `pip install -r requirements.txt`
+- **IMPORTANT**: Run from project root: `cd /path/to/tvision`
+- Start server: `python -m tools.api_server.main --port=8089` (binds `127.0.0.1:8089`)
+  - Or use venv directly: `./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089`
 - OpenAPI docs: `http://127.0.0.1:8089/docs`
 - WebSocket: `ws://127.0.0.1:8089/ws`
+- MCP endpoint: `http://127.0.0.1:8089/mcp` (requires `fastapi-mcp` installed)
 - Deactivate venv when finished: `deactivate`
+
+Alternative using uv (faster):
+- `cd tools/api_server && uv venv && uv pip install -r requirements.txt`
+- `cd ../.. && uv run python -m tools.api_server.main --port=8089`
 
 Run the C++ App (for live control)
 - Build once (from repo root): `cmake -S . -B build && cmake --build build -j`

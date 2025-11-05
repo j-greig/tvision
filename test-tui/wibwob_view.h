@@ -12,6 +12,9 @@
 #define Uses_TEvent
 #define Uses_TKeys
 #define Uses_TDrawBuffer
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TScrollBar
 #include <tvision/tv.h>
 
 #include <string>
@@ -101,5 +104,19 @@ private:
     int getInputAreaHeight() const { return 1; }
     int getStatusAreaHeight() const { return 1; }
 };
+
+class TWibWobWindow : public TWindow {
+public:
+    TWibWobWindow(const TRect& bounds, const std::string& title);
+
+    virtual void changeBounds(const TRect& bounds) override;
+
+private:
+    static TFrame* initFrame(TRect r);
+    TWibWobView* chatView {nullptr};
+    TScrollBar* vScrollBar {nullptr};
+};
+
+TWindow* createWibWobWindow(const TRect& bounds, const std::string& title);
 
 #endif // WIBWOB_VIEW_H

@@ -67,11 +67,7 @@ bool LLMConfig::loadFromFile(const std::string& configPath) {
 bool LLMConfig::loadFromString(const std::string& jsonConfig) {
     validationErrors.clear();
     bool result = parseJson(jsonConfig);
-    
-    // TEMP: Force anthropic_api as active provider regardless of config
-    activeProvider = ApiConfig::DEFAULT_PROVIDER;
-    fprintf(stderr, "DEBUG: Forced activeProvider to: %s\n", activeProvider.c_str());
-    
+
     return result;
 }
 
@@ -329,10 +325,8 @@ bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, b
 }
 
 std::string LLMConfig::getDefaultConfigJson() {
-    // TEMP: Force anthropic_api as active provider
-    fprintf(stderr, "DEBUG: Forcing anthropic_api as default provider\n");
     return R"({
-  "activeProvider": "anthropic_api",
+  "activeProvider": "claude_code",
   "providers": {
     "claude_code": {
       "enabled": true,

@@ -126,7 +126,7 @@ std::vector<std::string> ClaudeCodeProvider::getSupportedModels() const {
 bool ClaudeCodeProvider::configure(const std::string& config) {
     // Parse configuration to extract command and args
     // For now, keep it simple - in production would parse JSON properly
-    
+
     // Look for command path
     size_t cmdPos = config.find("\"command\"");
     if (cmdPos != std::string::npos) {
@@ -139,7 +139,36 @@ bool ClaudeCodeProvider::configure(const std::string& config) {
             }
         }
     }
-    
+
+    // Parse args array
+    size_t argsPos = config.find("\"args\"");
+    if (argsPos != std::string::npos) {
+        size_t arrayStart = config.find("[", argsPos);
+        size_t arrayEnd = config.find("]", argsPos);
+        if (arrayStart != std::string::npos && arrayEnd != std::string::npos) {
+            commandArgs.clear();
+            std::string argsStr = config.substr(arrayStart + 1, arrayEnd - arrayStart - 1);
+
+            // Simple arg extraction (handles quoted strings)
+            size_t pos = 0;
+            while (pos < argsStr.length()) {
+                size_t quoteStart = argsStr.find("\"", pos);
+                if (quoteStart == std::string::npos) break;
+                size_t quoteEnd = argsStr.find("\"", quoteStart + 1);
+                if (quoteEnd == std::string::npos) break;
+
+                std::string arg = argsStr.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+                if (!arg.empty()) {
+                    commandArgs.push_back(arg);
+                }
+                pos = quoteEnd + 1;
+            }
+        }
+    }
+
+    fprintf(stderr, "DEBUG: ClaudeCodeProvider configured: command=%s, args=%zu\n",
+            claudePath.c_str(), commandArgs.size());
+
     return true;
 }
 
@@ -212,12 +241,16 @@ void ClaudeCodeProvider::pollAsyncExecution() {
         response.provider_name = getProviderName();
         
         if (exitCode == 0) {
+            fprintf(stderr, "DEBUG: Raw Claude JSON response:\n%s\n", outputBuffer.c_str());
             response = parseClaudeResponse(outputBuffer);
             response.provider_name = getProviderName();
-            
+
             // Update session ID if we got one
             if (!response.session_id.empty()) {
                 currentSessionId = response.session_id;
+                fprintf(stderr, "DEBUG: Session ID updated: %s\n", currentSessionId.c_str());
+            } else {
+                fprintf(stderr, "DEBUG: No session ID in response\n");
             }
         } else {
             response.is_error = true;
@@ -300,20 +333,28 @@ LLMResponse ClaudeCodeProvider::executeClaudeCommand(const LLMRequest& request) 
 
 std::string ClaudeCodeProvider::buildClaudeCommand(const LLMRequest& request) const {
     std::ostringstream cmd;
-    
+
     cmd << claudePath;
+
+    // Add configured args (they already include -p, --mcp-config, etc.)
     for (const std::string& arg : commandArgs) {
+        // Skip --output-format if already in args (we'll add it explicitly)
+        if (arg.find("--output-format") != std::string::npos) continue;
         cmd << " " << arg;
     }
-    
+
+    // Always ensure JSON output
     cmd << " --output-format json";
-    
-    // Add continue flag if we have a session
-    if (!currentSessionId.empty() && !request.session_id.empty()) {
-        cmd << " --continue";
+
+    // Session management: use --resume with session ID if available
+    if (!currentSessionId.empty()) {
+        cmd << " --resume " << currentSessionId;
+        fprintf(stderr, "DEBUG: Using session resume with ID: %s\n", currentSessionId.c_str());
+    } else {
+        fprintf(stderr, "DEBUG: Starting new session (no session ID)\n");
     }
-    
-    // Check if system prompt file exists and use it
+
+    // System prompt: prefer file over inline
     FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
     if (promptCheck) {
         fclose(promptCheck);
@@ -329,7 +370,7 @@ std::string ClaudeCodeProvider::buildClaudeCommand(const LLMRequest& request) co
         }
         cmd << "\"";
     }
-    
+
     // Escape the query for shell
     cmd << " \"";
     for (char c : request.message) {
@@ -339,9 +380,11 @@ std::string ClaudeCodeProvider::buildClaudeCommand(const LLMRequest& request) co
         cmd << c;
     }
     cmd << "\"";
-    
+
     cmd << " 2>&1";  // Capture stderr too
-    
+
+    fprintf(stderr, "DEBUG: Claude command: %s\n", cmd.str().c_str());
+
     return cmd.str();
 }
 

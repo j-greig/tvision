@@ -107,6 +107,32 @@ TColorAttr black(trueBlack, trueBlack);
 - Unicode text handling with proper width calculations
 - Support for combining characters and double-width characters
 
+### View Traversal (Critical)
+
+**IMPORTANT**: `TGroup` (including `TDeskTop`) uses a **circular doubly-linked list** for child views where `last->next` points back to `first`. Naïve traversal with `view = view->next` creates an **infinite loop** if the target view doesn't exist.
+
+**Wrong** (infinite loop):
+```cpp
+TView* view = deskTop->first();
+while (view) {  // NEVER terminates - circular list!
+    if (auto* target = dynamic_cast<TTargetType*>(view))
+        return target;
+    view = view->next;  // ❌ Loops forever
+}
+```
+
+**Correct** (use `nextView()`):
+```cpp
+for (TView* v = deskTop->first(); v; v = v->nextView()) {  // ✅ Returns nullptr at end
+    if (auto* target = dynamic_cast<TTargetType*>(v))
+        return target;
+}
+```
+
+**Why it matters**: This bug causes 100% CPU spin in IPC handlers, API timeouts, and crashes when searching for windows that don't exist (e.g., auto-spawning text editors). Always use `nextView()` or a sentinel check (`v != start`) when iterating `TGroup` children.
+
+**See**: `test-tui/test_pattern_app.cpp:2291` (fixed in api_send_text), `test-tui/test_pattern_app.cpp:2353` (fixed in api_send_figlet)
+
 ## Environment Variables
 
 - `TVISION_MAX_FPS` - Refresh rate limit (default 60)
@@ -525,3 +551,94 @@ Claude Code (Headless) → HTTP MCP Protocol → FastAPI Server → Unix Socket 
 ```
 
 This enables **full AI-driven TUI control** through natural language commands while maintaining the existing REST API for other clients.
+
+## Wib&Wob AI Chat Window (MCP-Enabled)
+
+The `test_pattern` app includes an **embedded AI chat window** with full MCP support, bringing Wib&Wob personalities and tool access directly into the TUI.
+
+### Quick Start
+
+```bash
+# Terminal 1: Start API server
+./start_api_server.sh
+
+# Terminal 2: Run TUI app
+cd test-tui && ./build/test_pattern
+# Then: Tools → Wib&Wob Chat
+```
+
+### How It Works
+
+The chat window uses the **Claude Code CLI** as its LLM backend, configured in [test-tui/llm/config/llm_config.json](test-tui/llm/config/llm_config.json):
+
+```json
+{
+  "activeProvider": "claude_code",
+  "providers": {
+    "claude_code": {
+      "enabled": true,
+      "command": "claude",
+      "args": ["-p", "--mcp-config", ".claude/settings.local.json", "--output-format", "json"]
+    }
+  }
+}
+```
+
+This configuration makes the TUI chat **functionally identical to using Claude Code CLI**, but embedded in the TUI interface.
+
+### Available MCP Servers
+
+Configured in [test-tui/.claude/settings.local.json](test-tui/.claude/settings.local.json):
+
+- **`tui-control`** - Window management, pattern control, screenshot, workspace (http://127.0.0.1:8089/mcp)
+- **`symbient-brain`** - Memory storage and retrieval for persistent context
+
+### Wib&Wob Personality
+
+The chat loads its personality from [test-tui/wibandwob.prompt.md](test-tui/wibandwob.prompt.md):
+- **Wib** ```つ◕‿◕‿⚆༽つ``` - Chaotic artist, ASCII art creator, surreal phrasing
+- **Wob** ```つ⚆‿◕‿◕༽つ``` - Precise scientist, methodical analysis, complex systems
+
+The dual-persona responds with ASCII art, philosophical musings, and can **spawn/control windows via MCP tools**.
+
+### Example Chat Session
+
+```
+User: create a test pattern window
+Wib&Wob: つ◕‿◕‿⚆༽つ *manifesting geometric chaos...*
+         [Uses create_test_pattern_window tool via MCP]
+         つ⚆‿◕‿◕༽つ Window spawned: ID=w42, bounds={x:10, y:5, w:40, h:15}
+
+         Pattern tessellation initiated. Observe the recursive geometries!
+
+User: what time is it?
+Wib&Wob: つ◕‿◕‿⚆༽つ The eternal now collapses to...
+         [Uses get_current_time tool]
+         15:42:33
+
+         つ⚆‿◕‿◕༽つ Temporal coordinates confirmed.
+```
+
+### Chat Logs
+
+Sessions are automatically logged to `test-tui/logs/chat_YYYYMMDD_HHMMSS_<session-id>.log` for debugging and conversation history.
+
+### Switching Providers
+
+To use direct Anthropic API instead of Claude Code CLI:
+
+```json
+{
+  "activeProvider": "anthropic_api",  // No MCP support, but faster
+  "providers": {
+    "anthropic_api": {
+      "enabled": true,
+      "model": "claude-3-5-haiku-latest",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "apiKeyEnv": "ANTHROPIC_API_KEY"
+    }
+  }
+}
+```
+
+**Note**: `anthropic_api` provider does **not** have MCP support - it's a direct HTTP client without tool/server capabilities.

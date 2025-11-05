@@ -12,6 +12,8 @@
 #define Uses_TColorAttr
 #define Uses_TTimerEvent
 #define Uses_MsgBox
+#define Uses_TWindow
+#define Uses_TFrame
 #include <tvision/tv.h>
 
 #include <ctime>
@@ -350,6 +352,7 @@ void TWibWobView::processInput() {
             setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
         }
         drawView();
+        setState(sfExposed, True);  // Force redraw to ensure UI updates
     });
 }
 
@@ -400,28 +403,74 @@ void TWibWobView::ensureInputVisible() {
 
 std::vector<std::string> TWibWobView::wrapText(const std::string& text, int width) const {
     std::vector<std::string> lines;
-    if (width <= 0) return lines;
-    
-    std::istringstream words(text);
-    std::string word;
-    std::string currentLine;
-    
-    while (words >> word) {
-        if (currentLine.empty()) {
-            currentLine = word;
-        } else if (currentLine.length() + 1 + word.length() <= (size_t)width) {
-            currentLine += " " + word;
+    if (width <= 0) {
+        lines.emplace_back("");
+        return lines;
+    }
+
+    size_t lineStart = 0;
+    const size_t length = text.size();
+
+    while (lineStart <= length) {
+        size_t newlinePos = text.find('\n', lineStart);
+        std::string segment;
+        if (newlinePos == std::string::npos) {
+            segment = text.substr(lineStart);
         } else {
-            lines.push_back(currentLine);
-            currentLine = word;
+            segment = text.substr(lineStart, newlinePos - lineStart);
+        }
+
+        if (!segment.empty() && segment.back() == '\r') {
+            segment.pop_back();
+        }
+
+        if (segment.empty()) {
+            lines.emplace_back("");
+        } else {
+            size_t pos = 0;
+            while (pos < segment.size()) {
+                size_t remaining = segment.size() - pos;
+                size_t slice = remaining > static_cast<size_t>(width) ? static_cast<size_t>(width) : remaining;
+                bool trimmedSpace = false;
+
+                if (remaining > static_cast<size_t>(width)) {
+                    size_t breakPos = segment.find_last_of(" \t", pos + width - 1);
+                    if (breakPos != std::string::npos && breakPos >= pos) {
+                        size_t candidate = breakPos - pos;
+                        if (candidate > 0) {
+                            slice = candidate;
+                            trimmedSpace = true;
+                        }
+                    }
+                }
+
+                lines.push_back(segment.substr(pos, slice));
+                pos += slice;
+
+                if (trimmedSpace) {
+                    while (pos < segment.size() && segment[pos] == ' ') {
+                        ++pos;
+                    }
+                }
+            }
+        }
+
+        if (newlinePos == std::string::npos) {
+            break;
+        }
+
+        lineStart = newlinePos + 1;
+        if (lineStart == length) {
+            lines.emplace_back("");
+            break;
         }
     }
-    
-    if (!currentLine.empty()) {
-        lines.push_back(currentLine);
+
+    if (lines.empty()) {
+        lines.emplace_back("");
     }
-    
-    return lines.empty() ? std::vector<std::string>{""} : lines;
+
+    return lines;
 }
 
 std::string TWibWobView::getCurrentTime() const {
@@ -541,4 +590,54 @@ std::string TWibWobView::getTimestamp() const {
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
     ss << "." << std::setfill('0') << std::setw(3) << ms.count();
     return ss.str();
+}
+
+TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
+    : TWindow(bounds, title.c_str(), wnNoNumber)
+    , TWindowInit(&TWibWobWindow::initFrame)
+{
+    options |= ofTileable;
+    growMode = gfGrowHiX | gfGrowHiY;
+
+    TRect client = getExtent();
+    client.grow(-1, -1);
+
+    // Create vertical scrollbar on the right edge
+    TRect scrollBarRect = client;
+    scrollBarRect.a.x = scrollBarRect.b.x - 1;
+    vScrollBar = new TScrollBar(scrollBarRect);
+    vScrollBar->growMode = gfGrowLoY | gfGrowHiY;
+    insert(vScrollBar);
+
+    // Adjust client area to make room for scrollbar
+    client.b.x -= 1;
+
+    chatView = new TWibWobView(client);
+    chatView->growMode = gfGrowHiX | gfGrowHiY;
+    insert(chatView);
+}
+
+void TWibWobWindow::changeBounds(const TRect& bounds)
+{
+    TWindow::changeBounds(bounds);
+
+    if (chatView) {
+        TRect client = getExtent();
+        client.grow(-1, -1);
+        chatView->locate(client);
+        chatView->drawView();
+    }
+
+    setState(sfExposed, True);
+    redraw();
+}
+
+TFrame* TWibWobWindow::initFrame(TRect r)
+{
+    return new TFrame(r);
+}
+
+TWindow* createWibWobWindow(const TRect& bounds, const std::string& title)
+{
+    return new TWibWobWindow(bounds, title);
 }
