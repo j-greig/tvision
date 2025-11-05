@@ -61,6 +61,8 @@
 #include "generative_monster_verse_view.h"
 // Generative art: Monster Cam (Emoji)
 #include "generative_monster_cam_view.h"
+// Generative art: ASCII Cam
+// DISABLED: #include "generative_ascii_cam_view.h"
 // API-controllable text editor
 #include "text_editor_view.h"
 // Wib&Wob AI chat interface
@@ -140,6 +142,7 @@ const ushort cmCubeField = 153;
 const ushort cmMonsterPortal = 154;
 const ushort cmMonsterVerse = 155;
 const ushort cmMonsterCam   = 156;
+const ushort cmASCIICam     = 157;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -829,6 +832,14 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            // DISABLED: ASCII Cam (file not in repo)
+            // case cmASCIICam: {
+            //     TRect r = deskTop->getExtent();
+            //     r.grow(-2, -1);
+            //     deskTop->insert(createGenerativeASCIICamWindow(r));
+            //     clearEvent(event);
+            //     break;
+            // }
             case cmScoreBgColor: {
                 // Try to find an Animated Score view in the current window.
                 auto findScore = [](TView *p, void *out) -> Boolean {
@@ -1535,6 +1546,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
+            // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
@@ -1718,13 +1730,13 @@ void TTestPatternApp::idle()
     // Poll IPC server for incoming API commands
     if (ipcServer) ipcServer->poll();
 
-    // Update animated kaomoji in menu bar
-    if (menuBar) {
-        auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
-        if (customMenuBar) {
-            customMenuBar->update();
-        }
-    }
+    // DISABLED: Update animated kaomoji in menu bar (causing crashes + freezes)
+    // if (menuBar) {
+    //     auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+    //     if (customMenuBar) {
+    //         customMenuBar->update();
+    //     }
+    // }
 
     // Idle: no default content window or wallpaper.
 }

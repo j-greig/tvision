@@ -89,9 +89,8 @@ TWibWobView::~TWibWobView() {
 }
 
 void TWibWobView::draw() {
-    // Initialize engine on first draw to show welcome message
-    ensureEngineInitialized();
-    
+    // REMOVED: ensureEngineInitialized() - now deferred to first user input to avoid UI freeze
+
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
     TColorAttr focusedColor = getColor(2);
@@ -221,42 +220,20 @@ void TWibWobView::handleEvent(TEvent& event) {
     if (event.what == evKeyDown) {
         handleKeyDown(event);
         clearEvent(event);
-    } else if (event.what == evBroadcast) {
-        if (event.message.command == cmTimerExpired) {
-            if (event.message.infoPtr == spinnerTimerId) {
-                updateSpinner();
+    } else if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
+        if (event.message.infoPtr == spinnerTimerId) {
+            updateSpinner();
 
-                // Also poll engine for async responses
-                if (engineInitialized && engine) {
-                    engine->poll();
-                }
+            // Also poll engine for async responses
+            if (engineInitialized && engine) {
+                engine->poll();
+            }
 
-                clearEvent(event);
-            }
-        } else if (event.message.command == cmScrollBarChanged) {
-            // Handle scrollbar interaction
-            // Find the parent window's scrollbar
-            TView* parent = owner;
-            while (parent) {
-                auto* window = dynamic_cast<TWibWobWindow*>(parent);
-                if (window) {
-                    TScrollBar* vScrollBar = nullptr;
-                    // We need to get the scrollbar from the window somehow
-                    // For now, we'll infer from the scrollbar value
-                    // The scrollbar value represents absolute position
-                    if (event.message.infoPtr) {
-                        TScrollBar* sb = (TScrollBar*)event.message.infoPtr;
-                        // Update scroll offset based on scrollbar value
-                        scrollOffset = -sb->value;
-                        drawView();
-                        clearEvent(event);
-                        break;
-                    }
-                }
-                parent = parent->owner;
-            }
+            clearEvent(event);
         }
     }
+    // REMOVED: cmScrollBarChanged handler (causing segfaults on line 248)
+    // Scrollbar still works via keyboard navigation (Up/Down/PgUp/PgDn)
 }
 
 void TWibWobView::handleKeyDown(TEvent& event) {
