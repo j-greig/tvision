@@ -11,11 +11,33 @@ SOCK_PATH = os.environ.get("TV_IPC_SOCK", "/tmp/test_pattern_app.sock")
 
 def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
     path = SOCK_PATH
-    print(f"[IPC] Connecting to {path}...")
+
+    # Build human-readable summary for logging
+    params_summary = []
+    for k, v in (kv or {}).items():
+        if k == "content":
+            # Truncate long content for readability
+            preview = v[:50].replace("\n", "\\n")
+            if len(v) > 50:
+                preview += f"... ({len(v)} chars total)"
+            params_summary.append(f"{k}='{preview}'")
+        elif k == "type":
+            params_summary.append(f"{k}={v}")
+        elif k in ("id", "x", "y", "w", "h", "width", "height", "gradient", "font"):
+            params_summary.append(f"{k}={v}")
+        elif k == "path":
+            # Show just filename for paths
+            filename = os.path.basename(v) if v else "?"
+            params_summary.append(f"{k}={filename}")
+        else:
+            params_summary.append(f"{k}={v[:30]}")
+
+    params_str = ", ".join(params_summary) if params_summary else "(no params)"
+    print(f"[IPC] → {cmd}({params_str})")
+
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(5.0)  # 5 second timeout
     s.connect(path)
-    print(f"[IPC] Connected!")
     try:
         parts = [f"cmd:{cmd}"]
         for k, v in (kv or {}).items():
@@ -25,18 +47,38 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
                 # Base64 encode and add marker prefix
                 encoded = base64.b64encode(v.encode("utf-8")).decode("ascii")
                 parts.append(f"{k}=base64:{encoded}")
-                print(f"[IPC] Encoded content: {len(encoded)} base64 chars")
             else:
                 # Escape spaces in other values
                 escaped = v.replace(" ", "%20").replace("\n", "%0A").replace("\r", "%0D")
                 parts.append(f"{k}={escaped}")
         line = " ".join(parts) + "\n"
-        print(f"[IPC] Sending command: {line[:200]}... ({len(line)} bytes total)")
         s.sendall(line.encode("utf-8"))
-        print(f"[IPC] Waiting for response...")
         data = s.recv(4096)
-        print(f"[IPC] Got response: {data[:100]}")
-        return data.decode("utf-8", errors="ignore")
+
+        # Parse response and show meaningful summary
+        response = data.decode("utf-8", errors="ignore").strip()
+        if response == "ok":
+            print(f"[IPC] ✓ {cmd} succeeded")
+        elif response.startswith("{"):
+            # JSON response - try to parse and show key info
+            try:
+                import json
+                resp_data = json.loads(response)
+                if "windows" in resp_data:
+                    win_count = len(resp_data["windows"])
+                    print(f"[IPC] ✓ {cmd} → {win_count} windows")
+                elif "width" in resp_data and "height" in resp_data:
+                    print(f"[IPC] ✓ {cmd} → {resp_data['width']}×{resp_data['height']}")
+                elif "id" in resp_data:
+                    print(f"[IPC] ✓ {cmd} → id={resp_data['id']}")
+                else:
+                    print(f"[IPC] ✓ {cmd} → JSON ({len(response)} bytes)")
+            except:
+                print(f"[IPC] ✓ {cmd} → {response[:60]}")
+        else:
+            print(f"[IPC] ✓ {cmd} → {response[:60]}")
+
+        return response
     except socket.timeout:
         print(f"[IPC] ERROR: Timeout waiting for response!")
         raise

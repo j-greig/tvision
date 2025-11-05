@@ -536,6 +536,34 @@ This enables AI agents to:
 2. **Start MCP-enabled API Server**: `python -m tools.api_server.main --port=8089`
 3. **Use Claude Code Headless**: `claude -p --mcp-config=.mcp.json "<command>"`
 
+### Enhanced Logging
+
+The API server includes informative IPC logging that shows what commands are being executed with their key parameters:
+
+```
+[IPC] → create_window(type=test_pattern, x=10, y=5, w=40, h=12)
+[IPC] ✓ create_window succeeded
+
+[IPC] → send_text(id=win_abc123, content='Hello World\n... (87 chars total)', mode=append)
+[IPC] ✓ send_text succeeded
+
+[IPC] → get_state(no params)
+[IPC] ✓ get_state → 5 windows
+
+[IPC] → move_window(id=win_abc123, x=25, y=10)
+[IPC] ✓ move_window succeeded
+
+[IPC] → send_figlet(id=auto, text=HELLO, font=banner, width=80, mode=append)
+[IPC] ✓ send_figlet succeeded
+```
+
+**Features:**
+- **→** arrow shows outgoing commands with readable parameter summaries
+- **✓** checkmark indicates successful responses
+- Long content is truncated with character counts shown
+- JSON responses are parsed to show key information (window count, dimensions, IDs)
+- File paths show basename only for readability
+
 ### Claude Desktop Integration
 
 Claude Desktop integration requires additional bridge setup (see `CLAUDE-DESKTOP-SETUP.md`). However, **Claude Code CLI is the recommended approach** due to:

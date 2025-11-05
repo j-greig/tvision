@@ -3,7 +3,7 @@
   "providers": {
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-3-5-haiku-latest",
+      "model": "claude-sonnet-4-5-20250929",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",
