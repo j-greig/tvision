@@ -298,14 +298,40 @@ void TWibWobView::handleKeyDown(TEvent& event) {
 
 void TWibWobView::processInput() {
     ensureEngineInitialized();
-    
+
     if (currentInput.empty() || engine->isBusy()) {
         return;
     }
-    
+
     std::string userMessage = currentInput;
     currentInput.clear();
-    
+
+    // Handle slash commands
+    if (userMessage == "/clear") {
+        clearChat();
+        addMessage("System", "Chat cleared");
+        drawView();
+        return;
+    }
+
+    if (userMessage == "/model") {
+        std::string providerInfo = "Provider: " + engine->getCurrentProvider() +
+                                   "\nModel: " + engine->getCurrentModel();
+        addMessage("System", providerInfo);
+        drawView();
+        return;
+    }
+
+    if (userMessage == "/help") {
+        std::string helpText = "Available commands:\n"
+                              "/clear - Clear chat history\n"
+                              "/model - Show current provider and model\n"
+                              "/help - Show this help message";
+        addMessage("System", helpText);
+        drawView();
+        return;
+    }
+
     // Add user message to chat
     addMessage("User", userMessage);
     
