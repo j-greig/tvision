@@ -1,0 +1,10 @@
+# Cube can be made much bigger at any size to suit context, or extended verticall or horizontally to make rectangles or combined into any arrangemnt of multiple cuboid shapes or humanoid-like arrangements
+    a─────────b   
+   /│        /│   
+  / │       / │   
+ c─────────d  │   
+ │  │      │  │   
+ │  e──────│──f   
+ │ /       │ /    
+ │/        │/     
+ g─────────h      

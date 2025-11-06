@@ -1,0 +1,10 @@
+# isometric cube: can be repeated or duplicated and arranged in any combination
+   +--------+
+  /        /|
+ /        / |
++--------+  |
+|        |  |
+|        |  +
+|        | /
+|        |/
++--------+
