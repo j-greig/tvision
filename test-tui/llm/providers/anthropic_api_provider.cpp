@@ -20,9 +20,10 @@ REGISTER_LLM_PROVIDER("anthropic_api", AnthropicAPIProvider);
 
 AnthropicAPIProvider::AnthropicAPIProvider() {
     endpoint = "https://api.anthropic.com/v1/messages";
-    model = "claude-3-5-haiku-latest";
+    // model = "claude-3-5-haiku-latest";
+    model = "claude-sonnet-4-5";
     maxTokens = 4096;
-    temperature = 0.7;
+    temperature = 1.0;
 }
 
 AnthropicAPIProvider::~AnthropicAPIProvider() {

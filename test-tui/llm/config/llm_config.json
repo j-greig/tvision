@@ -1,18 +1,18 @@
 {
-  "activeProvider": "claude_code",
+  "activeProvider": "anthropic_api",
   "providers": {
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-sonnet-4-5-20250929",
+      "model": "claude-sonnet-4-5",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
-      "maxTokens": "4096",
+      "maxTokens": "8000",
       "temperature": "1.0"
     },
     "claude_code": {
       "enabled": true,
       "command": "claude",
-      "args": ["-p", "--model", "claude-sonnet-4-5-20250929", "--mcp-config", ".claude/settings.local.json", "--output-format", "json"]
+      "args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.json", "--output-format", "json"]
     },
     "openrouter": {
       "enabled": true,
