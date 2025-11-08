@@ -1,30 +1,185 @@
 # Product Requirements Document: wibwob-dos
-## Text-Native Operating System for Text-Native Intelligence
+## A Text-Native Operating System for Text-Native Intelligence
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** November 8, 2025
-**Product Name:** wibwob-dos (Wib and Wob Dual Operating System)
-**Vision:** A text-native operating system designed for seamless collaboration between human intelligence and language model intelligence.
+**Product Name:** wibwob-dos (Wib and Wob - Dual Operating System)
+**Tagline:** "A text-native operating system for text-native intelligence"
+**Current Codename:** test-tui / test_pattern_app
 
 ---
 
 ## Executive Summary
 
-**wibwob-dos** is a revolutionary text-based user interface (TUI) operating system built on the Turbo Vision framework. It provides a dual-interface environment where both humans and AI language models have equal control over the operating system and user interface. The system features a chat module and comprehensive API for dynamically spawning and populating windows with content, enabling real-time collaboration between text-native intelligences.
+**wibwob-dos** is a revolutionary text-based user interface (TUI) operating system that provides equal control to both human and AI intelligences. Built on the Turbo Vision framework, it features a sophisticated window management system, generative art engines, API-driven automation, and an embedded AI chat interface (Wib&Wob).
 
-The name reflects its dual nature:
-- **Wib**: The artist (creative, human-driven interaction)
-- **Wob**: The scientist (analytical, AI-driven processing)
+**Core Vision:**
+- **Wib** (つ◕‿◕‿⚆༽つ): The artist - chaotic creativity, ASCII art, surreal experiences
+- **Wob** (つ⚆‿◕‿◕༽つ): The scientist - methodical analysis, precise control, structured systems
+
+**Current State:** Highly functional prototype with 40+ features, REST API integration, MCP support for AI agents, and embedded LLM chat.
 
 ---
 
-## Phase 1: Core Application Restructuring & Documentation
+## Current Application Analysis
+
+### Application Architecture
+
+**Primary Application:** `test_pattern_app.cpp` (2,800+ lines)
+**Supporting Modules:** 38 C++ files, 50+ custom view classes
+**Total Codebase:** ~15,000 lines of application code
+
+**Key Components:**
+- Window manager with unlimited window support
+- API/IPC server (Unix domain socket at `/tmp/test_pattern_app.sock`)
+- Window registry system for programmatic control
+- Generative art engines (8+ algorithms)
+- Frame-based animation system
+- Glitch effects engine
+- Workspace persistence (JSON)
+- Screenshot capture system
+- Embedded AI chat (Wib&Wob)
+
+### Feature Inventory: Functional vs Placeholder
+
+#### ✅ **FULLY FUNCTIONAL** (95% of features)
+
+**File Menu:**
+- ✅ New Test Pattern (Ctrl+N) - Unlimited windows with configurable patterns
+- ✅ New H-Gradient - Horizontal color gradients
+- ✅ New V-Gradient - Vertical color gradients
+- ✅ New Radial Gradient - Radial/circular gradients
+- ✅ New Diagonal Gradient - Diagonal color gradients
+- ✅ New Mechs Grid (Ctrl+M) - Mech grid visualization
+- ✅ New Animation (Ctrl+D) - Animated donut/effects
+- ✅ Open Text/Animation (Ctrl+O) - Load text or frame-delimited animations
+- ✅ Open Image - ASCII art image viewer (STB image library)
+- ✅ Open Monodraw - Monodraw JSON file viewer
+- ✅ Save Workspace (Ctrl+S) - Serialize all windows to JSON
+- ✅ Open Workspace - Restore saved workspace
+- ✅ Exit (Alt+X) - Clean shutdown
+
+**Edit Menu:**
+- ✅ Screenshot (Ctrl+P) - Capture entire screen to file
+- ✅ Pattern Mode → Continuous (Diagonal) - Flowing diagonal patterns
+- ✅ Pattern Mode → Tiled (Cropped) - Cropped/tiled patterns
+
+**View Menu:**
+- ✅ ASCII Grid Demo - ASCII character grid demonstration
+- ✅ Animated Blocks - Color-changing block animation
+- ✅ Animated Gradient - Flowing gradient animation
+- ✅ Animated Score - Musical score ASCII animation
+- ✅ Score BG Color - Background color picker for score
+- ✅ Verse Field (Generative) - Verse field generative art
+- ✅ Orbit Field (Generative) - Orbital motion visualization
+- ✅ Mycelium Field (Generative) - Mycelium growth simulation
+- ✅ Torus Field (Generative) - 3D torus rendering
+- ✅ Cube Spinner (Generative) - Rotating 3D cube
+- ✅ Monster Portal (Generative) - Emoji tile patterns
+- ✅ Monster Verse (Generative) - Monster emoji verse field
+- ✅ Monster Cam (Emoji) - Emoji camera effect
+- ⚠️ Zoom In/Out/Actual Size - Placeholder (no implementation)
+- ⚠️ Full Screen (F11) - Placeholder (conflicts with Quantum Printer)
+
+**Window Menu:**
+- ✅ Edit Text Editor - API-controllable text editor window
+- ✅ Open Text File (Transparent BG) - Text viewer with transparent background
+- ✅ Cascade - Arrange windows in cascade
+- ✅ Tile - Tile windows across desktop
+- ✅ Send to Back - Z-order control
+- ✅ Next (F6) - Cycle to next window
+- ✅ Previous (Shift+F6) - Cycle to previous window
+- ✅ Close (Alt+F3) - Close active window
+- ✅ Close All - Close all windows
+- ✅ Background Color - Desktop background color picker
+
+**Tools Menu:**
+- ✅ Wib&Wob Chat (F12) - Embedded AI chat with Claude Code CLI + MCP
+- ✅ Glitch Effects → Enable Glitch Mode (Ctrl+G) - Toggle glitch engine
+- ✅ Glitch Effects → Scatter Pattern - Scatter glitch effect
+- ✅ Glitch Effects → Color Bleed - Color bleeding effect
+- ✅ Glitch Effects → Radial Distort - Radial distortion
+- ✅ Glitch Effects → Diagonal Scatter - Diagonal scatter effect
+- ✅ Glitch Effects → Capture Frame (F9) - Save glitched frame
+- ✅ Glitch Effects → Reset Parameters - Reset glitch settings
+- ✅ Glitch Effects → Glitch Settings - Configure glitch parameters
+- ⚠️ ANSI Editor - Placeholder (no implementation)
+- ⚠️ Paint Tools - Placeholder (no implementation)
+- ⚠️ Animation Studio - Placeholder (no implementation)
+- ⚠️ Quantum Printer (F11) - Placeholder (no implementation)
+
+**Help Menu:**
+- ✅ About WIBWOBWORLD - About dialog
+
+**Programmatic API (REST + MCP):**
+- ✅ GET /state - Get application state and window list
+- ✅ POST /windows - Create window (test_pattern, gradient, frame_player, text_view)
+- ✅ POST /windows/{id}/move - Move/resize window
+- ✅ POST /windows/{id}/focus - Focus window
+- ✅ POST /windows/{id}/close - Close window
+- ✅ POST /windows/cascade - Cascade all windows
+- ✅ POST /windows/tile - Tile windows
+- ✅ POST /windows/close_all - Close all windows
+- ✅ POST /pattern_mode - Set pattern mode (continuous/tiled)
+- ✅ POST /screenshot - Take screenshot
+- ✅ POST /workspace/save - Save workspace to file
+- ✅ POST /workspace/load - Load workspace from file
+- ✅ POST /send_text - Send text to text editor window
+- ✅ POST /send_figlet - Send FIGlet text to window
+- ✅ GET /primers/list - List all primer files (128 available)
+- ✅ POST /primers/batch - Spawn multiple primer text windows
+- ✅ WebSocket at /ws - Real-time event stream
+
+#### ⚠️ **PLACEHOLDER/PARTIAL** (5% of features)
+
+1. **Zoom Controls** - Menu items present, no implementation
+2. **ANSI Editor** - Menu item only
+3. **Paint Tools** - Menu item only
+4. **Animation Studio** - Menu item only
+5. **Quantum Printer** - Menu item only (keycode conflict with Full Screen)
+
+### Technical Capabilities
+
+**Window System:**
+- Unlimited concurrent windows
+- Per-window stable IDs (w1, w2, ... w999+)
+- Dynamic registration/de-registration
+- Automatic bounds calculation for content
+- Auto-sizing for text files and animations
+- Z-order management
+
+**Animation System:**
+- Timer-based animations (no threads)
+- Multiple concurrent animations
+- Configurable FPS per animation
+- Frame file format (---- delimiters)
+- Real-time generative art
+
+**API Integration:**
+- FastAPI REST server (tools/api_server/)
+- Unix socket IPC bridge
+- MCP (Model Context Protocol) endpoint at /mcp
+- WebSocket event streaming
+- JSON workspace format
+- Batch operations (primers)
+
+**AI Integration:**
+- Wib&Wob chat window
+- Claude Code CLI backend
+- MCP tool access (window management, state queries)
+- Configurable LLM provider (Haiku/Sonnet/Opus)
+- Personality prompts (wibandwob.prompt.md)
+- Session logging
+
+---
+
+## Phase 1: Core Refactoring & Documentation
 
 ### Objectives
-1. Consolidate the main application architecture
-2. Establish clear documentation and codebase structure
-3. Identify and document all functional vs. placeholder features
-4. Create foundation for future API development
+1. Establish wibwob-dos as the primary project identity
+2. Reorganize codebase for clarity and maintainability
+3. Create comprehensive documentation
+4. Consolidate and clean up experimental code
 
 ### Deliverables
 
@@ -33,622 +188,662 @@ The name reflects its dual nature:
 **Current Structure:**
 ```
 /tvision
-  /examples         # Multiple demo applications
-    /tvdemo         # Main demonstration app (to be promoted)
-    /tvedit         # Text editor example
-    /tvdir          # Directory browser
-    /mmenu          # Menu example
-    /palette        # Palette example
+  /test-tui          # Main application (to be promoted)
+  /examples          # Legacy Turbo Vision examples
+    /tvdemo
+    /tvedit
+    /tvdir
     /others...
-  /source           # Turbo Vision library source
-  /include          # Library headers
-  /test             # Unit tests
-  hello.cpp         # Basic example
+  /source            # Turbo Vision library
+  /include           # Library headers
+  /tools             # API server, utilities
 ```
 
-**New Structure:**
+**New Structure (wibwob-dos):**
 ```
 /wibwob-dos
-  /app              # Main wibwob-dos application (formerly tvdemo)
-    /src            # Application source files
-    /include        # Application headers
-    /resources      # Help files, assets
+  /app               # Main wibwob-dos application (formerly test-tui)
+    /src             # Application source files
+    /views           # Custom view classes
+    /llm             # LLM integration (chat, config)
+    /primers         # Primer text files
+    /workspaces      # Saved workspaces
+    /ansi            # ANSI art files
+    /images          # Image files
     CMakeLists.txt
-  /lib              # Turbo Vision library (formerly /source)
-    /source
-    /include
-  /workings         # Experimental code and alternative examples
-    /text-editor    # tvedit - functional text editor
-    /file-browser   # tvdir - directory browser
-    /examples       # Other examples (mmenu, palette, etc.)
-    /prototypes     # Experimental features
-  /tests            # Unit and integration tests
-  /docs             # Comprehensive documentation
-    /api            # API documentation
-    /user-guide     # User documentation
-    /development    # Development guides
-  CMakeLists.txt    # Root build configuration
-  README.md         # Primary documentation
-  CLAUDE.md         # AI collaboration guide
-  PRD.md            # This document
+    README.md
+  /lib               # Turbo Vision library (formerly /source + /include)
+    /source          # Library implementation
+    /include         # Public headers
+  /tools             # API server and utilities
+    /api_server      # FastAPI REST + MCP server
+  /workings          # Experimental/reference code
+    /examples        # Original TV examples (tvdemo, tvedit, etc.)
+    /prototypes      # Experimental features
+  /docs              # Comprehensive documentation
+    /api             # API documentation
+    /user-guide      # User manual
+    /development     # Developer guide
+  CMakeLists.txt     # Root build
+  README.md          # Project overview
+  CLAUDE.md          # AI collaboration guide
+  PRD.md             # This document
+  FUNCTIONALITY_REPORT.md  # Feature analysis
 ```
 
-#### 1.2 Core Application Features Documentation
+#### 1.2 File Reorganization
 
-**Fully Functional Features:**
+**Move to /app:**
+- test-tui/* → app/src/
+- test-tui/llm/ → app/llm/
+- test-tui/primers/ → app/primers/
+- test-tui/workspaces/ → app/workspaces/
+- test-tui/.claude/ → app/.claude/
 
-1. **Window Management System**
-   - Resize/Move windows (`Ctrl+F5`)
-   - Zoom windows (`F5`)
-   - Navigate between windows (`F6`)
-   - Close windows (`Alt+F3`)
-   - Tile windows automatically
-   - Cascade windows
-   - Desktop persistence (save/restore)
+**Move to /workings:**
+- examples/* → workings/examples/
+- hello.cpp → workings/examples/hello/
 
-2. **Interactive Tools**
-   - **Puzzle Game**: Fully functional sliding tile puzzle
-   - **Calendar**: Interactive calendar viewer with date navigation
-   - **ASCII Table**: Complete ASCII character reference
-   - **Calculator**: Functional calculator with basic operations
-   - **Event Viewer**: Real-time event debugging tool (`Alt+0`)
-   - **File Viewer**: Text file browser with Unicode support
-
-3. **System Features**
-   - **File Operations**: Open files with dialog (`F3`)
-   - **Directory Navigation**: Change directory dialog
-   - **Mouse Control**: Configure mouse behavior
-   - **Color Customization**: Full palette editor for UI theming
-   - **Background Patterns**: Customizable desktop background
-   - **Help System**: Context-sensitive help (`F1`)
-
-4. **Core Infrastructure**
-   - Clock display (top-right)
-   - Heap memory monitor (bottom-right)
-   - Status bar with keyboard shortcuts
-   - Menu system with keyboard navigation
-   - UTF-8 Unicode support
-   - 24-bit color support
-   - Cross-platform (Linux, Windows, macOS)
-
-**Placeholder/Partially Implemented Features:**
-
-1. **DOS Shell** (`File > DOS Shell`)
-   - Menu item exists
-   - Handled by TApplication default handler
-   - Functional on original DOS/Windows
-   - Needs modernization for Unix systems
-
-**Feature Status Matrix:**
-
-| Menu Item | Keyboard | Status | Notes |
-|-----------|----------|--------|-------|
-| About | - | ✅ Functional | Static dialog |
-| Video Mode | - | ⚠️ DOS Only | Screen mode switching |
-| Puzzle | - | ✅ Functional | Complete game |
-| Calendar | - | ✅ Functional | Date navigation |
-| ASCII Table | - | ✅ Functional | Full character set |
-| Calculator | - | ✅ Functional | Basic operations |
-| Event Viewer | Alt+0 | ✅ Functional | Debug tool |
-| Open File | F3 | ✅ Functional | File browser |
-| Change Dir | - | ✅ Functional | Directory dialog |
-| DOS Shell | - | ⚠️ Partial | Needs modernization |
-| Exit | Alt+X | ✅ Functional | Clean shutdown |
-| Resize/Move | Ctrl+F5 | ✅ Functional | Window operations |
-| Zoom | F5 | ✅ Functional | Maximize/restore |
-| Next Window | F6 | ✅ Functional | Window cycling |
-| Close | Alt+F3 | ✅ Functional | Close active |
-| Tile | - | ✅ Functional | Auto-arrange |
-| Cascade | - | ✅ Functional | Overlap windows |
-| Mouse Config | - | ✅ Functional | Mouse settings |
-| Colors | - | ✅ Functional | Palette editor |
-| Background | - | ✅ Functional | Pattern chooser |
-| Save Desktop | - | ✅ Functional | Persist layout |
-| Restore Desktop | - | ✅ Functional | Load layout |
+**Move to /lib:**
+- source/tvision/ → lib/source/
+- include/tvision/ → lib/include/
 
 #### 1.3 Documentation Deliverables
 
-1. **CLAUDE.md** - AI Collaboration Guide
-   - Project architecture
-   - API design philosophy
-   - Coding conventions for AI assistance
-   - How LMs can interact with the codebase
+**✅ COMPLETE:**
+- **PRD.md** - This document (Product Requirements)
+- **FUNCTIONALITY_REPORT.md** - Comprehensive feature analysis
 
-2. **README.md** - Updated for wibwob-dos
-   - New project identity
-   - Quick start guide
-   - Build instructions
-   - Feature overview
-
-3. **FUNCTIONALITY_REPORT.md** - Comprehensive Feature Analysis
-   - Detailed feature descriptions
-   - Code architecture documentation
-   - Module dependencies
-   - Extension points for future development
-
-4. **API_DESIGN.md** - Future API Specification (Phase 2 preview)
-   - Window spawning API
-   - Text population mechanisms
-   - Event handling for LM integration
-   - Chat module architecture
+**🚧 TODO:**
+- **README.md** - Update for wibwob-dos identity
+- **CLAUDE.md** - Update with new structure and vision
+- **docs/USER_GUIDE.md** - End-user documentation
+- **docs/API_REFERENCE.md** - API endpoint documentation
+- **docs/DEVELOPER_GUIDE.md** - Development setup and architecture
 
 #### 1.4 Success Criteria
 
-- [x] All source files reorganized into new structure
-- [ ] Build system (CMake) updated and functional
-- [ ] All applications compile and run correctly
-- [ ] Documentation complete and accurate
-- [ ] Git history preserved
+- [ ] All source files reorganized
+- [ ] Build system updated and functional
+- [ ] All applications compile successfully
 - [ ] No functionality regression
+- [ ] Documentation coverage >90%
+- [ ] Git history preserved
+- [ ] API server still functional
 
 ---
 
 ## Phase 2: CLI/Terminal Distribution & Shareability
 
 ### Objectives
-1. Make wibwob-dos easily distributable via package managers
-2. Enable simple installation and execution via terminal
-3. Create portable binaries for multiple platforms
-4. Establish CI/CD pipeline for automated builds
+1. Make wibwob-dos easily installable via standard package managers
+2. Enable one-command installation on all major platforms
+3. Create portable standalone binaries
+4. Establish CI/CD for automated releases
 
 ### Deliverables
 
-#### 2.1 Package Distribution
+#### 2.1 Package Distribution Strategy
 
-**Platform-Specific Packages:**
+**Linux Packages:**
+- **Debian/Ubuntu**: `.deb` package via PPA or GitHub releases
+- **Arch Linux**: AUR package (`wibwob-dos`, `wibwob-dos-git`)
+- **Fedora/RHEL**: `.rpm` package via COPR
+- **Universal**: AppImage, Snap, or Flatpak
+- **Install commands:**
+  ```bash
+  # Ubuntu/Debian
+  sudo add-apt-repository ppa:wibwob/dos
+  sudo apt install wibwob-dos
 
-1. **Linux**
-   - **Debian/Ubuntu**: `.deb` package
-   - **Red Hat/Fedora**: `.rpm` package
-   - **Arch Linux**: AUR package
-   - **Universal**: AppImage or Snap package
-   - **Package Managers**:
-     - apt: `sudo apt install wibwob-dos`
-     - dnf: `sudo dnf install wibwob-dos`
-     - pacman: `pacman -S wibwob-dos`
+  # Arch
+  yay -S wibwob-dos
 
-2. **macOS**
-   - **Homebrew Formula**: `brew install wibwob-dos`
-   - **MacPorts**: `port install wibwob-dos`
-   - Standalone `.pkg` installer
+  # Fedora
+  sudo dnf copr enable wibwob/dos
+  sudo dnf install wibwob-dos
+  ```
 
-3. **Windows**
-   - **Chocolatey**: `choco install wibwob-dos`
-   - **Scoop**: `scoop install wibwob-dos`
-   - **WinGet**: `winget install wibwob-dos`
-   - Standalone `.exe` installer
-   - Portable `.zip` distribution
+**macOS Packages:**
+- **Homebrew**: `brew install wibwob-dos`
+- **MacPorts**: `port install wibwob-dos`
+- **Standalone**: `.pkg` installer or `.dmg` bundle
 
-4. **Cross-Platform**
-   - **vcpkg**: Already supported - enhance visibility
-   - **Conda**: `conda install wibwob-dos`
-   - **Docker**: `docker run -it wibwob-dos`
+**Windows Packages:**
+- **Chocolatey**: `choco install wibwob-dos`
+- **Scoop**: `scoop install wibwob-dos`
+- **WinGet**: `winget install wibwob.dos`
+- **Portable**: `.zip` with static binary
 
-#### 2.2 Terminal Shareability Features
-
-**Installation Methods:**
-
+**Universal Install Script:**
 ```bash
-# Quick install script (curl-to-bash)
-curl -sSL https://wibwob.sh | bash
+# One-liner install (detects OS and installs)
+curl -sSL https://get.wibwob.dev | bash
 
 # Or with wget
-wget -qO- https://wibwob.sh | bash
+wget -qO- https://get.wibwob.dev | bash
 
 # Direct binary download
-wget https://releases.wibwob.dev/latest/wibwob-dos-linux-amd64
-chmod +x wibwob-dos-linux-amd64
-./wibwob-dos-linux-amd64
+curl -LO https://releases.wibwob.dev/latest/wibwob-dos-$(uname -s)-$(uname -m)
+chmod +x wibwob-dos-*
+./wibwob-dos-*
 ```
 
-**Remote Session Sharing:**
+#### 2.2 Binary Distribution
 
-1. **SSH Integration**
-   - Optimized for SSH sessions
-   - Automatic terminal detection
-   - Bandwidth optimization for remote use
-   - Session recording/playback
-
-2. **tmux/screen Integration**
-   - Attach/detach support
-   - Multi-user collaboration in same session
-   - Persistent sessions across disconnects
-
-3. **Cloud Terminal Support**
-   - Google Cloud Shell
-   - AWS CloudShell
-   - Azure Cloud Shell
-   - GitHub Codespaces
-   - Replit, Glitch, etc.
-
-#### 2.3 Binary Distribution Strategy
-
-**Release Artifacts (per release):**
-- `wibwob-dos-linux-x86_64` (static binary)
+**Release Artifacts (per version):**
+- `wibwob-dos-linux-x86_64` (static, glibc 2.17+)
 - `wibwob-dos-linux-aarch64` (ARM64)
 - `wibwob-dos-darwin-x86_64` (macOS Intel)
-- `wibwob-dos-darwin-aarch64` (macOS Apple Silicon)
-- `wibwob-dos-windows-x86_64.exe`
-- `wibwob-dos-windows-arm64.exe`
+- `wibwob-dos-darwin-aarch64` (Apple Silicon)
+- `wibwob-dos-windows-x64.exe` (MSVC, Vista+)
+- `wibwob-dos-windows-arm64.exe` (ARM64 Windows)
 
-**Hosting Options:**
-1. **GitHub Releases**: Primary distribution
-2. **CDN**: Fast global delivery
-3. **Registry Mirrors**: Regional availability
+**Static Linking Strategy:**
+- ncurses statically linked (Linux)
+- No runtime dependencies except libc
+- Target size: <5MB per binary (with compression)
+
+#### 2.3 Cloud Terminal Support
+
+**Optimizations for Remote Sessions:**
+- Bandwidth optimization (efficient screen updates)
+- SSH-friendly operation (respects TERM environment)
+- Tmux/screen integration (persistent sessions)
+- Cloud shell support:
+  - Google Cloud Shell
+  - AWS CloudShell
+  - Azure Cloud Shell
+  - GitHub Codespaces
+  - Gitpod
+
+**Sharing Features:**
+```bash
+# Start session with sharing
+wibwob-dos --share
+
+# Join existing session
+wibwob-dos --join <session-id>
+
+# Record session (asciinema compatible)
+wibwob-dos --record session.cast
+```
 
 #### 2.4 CI/CD Pipeline
 
 **GitHub Actions Workflow:**
 ```yaml
-name: Build and Release
-on: [push, tag]
+name: Build & Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-20.04, macos-latest, windows-latest]
         arch: [x64, arm64]
 
     steps:
       - Build static binaries
-      - Run test suite
+      - Run integration tests
       - Package for distribution
-      - Upload to releases
-      - Publish to package registries
+      - Upload artifacts
+      - Publish to registries (on tag)
 ```
 
 **Automated Testing:**
-- Unit tests
-- Integration tests
-- Cross-platform compatibility tests
+- Unit tests (lib/tests/)
+- Integration tests (app/tests/)
+- API tests (tools/api_server/tests/)
+- Cross-platform smoke tests
 - Performance benchmarks
-- Memory leak detection
 
-#### 2.5 Success Criteria
+**Release Automation:**
+- Tag-triggered builds (`v1.0.0`)
+- Automatic changelog generation
+- GitHub Releases with binaries
+- Package registry publishing
+- Docker image builds
 
-- [ ] One-command installation on all major platforms
-- [ ] Static binaries under 5MB
-- [ ] Launch time under 100ms
-- [ ] Works in constrained environments (256MB RAM)
-- [ ] Perfect SSH terminal compatibility
-- [ ] Automated builds on every release tag
-- [ ] Package manager submissions accepted
+#### 2.5 Docker Distribution
+
+**Docker Images:**
+```bash
+# Run wibwob-dos in container
+docker run -it wibwob/dos:latest
+
+# With API server
+docker run -it -p 8089:8089 wibwob/dos:api
+
+# Persistent workspace
+docker run -it -v $(pwd)/workspace:/workspace wibwob/dos:latest
+```
+
+**Docker Compose (Full Stack):**
+```yaml
+version: '3.8'
+services:
+  wibwob-dos:
+    image: wibwob/dos:latest
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./workspaces:/app/workspaces
+```
+
+#### 2.6 Success Criteria
+
+- [ ] One-command install on 3+ platforms
+- [ ] Binary size <5MB (compressed)
+- [ ] Launch time <200ms
+- [ ] Works in 256MB RAM environments
+- [ ] GitHub Actions builds all platforms
+- [ ] Homebrew formula accepted
+- [ ] AUR package published
+- [ ] 100+ installations in first month
 
 ---
 
-## Phase 3: Web Wrapper & Browser-Based Access
+## Phase 3: Web Wrapper & Browser Access
 
 ### Objectives
 1. Enable browser-based access to wibwob-dos
-2. Maintain full functionality in web environment
+2. Maintain full feature parity in web environment
 3. Support collaborative multi-user sessions
-4. Provide embeddable widget for documentation/demos
+4. Provide embeddable demos for documentation
 
-### Deliverables
+### Framework Evaluation & Recommendation
 
-#### 3.1 Web Terminal Framework Evaluation
-
-**Option 1: xterm.js + WebSocket Backend (Recommended)**
-
-**Pros:**
-- ✅ Industry standard (used by VS Code, Jupyter)
-- ✅ Excellent terminal emulation (xterm.js)
-- ✅ Real WebSocket communication
-- ✅ Active maintenance and community
-- ✅ Full ANSI/VT100 support
-- ✅ Copy/paste, mouse support
-- ✅ Supports terminal protocols (Sixel, images)
-
-**Cons:**
-- ⚠️ Requires WebSocket server component
-- ⚠️ More complex deployment
+#### **Option 1: xterm.js + WebSocket (RECOMMENDED ⭐⭐⭐⭐⭐)**
 
 **Architecture:**
 ```
-[Browser] ←→ xterm.js ←→ WebSocket ←→ wibwob-dos process
+[Browser] ←→ xterm.js ←→ WebSocket ←→ PTY ←→ wibwob-dos process
 ```
 
+**Pros:**
+- ✅ Industry standard (VS Code, Jupyter, AWS CloudShell)
+- ✅ Perfect terminal emulation (xterm.js)
+- ✅ Full ANSI/Unicode support
+- ✅ Mouse and keyboard support
+- ✅ Clipboard integration
+- ✅ Copy/paste, selection
+- ✅ Active maintenance
+- ✅ Multi-user capable
+
+**Cons:**
+- ⚠️ Requires server-side process per session
+- ⚠️ More complex deployment than pure client-side
+
 **Implementation:**
-- Frontend: xterm.js + xterm-addon-fit, xterm-addon-web-links
-- Backend: Go/Rust/Node.js WebSocket server
-- Spawns wibwob-dos process per session
-- PTY (pseudo-terminal) interface
+- **Frontend**: xterm.js + xterm-addon-fit + xterm-addon-webgl
+- **Backend**: Go/Rust/Node.js WebSocket server
+- **PTY**: Spawns wibwob-dos in pseudo-terminal
+- **Session management**: Redis or in-memory
 
-**Example Projects:**
-- [gotty](https://github.com/yudai/gotty) - Go-based
-- [ttyd](https://github.com/tsl0922/ttyd) - C-based
-- [wetty](https://github.com/butlerx/wetty) - Node.js-based
+**Reference Projects:**
+- [ttyd](https://github.com/tsl0922/ttyd) - C/libwebsockets
+- [gotty](https://github.com/yudai/gotty) - Go implementation
+- [wetty](https://github.com/butlerx/wetty) - Node.js implementation
 
-**Estimated Effort:** 2-3 weeks
+**Estimated Effort:** 3-4 weeks
 
 ---
 
-**Option 2: WebAssembly (WASM) Compilation**
+#### **Option 2: WebAssembly (WASM) Compilation**
+
+**Architecture:**
+```
+[Browser] ←→ WASM Module (wibwob-dos) ←→ Canvas/DOM Renderer
+```
 
 **Pros:**
-- ✅ Runs entirely in browser (no server-side process)
-- ✅ Instant startup
+- ✅ Runs entirely in browser (serverless)
+- ✅ Instant startup, no latency
 - ✅ Offline capable
-- ✅ Maximum portability
-- ✅ Can embed in static sites
+- ✅ Can be hosted on static CDN
+- ✅ Perfect for demos/documentation
 
 **Cons:**
-- ⚠️ Significant porting effort (ncurses → canvas/DOM)
-- ⚠️ File system limitations (virtual FS)
-- ⚠️ May not support all Turbo Vision features
-- ⚠️ Binary size concerns
-
-**Architecture:**
-```
-[Browser] ←→ WASM Module (wibwob-dos) ←→ Canvas/Terminal Emulator
-```
+- ⚠️ Significant porting effort (ncurses → canvas)
+- ⚠️ File system limitations (IndexedDB/OPFS)
+- ⚠️ API server integration complex
+- ⚠️ Binary size concerns (~10-20MB)
+- ⚠️ Not all Turbo Vision features may work
 
 **Implementation:**
-- Compile Turbo Vision to WASM with Emscripten
+- Compile with Emscripten
 - Port ncurses backend to canvas rendering
-- Use IndexedDB for file storage
-- ServiceWorker for offline support
+- Implement virtual filesystem (IDBFS)
+- Service Worker for offline support
 
-**Example Projects:**
-- [Turbo editor WASM port](https://github.com/magiblot/turbo) (partial)
+**Reference Projects:**
+- [Turbo WASM experiments](https://github.com/magiblot/turbo) (partial)
+- Various ncurses WASM ports
 
-**Estimated Effort:** 6-8 weeks (significant porting)
+**Estimated Effort:** 8-12 weeks (heavy porting)
 
 ---
 
-**Option 3: VNC/Remote Desktop Protocol**
+#### **Option 3: VNC/Remote Desktop (NOT RECOMMENDED)**
+
+**Architecture:**
+```
+[Browser] ←→ noVNC ←→ VNC Server ←→ Xvfb ←→ wibwob-dos
+```
 
 **Pros:**
 - ✅ Zero code changes to wibwob-dos
-- ✅ Standard protocol (VNC/RDP)
-- ✅ Existing client libraries (noVNC)
-- ✅ Full graphical fidelity
+- ✅ Standard VNC protocol
 
 **Cons:**
-- ⚠️ Requires full X11/framebuffer for TUI (overkill)
-- ⚠️ Higher latency than native terminal
-- ⚠️ More bandwidth intensive
-- ⚠️ Server resource intensive
+- ⚠️ Requires X11/framebuffer for TUI (massive overkill)
+- ⚠️ High latency and bandwidth
+- ⚠️ Resource intensive
+- ⚠️ Poor user experience for text
 
-**Architecture:**
-```
-[Browser] ←→ noVNC ←→ VNC Server ←→ Virtual X11 ←→ wibwob-dos
-```
-
-**Implementation:**
-- Run wibwob-dos in Xvfb (virtual framebuffer)
-- x11vnc or TigerVNC server
-- noVNC client in browser
-
-**Estimated Effort:** 1-2 weeks (configuration heavy)
+**Estimated Effort:** 2 weeks (not worth it)
 
 ---
 
-#### 3.2 Recommendation Matrix
+### Recommendation Matrix
 
-| Criteria | xterm.js + WS | WebAssembly | VNC |
-|----------|---------------|-------------|-----|
+| Criteria | xterm.js + WS | WASM | VNC |
+|----------|---------------|------|-----|
 | **Performance** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **Development Effort** | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Maintenance** | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Feature Completeness** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Deployment Complexity** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| **Multi-user Support** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
-| **Offline Capability** | ⭐ | ⭐⭐⭐⭐⭐ | ⭐ |
-| **Resource Usage** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **Development Effort** | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
+| **Feature Parity** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **Deployment Ease** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **Multi-user** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
+| **Offline Support** | ⭐ | ⭐⭐⭐⭐⭐ | ⭐ |
+| **Maintenance** | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
 
-**Final Recommendation: xterm.js + WebSocket** ⭐⭐⭐⭐⭐
+**Final Recommendation:** **xterm.js + WebSocket** for primary deployment, with **WASM** as Phase 4 for embedded demos.
 
-**Rationale:**
-- Best balance of features, performance, and development effort
-- Proven at scale (VS Code, AWS CloudShell)
-- Enables multi-user collaboration features
-- Maintains full terminal compatibility
-- Can add WASM support later for offline mode
+### Deliverables
 
-**Hybrid Approach (Future):**
-- Primary: xterm.js + WebSocket for full features
-- Secondary: WASM build for embedded demos/documentation
-- Fallback: VNC for legacy browser support
+#### 3.1 Web Application Features
 
-#### 3.3 Web Application Features
+**Core Functionality:**
+- Full wibwob-dos instance in browser
+- Real-time terminal emulation
+- Keyboard shortcuts (all shortcuts work)
+- Mouse support (clicks, drags, scroll)
+- Clipboard integration (copy/paste)
+- File upload/download
+- Workspace persistence (browser storage + backend)
 
-**Core Features:**
+**Collaboration Features:**
+- Multi-user shared sessions
+- Session sharing via URL (`app.wibwob.dev/session/abc123`)
+- Real-time cursor tracking
+- Integrated text chat alongside TUI
+- Session recording/replay (asciinema format)
+- Read-only spectator mode
 
-1. **Instant Demo Mode**
-   - Embeddable `<iframe>` or widget
-   - Read-only demo with sample content
-   - No server-side state required
-   - Perfect for documentation
+**Deployment Modes:**
+1. **Full App**: `https://app.wibwob.dev/` - Interactive instance
+2. **Demo**: `https://demo.wibwob.dev/` - Read-only showcase
+3. **Embed**: `<iframe src="https://embed.wibwob.dev/">` - Embeddable widget
+4. **API**: `https://api.wibwob.dev/` - WebSocket API endpoint
 
-2. **Full Interactive Mode**
-   - WebSocket-based real-time connection
-   - Full keyboard and mouse support
-   - File upload/download
-   - Clipboard integration
-   - Session persistence
-
-3. **Collaborative Sessions**
-   - Multi-user shared sessions
-   - Real-time cursor tracking
-   - Chat integration
-   - Session recording/replay
-   - Invite links for collaboration
-
-4. **Cloud Storage Integration**
-   - Save/load files to browser storage
-   - GitHub integration (open repos)
-   - Google Drive, Dropbox connectors
-   - WebDAV support
-
-**Example Deployment:**
-```
-https://app.wibwob.dev/          # Full application
-https://demo.wibwob.dev/         # Read-only demo
-https://embed.wibwob.dev/        # Embeddable widget
-```
-
-#### 3.4 Implementation Roadmap
+#### 3.2 Implementation Roadmap
 
 **Week 1-2: Core Infrastructure**
 - Set up xterm.js frontend
-- Create WebSocket server (Go/Node.js)
-- PTY process management
+- WebSocket server (Go/Node.js)
+- PTY process spawning
 - Basic authentication
+- Session management
 
 **Week 3-4: Feature Parity**
 - File operations (upload/download)
-- Clipboard support
-- Session management
+- Clipboard bidirectional sync
 - Configuration persistence
+- Error handling and reconnection
+- Mobile touch support
 
-**Week 5-6: Collaboration Features**
-- Multi-user sessions
-- Session sharing
+**Week 5-6: Collaboration**
+- Multi-user session support
+- Shared cursor tracking
 - Chat integration
 - Recording/replay
+- Session URLs
 
-**Week 7-8: Polish & Deployment**
-- Performance optimization
-- Security hardening
-- CDN deployment
-- Documentation
+**Week 7-8: Polish & Deploy**
+- Performance optimization (WebGL renderer)
+- Security hardening (rate limiting, input validation)
+- CDN deployment (Cloudflare/AWS)
+- Documentation and examples
+- Load testing (100+ concurrent users)
 
-#### 3.5 Success Criteria
+#### 3.3 Embedding & Documentation
 
-- [ ] Web application loads in under 2 seconds
-- [ ] No perceptible input lag (<50ms)
+**Embeddable Widget:**
+```html
+<!-- Embed wibwob-dos in documentation -->
+<iframe src="https://embed.wibwob.dev/?demo=generative-art"
+        width="800" height="600"
+        style="border: 2px solid #000; border-radius: 8px;">
+</iframe>
+
+<!-- With specific workspace -->
+<iframe src="https://embed.wibwob.dev/?workspace=demos/monster-portal.json">
+</iframe>
+```
+
+**Customization Options:**
+```javascript
+// Embed with custom config
+<script src="https://cdn.wibwob.dev/embed.js"></script>
+<div id="wibwob-container"></div>
+<script>
+  WibWob.embed('#wibwob-container', {
+    readonly: true,
+    workspace: 'demos/verse-field.json',
+    theme: 'dark',
+    width: '100%',
+    height: '600px'
+  });
+</script>
+```
+
+#### 3.4 Success Criteria
+
+- [ ] Web app loads in <2 seconds
+- [ ] Input latency <50ms (P95)
 - [ ] Full keyboard shortcut support
-- [ ] Works on mobile browsers (responsive)
-- [ ] Supports concurrent sessions (100+ users per server)
-- [ ] Embeddable in external websites
-- [ ] Session sharing with unique URLs
-- [ ] 99.9% uptime SLA
-
----
-
-## Technical Architecture
-
-### API Design Philosophy (Phase 2+)
-
-**Core Principles:**
-
-1. **LM-First Design**
-   - API optimized for programmatic control
-   - Natural language command parsing
-   - Stateless operations where possible
-   - Comprehensive event system
-
-2. **Window Management API**
-   ```cpp
-   // Proposed API (Phase 2)
-   class WindowAPI {
-   public:
-       WindowHandle spawn(WindowConfig config);
-       void setText(WindowHandle handle, const std::string& content);
-       void append(WindowHandle handle, const std::string& content);
-       void setTitle(WindowHandle handle, const std::string& title);
-       void close(WindowHandle handle);
-
-       // Event subscription
-       void onEvent(WindowHandle handle, EventType type, CallbackFn callback);
-   };
-   ```
-
-3. **Chat Module Integration**
-   ```cpp
-   // Proposed API (Phase 2)
-   class ChatModule {
-   public:
-       void sendMessage(const std::string& message, ChatRole role);
-       void registerHandler(MessageHandler handler);
-       void executeCommand(const std::string& command);
-   };
-   ```
-
-### Data Flow Architecture
-
-```
-Human Input → Event System → Application Logic → UI Update → Screen
-     ↓                              ↑
-LM Input  → API Interface → Command Parser ──→ ─┘
-     ↓
-Chat Module → Context Manager → Response Generator
-```
+- [ ] Works on mobile browsers
+- [ ] 100+ concurrent users per server
+- [ ] Session sharing functional
+- [ ] Embeddable in external sites
+- [ ] 99.9% uptime
+- [ ] SEO-friendly landing page
 
 ---
 
 ## Non-Functional Requirements
 
-### Performance
-- Startup time: <500ms (native), <2s (web)
+### Performance Targets
+
+**Native Application:**
+- Startup time: <300ms cold start
 - Input latency: <16ms (60 FPS)
-- Memory usage: <50MB baseline
-- CPU: <5% idle, <30% active
+- Memory usage: <50MB baseline, <100MB with 20 windows
+- CPU: <2% idle, <20% active with animations
+
+**Web Application:**
+- Page load: <2s (TTI - Time to Interactive)
+- WebSocket latency: <50ms (P95), <100ms (P99)
+- Frame rate: 60 FPS in browser
+- Memory: <150MB browser tab
+
+**API Server:**
+- Request latency: <20ms (local), <100ms (remote)
+- Throughput: 1000+ req/sec per core
+- WebSocket connections: 1000+ concurrent
 
 ### Security
+
+**Application Security:**
 - No arbitrary code execution
-- Sandboxed file access
-- Input sanitization
-- Rate limiting for web API
-- HTTPS/WSS only for web
+- Sandboxed file access (configurable allowlist)
+- Input validation on all API endpoints
+- Rate limiting (10 req/sec per IP)
+- Authentication for web interface
+
+**Web Security:**
+- HTTPS/WSS only (no HTTP)
+- CSP (Content Security Policy) headers
+- XSS protection
+- CSRF protection
+- Session timeout (30 min idle)
 
 ### Accessibility
-- Full keyboard navigation
-- Screen reader compatibility (terminal-based)
-- Configurable color schemes (high contrast)
-- Font size adjustments
+
+**Terminal Accessibility:**
+- Full keyboard navigation (no mouse required)
+- Screen reader support (via terminal)
+- Configurable color schemes (high contrast, colorblind-friendly)
+- Font size adjustments (terminal emulator dependent)
+
+**Web Accessibility:**
+- WCAG 2.1 Level AA compliance
+- Keyboard navigation in web UI
+- Screen reader compatibility
+- Adjustable font sizes
+- Color contrast ratios >4.5:1
 
 ### Compatibility
-- Linux: kernel 3.2+ (glibc 2.17+)
-- macOS: 10.13+
-- Windows: Windows 7+
-- Browsers: Chrome 90+, Firefox 88+, Safari 14+
+
+**Native Support:**
+- **Linux**: Kernel 3.2+, glibc 2.17+ (CentOS 7+)
+- **macOS**: 10.13+ (High Sierra and later)
+- **Windows**: Windows 7+ (Vista with updates)
+
+**Terminal Emulators (Tested):**
+- gnome-terminal, konsole, xterm, alacritty, kitty
+- iTerm2, Terminal.app (macOS)
+- Windows Terminal, ConEmu (Windows)
+- tmux, screen (multiplexers)
+
+**Web Browsers:**
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+
+---
+
+## Risk Assessment
+
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Directory refactor breaks builds | High | Medium | Incremental migration, extensive testing, rollback plan |
+| Package manager rejections | Medium | Low | Follow packaging guidelines, engage maintainers early |
+| Web performance issues | High | Medium | Extensive profiling, WebGL optimization, CDN usage |
+| WASM porting complexity | High | High | Start with xterm.js, defer WASM to Phase 4 |
+| API backwards compatibility | Medium | Low | Semantic versioning, deprecation warnings |
+| Security vulnerabilities | High | Medium | Security audit, penetration testing, bug bounty |
+| Scaling challenges (web) | High | Medium | Load testing, horizontal scaling, rate limiting |
+
+---
+
+## Timeline & Milestones
+
+### Phase 1: Refactoring (2 weeks)
+**Week 1:**
+- Directory restructuring
+- CMake updates
+- Build verification
+
+**Week 2:**
+- Documentation creation
+- Feature audit
+- Git migration
+
+**Milestone**: Clean, well-documented codebase with wibwob-dos identity
+
+---
+
+### Phase 2: Distribution (4 weeks)
+**Week 1-2:**
+- Static binary builds
+- CI/CD setup (GitHub Actions)
+- Package templates (deb, rpm, brew)
+
+**Week 3:**
+- Package submissions (Homebrew, AUR, etc.)
+- Install script development
+- Docker images
+
+**Week 4:**
+- Testing across platforms
+- Documentation for installers
+- Release v1.0.0
+
+**Milestone**: wibwob-dos installable on all major platforms
+
+---
+
+### Phase 3: Web (8 weeks)
+**Week 1-2:**
+- xterm.js frontend prototype
+- WebSocket server basic implementation
+- PTY integration
+
+**Week 3-4:**
+- File operations, clipboard
+- Authentication system
+- Session management
+
+**Week 5-6:**
+- Multi-user collaboration
+- Session sharing
+- Recording/replay
+
+**Week 7:**
+- Performance optimization
+- Security hardening
+- Load testing
+
+**Week 8:**
+- Production deployment
+- Documentation
+- Launch
+
+**Milestone**: web.wibwob.dev live and accessible
+
+---
+
+**Total Duration**: 14 weeks (3.5 months)
 
 ---
 
 ## Success Metrics
 
-### Phase 1 (Foundation)
-- [x] Code reorganization complete
-- [ ] Build system functional
-- [ ] Documentation coverage >80%
-- [ ] Zero regression bugs
+### Phase 1
+- [x] Codebase reorganized
+- [ ] All applications build successfully
+- [ ] Zero functionality regression
+- [ ] Documentation coverage >90%
 
-### Phase 2 (Distribution)
+### Phase 2
 - [ ] Available on 3+ package managers per platform
 - [ ] 1000+ downloads in first month
 - [ ] <10 installation issues reported
-- [ ] 5-star average rating
+- [ ] Average 4.5+ star rating
 
-### Phase 3 (Web)
-- [ ] Web app live and accessible
-- [ ] 100+ concurrent users supported
-- [ ] <100ms P95 latency
-- [ ] Embedded in 10+ external sites
-
----
-
-## Risks and Mitigation
-
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| Build system complexity | High | Medium | Incremental migration, extensive testing |
-| Package manager rejections | Medium | Low | Follow guidelines, seek maintainer feedback |
-| Web performance issues | High | Medium | Extensive profiling, CDN usage |
-| WASM porting difficulty | High | High | Start with xterm.js, defer WASM to Phase 4 |
-| Breaking API changes | High | Low | Semantic versioning, deprecation warnings |
-
----
-
-## Timeline
-
-**Phase 1:** 2 weeks (November 8-22, 2025)
-**Phase 2:** 4 weeks (November 22 - December 20, 2025)
-**Phase 3:** 8 weeks (December 20, 2025 - February 14, 2026)
-
-**Total Duration:** 14 weeks (3.5 months)
+### Phase 3
+- [ ] Web app handling 100+ concurrent users
+- [ ] P95 latency <50ms
+- [ ] 99.9% uptime over 30 days
+- [ ] Embedded in 5+ external sites
+- [ ] 10,000+ sessions in first month
 
 ---
 
@@ -656,36 +851,82 @@ Chat Module → Context Manager → Response Generator
 
 **Primary:**
 - Open source contributors
-- Turbo Vision community
-- Terminal application developers
-- AI/LM researchers
+- AI/LM researchers and developers
+- Terminal enthusiasts
+- Generative art community
 
 **Secondary:**
-- System administrators
-- DevOps engineers
-- Education/training sector
-- Retro computing enthusiasts
+- Turbo Vision community
+- Text-based UI developers
+- Education sector (CS curricula)
+- DevOps/sysadmin professionals
 
 ---
 
-## Appendix
+## Appendix A: Technology Stack
 
-### Related Projects
+### Core Technologies
+- **Language**: C++14
+- **UI Framework**: Turbo Vision (modern port)
+- **Build System**: CMake 3.5+
+- **Terminal**: ncurses (Unix), Win32 Console (Windows)
+
+### API Stack
+- **API Server**: FastAPI (Python 3.8+)
+- **IPC**: Unix domain sockets
+- **Protocol**: REST + MCP + WebSocket
+- **Serialization**: JSON
+
+### Web Stack (Phase 3)
+- **Frontend**: xterm.js + TypeScript
+- **Backend**: Go/Node.js
+- **Transport**: WebSocket (Socket.IO)
+- **Auth**: JWT or session-based
+
+### AI Integration
+- **LLM Backend**: Claude Code CLI
+- **Protocol**: MCP (Model Context Protocol)
+- **Models**: Claude Haiku (default), Sonnet, Opus (configurable)
+- **Personality**: Wib&Wob dual persona
+
+---
+
+## Appendix B: File Count & Complexity
+
+**Application Files:**
+- C++ source files: 38
+- Header files: 38
+- Total lines: ~15,000 (application)
+- View classes: 50+
+- Menu commands: 60+
+
+**Supporting Files:**
+- Primer files: 128
+- Animation frames: 10+
+- Monodraw files: 2
+- Workspace templates: 5+
+
+**Library Files:**
+- Turbo Vision: ~190 source files
+- Total lines: ~100,000 (library + app)
+
+---
+
+## Appendix C: Related Projects
+
 - [Turbo Vision](https://github.com/magiblot/tvision) - Base framework
-- [Turbo](https://github.com/magiblot/turbo) - Text editor using TV
-- [TMBASIC](https://github.com/electroly/tmbasic) - BASIC interpreter with TV
+- [Turbo](https://github.com/magiblot/turbo) - Text editor
 - [far2l](https://github.com/elfmz/far2l) - File manager with terminal extensions
-
-### References
-- [Borland Turbo Vision Programming Guide](https://archive.org/details/bitsavers_borlandTurrogrammingGuide1992_25707423)
-- [Modern ncurses Programming](https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/)
-- [xterm.js Documentation](https://xtermjs.org/)
-- [WebAssembly Documentation](https://webassembly.org/)
+- [tmbasic](https://github.com/electroly/tmbasic) - BASIC interpreter
+- [asciinema](https://asciinema.org/) - Terminal session recording
+- [xterm.js](https://xtermjs.org/) - Terminal in browser
 
 ---
 
 **Document Control:**
-- Version: 1.0
-- Last Updated: 2025-11-08
-- Next Review: 2025-11-22
-- Owner: wibwob-dos core team
+- **Version**: 2.0
+- **Last Updated**: 2025-11-08
+- **Next Review**: Phase 1 completion
+- **Owner**: wibwob-dos core team
+- **Status**: Active Development
+

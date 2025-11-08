@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2025-09-03T17:02:02",
+  "screen": { "width": 100, "height": 28 },
+  "globals": { "patternMode": "continuous" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "custom",
+      "title": "Donut Animation 3",
+      "bounds": { "x": 43, "y": 1, "w": 48, "h": 14 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w2",
+      "type": "gradient",
+      "title": "Radial Gradient 3",
+      "bounds": { "x": 6, "y": 16, "w": 48, "h": 14 },
+      "zoomed": false,
+      "props": {"gradientType": "radial"}
+    },
+    {
+      "id": "w3",
+      "type": "test_pattern",
+      "title": "Test Pattern 1",
+      "bounds": { "x": 2, "y": 1, "w": 27, "h": 28 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w4",
+      "type": "test_pattern",
+      "title": "Test Pattern 4",
+      "bounds": { "x": 8, "y": 4, "w": 48, "h": 14 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w5",
+      "type": "custom",
+      "title": "Donut Animation 2",
+      "bounds": { "x": 48, "y": 16, "w": 48, "h": 14 },
+      "zoomed": false,
+      "props": {}
+    }
+  ],
+  "focusedIndex": 0
+}

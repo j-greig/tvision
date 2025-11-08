@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2025-09-12T17:56:14",
+  "screen": { "width": 218, "height": 78 },
+  "globals": { "patternMode": "continuous" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "custom",
+      "title": "aaa_mechs.txt - Text 4",
+      "bounds": { "x": 143, "y": 38, "w": 67, "h": 34 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w2",
+      "type": "custom",
+      "title": "exit-start.txt - Text 5",
+      "bounds": { "x": 114, "y": 36, "w": 20, "h": 40 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w3",
+      "type": "custom",
+      "title": "kaomoji-poly-eye.txt - Text 8",
+      "bounds": { "x": 153, "y": 7, "w": 59, "h": 10 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w4",
+      "type": "custom",
+      "title": "chaos-vs-order.txt - Text 7",
+      "bounds": { "x": 2, "y": 2, "w": 50, "h": 13 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w5",
+      "type": "custom",
+      "title": "cat-cat.txt - Text 6",
+      "bounds": { "x": 178, "y": 22, "w": 21, "h": 14 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w6",
+      "type": "custom",
+      "title": "perception.txt - Text 1",
+      "bounds": { "x": 18, "y": 8, "w": 84, "h": 59 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w7",
+      "type": "custom",
+      "title": "cli-timestamp-pattern.txt - Text 2",
+      "bounds": { "x": 107, "y": 2, "w": 65, "h": 42 },
+      "zoomed": false,
+      "props": {}
+    }
+  ],
+  "focusedIndex": 0
+}

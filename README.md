@@ -1,22 +1,62 @@
-# Turbo Vision
+# wibwob-dos
 
-A modern port of Turbo Vision 2.0, the classical framework for text-based user interfaces. Now cross-platform and with Unicode support.
+**A text-native operating system for text-native intelligence**
 
-![tvedit in Konsole](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)
+Built on Turbo Vision, wibwob-dos is a sophisticated TUI application where humans and AI have equal control. Featuring 60+ commands, generative art engines, API automation, and an embedded AI chat interface (Wib&Wob).
 
-I started this as a personal project at the very end of 2018. By May 2020 I considered it was very close to feature parity with the original, and decided to make it open.
+```
+つ◕‿◕‿⚆༽つ Wib: The artist - chaotic creativity, surreal ASCII experiences
+つ⚆‿◕‿◕༽つ Wob: The scientist - methodical analysis, precise control
+```
 
-The original goals of this project were:
+**Key Features:** Unlimited windows • 8+ generative art modes • REST API + MCP • Workspace persistence • Screenshot capture • Glitch effects • AI chat
 
-* Making Turbo Vision work on Linux by altering the legacy codebase as little as possible.
-* Keeping it functional on DOS/Windows.
-* Being as compatible as possible at the source code level with old Turbo Vision applications. This led me to implement some of the Borland C++ RTL functions, as explained below.
+## Quick Start
 
-At one point I considered I had done enough, and that any attempts at revamping the library and overcoming its original limitations would require either extending the API or breaking backward compatibility, and that a major rewrite would be most likely necessary.
+```bash
+cd test-tui
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+./build/test_pattern  # Main test app with unlimited windows, patterns, gradients
+./build/simple_tui    # Basic TUI demo
+```
 
-However, between July and August 2020 I found the way to integrate full-fledged Unicode support into the existing architecture, wrote the [Turbo](https://github.com/magiblot/turbo) text editor and also made the new features available on Windows. So I am confident that Turbo Vision can now meet many of the expectations of modern users and programmers.
+**Debug Logging**: Capture stderr debug output (session IDs, raw JSON, IPC logs):
+```bash
+cd test-tui
+./run_test_pattern_logged.sh        # Logs to test_pattern_debug.log
+tail -f test_pattern_debug.log      # Watch logs live (separate terminal)
+```
 
-The original location of this project is https://github.com/magiblot/tvision.
+**Programmatic Control**: The `test_pattern` app can be controlled via REST API + MCP for AI agents. See [tools/api_server/README.md](tools/api_server/README.md) and [CLAUDE.md](CLAUDE.md) for setup.
+
+**Wib&Wob Chat LLM Model**: The embedded chat window uses Claude Code CLI with **Haiku by default**. To use Sonnet instead, edit `test-tui/llm/config/llm_config.json` and change the `claude_code` provider's `args` array to include `"--model"` and `"sonnet"`:
+```json
+"args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.local.json", "--output-format", "json"]
+```
+
+![wibwob-dos in terminal](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)
+
+## About Turbo Vision (The Framework)
+
+wibwob-dos is built on **Turbo Vision** - a modern port of Borland's classic 1990s text-based UI framework. This C++ library enables building sophisticated TUI applications that work across platforms (Linux, Windows, macOS) with full Unicode support.
+
+**Framework History:** Started as a personal project in late 2018 by [magiblot](https://github.com/magiblot), reaching feature parity with the original Turbo Vision 2.0 by May 2020. Between July-August 2020, full Unicode support was integrated into the existing architecture, proving that Turbo Vision can meet modern expectations.
+
+**Original Goals:**
+* Make Turbo Vision work on Linux with minimal changes to legacy codebase
+* Maintain functionality on DOS/Windows
+* Maximum source-code compatibility with old Turbo Vision applications
+
+**Modern Enhancements:**
+* UTF-8 Unicode support throughout
+* 24-bit color support (extends original 16 colors)
+* Mouse wheel and middle button support
+* System clipboard integration
+* Resizable windows and responsive layouts
+* Cross-platform terminal support (ncurses/Win32 Console)
+
+**Framework Location:** https://github.com/magiblot/tvision
 
 # Table of contents
 
