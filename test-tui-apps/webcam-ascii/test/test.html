@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Camera Tests</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00ff00;
+            border-bottom: 2px solid #00ff00;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #00dd00;
+            margin-top: 30px;
+        }
+
+        .test-section {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            background: #000;
+            border-left: 3px solid #666;
+        }
+
+        .test-case.pass {
+            border-left-color: #00ff00;
+        }
+
+        .test-case.fail {
+            border-left-color: #ff0000;
+            color: #ff6666;
+        }
+
+        .test-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .test-result {
+            font-size: 0.9em;
+            margin-left: 20px;
+        }
+
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            border-radius: 3px;
+        }
+
+        button:hover {
+            background: #00dd00;
+        }
+
+        #results {
+            margin-top: 20px;
+        }
+
+        .summary {
+            font-size: 1.2em;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .summary.all-pass {
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .summary.has-failures {
+            border-color: #ff0000;
+            color: #ff6666;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            border: 1px solid #333;
+            overflow-x: auto;
+            color: #00ff00;
+        }
+
+        .visual-test {
+            background: #000;
+            padding: 20px;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            border: 1px solid #666;
+            margin: 10px;
+        }
+
+        .ascii-sample {
+            font-family: 'Courier New', monospace;
+            line-height: 0.65;
+            letter-spacing: 0.1em;
+            color: #fff;
+            background: #000;
+            padding: 10px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Webcam ASCII Art - Test Suite</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="runUnitTests()">Run Unit Tests Only</button>
+        <button onclick="runVisualTests()">Run Visual Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Simple test framework
+        class TestRunner {
+            constructor() {
+                this.results = [];
+                this.currentSuite = '';
+            }
+
+            suite(name) {
+                this.currentSuite = name;
+            }
+
+            assert(condition, testName, details = '') {
+                const result = {
+                    suite: this.currentSuite,
+                    name: testName,
+                    pass: condition,
+                    details: details
+                };
+                this.results.push(result);
+                return condition;
+            }
+
+            assertEqual(actual, expected, testName) {
+                const pass = actual === expected;
+                const details = pass
+                    ? `Expected: ${expected}, Got: ${actual}`
+                    : `FAILED - Expected: ${expected}, Got: ${actual}`;
+                return this.assert(pass, testName, details);
+            }
+
+            assertInRange(value, min, max, testName) {
+                const pass = value >= min && value <= max;
+                const details = pass
+                    ? `Value ${value} is in range [${min}, ${max}]`
+                    : `FAILED - Value ${value} is NOT in range [${min}, ${max}]`;
+                return this.assert(pass, testName, details);
+            }
+
+            assertType(value, type, testName) {
+                const pass = typeof value === type;
+                const details = pass
+                    ? `Type is ${type}`
+                    : `FAILED - Expected type ${type}, got ${typeof value}`;
+                return this.assert(pass, testName, details);
+            }
+
+            getResults() {
+                return this.results;
+            }
+
+            getSummary() {
+                const total = this.results.length;
+                const passed = this.results.filter(r => r.pass).length;
+                const failed = total - passed;
+                return { total, passed, failed };
+            }
+
+            clear() {
+                this.results = [];
+                this.currentSuite = '';
+            }
+        }
+
+        // ASCII Converter (copied from main app for testing)
+        class AsciiConverter {
+            constructor() {
+                this.charSets = {
+                    simple: ' .:-=+*#%@',
+                    standard: '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`\'. ',
+                    blocks: ' ░▒▓█',
+                    minimal: ' .:+#@'
+                };
+                this.currentCharSet = this.charSets.standard;
+            }
+
+            setCharSet(type) {
+                if (this.charSets[type]) {
+                    this.currentCharSet = this.charSets[type];
+                }
+            }
+
+            getBrightness(r, g, b) {
+                return 0.299 * r + 0.587 * g + 0.114 * b;
+            }
+
+            pixelToChar(r, g, b) {
+                const brightness = this.getBrightness(r, g, b);
+                const charIndex = Math.floor((brightness / 255) * (this.currentCharSet.length - 1));
+                return this.currentCharSet[charIndex];
+            }
+
+            imageDataToAscii(imageData, width, height) {
+                let ascii = '';
+                const data = imageData.data;
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const offset = (y * width + x) * 4;
+                        const r = data[offset];
+                        const g = data[offset + 1];
+                        const b = data[offset + 2];
+                        ascii += this.pixelToChar(r, g, b);
+                    }
+                    ascii += '\n';
+                }
+
+                return ascii;
+            }
+        }
+
+        const runner = new TestRunner();
+
+        // Unit Tests
+        function testBrightnessCalculation() {
+            runner.suite('Brightness Calculation');
+            const converter = new AsciiConverter();
+
+            // Test pure white
+            let brightness = converter.getBrightness(255, 255, 255);
+            runner.assertEqual(brightness, 255, 'Pure white should have brightness 255');
+
+            // Test pure black
+            brightness = converter.getBrightness(0, 0, 0);
+            runner.assertEqual(brightness, 0, 'Pure black should have brightness 0');
+
+            // Test weighted average (green is weighted highest)
+            brightness = converter.getBrightness(0, 255, 0);
+            runner.assertInRange(brightness, 145, 155, 'Pure green should have brightness ~150 (weighted)');
+
+            // Test gray
+            brightness = converter.getBrightness(128, 128, 128);
+            runner.assertEqual(brightness, 128, 'Mid gray should have brightness 128');
+        }
+
+        function testCharacterMapping() {
+            runner.suite('Character Mapping');
+            const converter = new AsciiConverter();
+
+            // Test simple charset
+            converter.setCharSet('simple');
+            runner.assertType(converter.currentCharSet, 'string', 'Character set should be a string');
+            runner.assert(converter.currentCharSet.length > 0, 'Character set should not be empty');
+
+            // Test character mapping for white pixel
+            let char = converter.pixelToChar(255, 255, 255);
+            runner.assertType(char, 'string', 'pixelToChar should return a string');
+            runner.assertEqual(char.length, 1, 'pixelToChar should return a single character');
+
+            // Test character mapping for black pixel
+            char = converter.pixelToChar(0, 0, 0);
+            runner.assertEqual(char, ' ', 'Black pixel should map to space character');
+
+            // Test all charsets exist
+            converter.setCharSet('standard');
+            runner.assert(converter.currentCharSet.length > 10, 'Standard charset should have many characters');
+
+            converter.setCharSet('blocks');
+            runner.assertInRange(converter.currentCharSet.length, 3, 10, 'Blocks charset should have few characters');
+
+            converter.setCharSet('minimal');
+            runner.assertInRange(converter.currentCharSet.length, 5, 10, 'Minimal charset should have 5-10 characters');
+        }
+
+        function testImageDataConversion() {
+            runner.suite('Image Data to ASCII Conversion');
+            const converter = new AsciiConverter();
+
+            // Create a simple 2x2 test image
+            const canvas = document.createElement('canvas');
+            canvas.width = 2;
+            canvas.height = 2;
+            const ctx = canvas.getContext('2d');
+
+            // Fill with white
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 2, 2);
+            const imageData = ctx.getImageData(0, 0, 2, 2);
+
+            const ascii = converter.imageDataToAscii(imageData, 2, 2);
+
+            runner.assertType(ascii, 'string', 'Conversion should return a string');
+            runner.assert(ascii.length > 0, 'ASCII output should not be empty');
+            runner.assert(ascii.includes('\n'), 'ASCII output should contain newlines');
+
+            // Should have 2 lines (2 chars per line + newline)
+            const lines = ascii.split('\n').filter(l => l.length > 0);
+            runner.assertEqual(lines.length, 2, 'Should have 2 lines for 2x2 image');
+            runner.assertEqual(lines[0].length, 2, 'Each line should have 2 characters');
+        }
+
+        function testCharsetSwitching() {
+            runner.suite('Character Set Switching');
+            const converter = new AsciiConverter();
+
+            const charsets = ['simple', 'standard', 'blocks', 'minimal'];
+
+            charsets.forEach(charset => {
+                converter.setCharSet(charset);
+                const char = converter.pixelToChar(128, 128, 128);
+                runner.assertType(char, 'string', `${charset} charset should produce valid character`);
+                runner.assertEqual(char.length, 1, `${charset} charset should produce single character`);
+            });
+        }
+
+        // Visual Tests
+        function testVisualGradient() {
+            runner.suite('Visual Gradient Test');
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 50;
+            canvas.height = 10;
+            const ctx = canvas.getContext('2d');
+
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, 50, 0);
+            gradient.addColorStop(0, 'black');
+            gradient.addColorStop(1, 'white');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 50, 10);
+
+            const imageData = ctx.getImageData(0, 0, 50, 10);
+            const converter = new AsciiConverter();
+            converter.setCharSet('simple');
+            const ascii = converter.imageDataToAscii(imageData, 50, 10);
+
+            runner.assert(ascii.length > 0, 'Gradient conversion should produce output');
+
+            const lines = ascii.split('\n').filter(l => l.length > 0);
+            runner.assertEqual(lines.length, 10, 'Should have 10 lines for height of 10');
+
+            // Check that we have variety in characters (gradient effect)
+            const uniqueChars = new Set(ascii.replace(/\n/g, '')).size;
+            runner.assert(uniqueChars > 3, 'Gradient should produce at least 4 different characters');
+
+            // Display visual result
+            const visual = document.createElement('div');
+            visual.className = 'visual-test';
+            visual.innerHTML = `
+                <h3>Gradient Test</h3>
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div>
+                        <p>Original:</p>
+                        ${canvas.outerHTML}
+                    </div>
+                    <div>
+                        <p>ASCII Output:</p>
+                        <pre class="ascii-sample">${ascii}</pre>
+                    </div>
+                </div>
+            `;
+            document.getElementById('results').appendChild(visual);
+        }
+
+        function testPerformance() {
+            runner.suite('Performance Tests');
+
+            const converter = new AsciiConverter();
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 60;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'gray';
+            ctx.fillRect(0, 0, 100, 60);
+
+            const imageData = ctx.getImageData(0, 0, 100, 60);
+
+            // Test conversion speed
+            const iterations = 100;
+            const startTime = performance.now();
+
+            for (let i = 0; i < iterations; i++) {
+                converter.imageDataToAscii(imageData, 100, 60);
+            }
+
+            const endTime = performance.now();
+            const totalTime = endTime - startTime;
+            const avgTime = totalTime / iterations;
+
+            runner.assert(avgTime < 50, `Average conversion time should be under 50ms (got ${avgTime.toFixed(2)}ms)`);
+
+            // Test theoretical FPS
+            const theoreticalFPS = 1000 / avgTime;
+            runner.assert(theoreticalFPS > 20, `Should support >20 FPS (got ${theoreticalFPS.toFixed(1)} FPS)`);
+
+            // Display performance results
+            const perfDiv = document.createElement('div');
+            perfDiv.className = 'visual-test';
+            perfDiv.innerHTML = `
+                <h3>Performance Metrics</h3>
+                <p>Average conversion time: ${avgTime.toFixed(2)}ms</p>
+                <p>Theoretical max FPS: ${theoreticalFPS.toFixed(1)}</p>
+                <p>Test iterations: ${iterations}</p>
+                <p>Test resolution: 100x60 characters</p>
+            `;
+            document.getElementById('results').appendChild(perfDiv);
+        }
+
+        // Run all tests
+        function runAllTests() {
+            clearResults();
+            runUnitTests();
+            runVisualTests();
+        }
+
+        function runUnitTests() {
+            runner.clear();
+
+            testBrightnessCalculation();
+            testCharacterMapping();
+            testImageDataConversion();
+            testCharsetSwitching();
+
+            displayResults();
+        }
+
+        function runVisualTests() {
+            testVisualGradient();
+            testPerformance();
+            displayResults();
+        }
+
+        function displayResults() {
+            const resultsDiv = document.getElementById('results');
+
+            // Group results by suite
+            const suites = {};
+            runner.getResults().forEach(result => {
+                if (!suites[result.suite]) {
+                    suites[result.suite] = [];
+                }
+                suites[result.suite].push(result);
+            });
+
+            // Display each suite
+            Object.keys(suites).forEach(suiteName => {
+                const suiteDiv = document.createElement('div');
+                suiteDiv.className = 'test-section';
+
+                let suiteHTML = `<h2>${suiteName}</h2>`;
+
+                suites[suiteName].forEach(result => {
+                    const passClass = result.pass ? 'pass' : 'fail';
+                    const passText = result.pass ? '✓ PASS' : '✗ FAIL';
+
+                    suiteHTML += `
+                        <div class="test-case ${passClass}">
+                            <div class="test-name">${passText}: ${result.name}</div>
+                            <div class="test-result">${result.details}</div>
+                        </div>
+                    `;
+                });
+
+                suiteDiv.innerHTML = suiteHTML;
+                resultsDiv.appendChild(suiteDiv);
+            });
+
+            // Display summary
+            const summary = runner.getSummary();
+            const summaryDiv = document.createElement('div');
+            const summaryClass = summary.failed === 0 ? 'all-pass' : 'has-failures';
+            summaryDiv.className = `summary ${summaryClass}`;
+            summaryDiv.innerHTML = `
+                <strong>Test Summary</strong><br>
+                Total: ${summary.total} | Passed: ${summary.passed} | Failed: ${summary.failed}
+            `;
+            resultsDiv.insertBefore(summaryDiv, resultsDiv.firstChild);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            runner.clear();
+        }
+
+        // Manual test checklist
+        window.addEventListener('DOMContentLoaded', () => {
+            const manualTests = document.createElement('div');
+            manualTests.className = 'test-section';
+            manualTests.innerHTML = `
+                <h2>Manual Testing Checklist</h2>
+                <p>For complete testing, perform these manual checks with the main application:</p>
+                <pre>
+□ Camera permission request displays correctly
+□ Camera feed starts when "Start Camera" clicked
+□ ASCII conversion displays in real-time
+□ Width slider changes character count horizontally
+□ Height slider changes character count vertically
+□ Font size slider changes display size
+□ Character set selector changes ASCII appearance
+□ FPS counter shows reasonable values (>15 FPS)
+□ Stop button halts the camera
+□ Start button works after stopping
+□ Toggle controls button hides/shows UI
+□ Works in Safari on macOS
+□ Works in Chrome on macOS
+□ Error message displays for denied camera permission
+□ Error message displays if camera not available
+□ Performance remains smooth with large resolutions
+□ No memory leaks during extended use
+                </pre>
+            `;
+            document.getElementById('results').appendChild(manualTests);
+        });
+    </script>
+</body>
+</html>
