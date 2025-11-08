@@ -1,13 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Name the project 'tvision' so source/CMakeLists.txt can use ${PROJECT_NAME}
-project(test_tui_apps CXX)
+# Name the project 'wibwob-dos' or use parent project name
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    # Standalone build - include parent to get tvision library
+    project(wibwob-dos CXX)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/.. ${CMAKE_BINARY_DIR}/tvision-root)
+else()
+    # Being built as part of root project - tvision library already available
+    project(wibwob-dos-app CXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Bring in the root project to build the tvision library target
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/.. ${CMAKE_BINARY_DIR}/tvision-root)
 
 # Common sources used by multiple apps
 set(TV_COMMON_SOURCES
