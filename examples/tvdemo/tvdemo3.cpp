@@ -35,6 +35,7 @@
 #include "mousedlg.h"
 #include "demohelp.h"
 #include "fileview.h"
+#include "webcam.h"
 
 #include <tvision/help.h>
 
@@ -136,12 +137,23 @@ void TVDemo::idle()
     TProgram::idle();
     clock->update();
     heap->update();
+
+    // Update all webcam windows
+    TView *p = deskTop->first();
+    while (p != 0) {
+        TWebcamAsciiWindow *webcam = dynamic_cast<TWebcamAsciiWindow*>(p);
+        if (webcam != 0) {
+            webcam->idle();
+        }
+        p = p->next();
+    }
+
     if (deskTop->firstThat(isTileable, 0) != 0 )
         {
         enableCommand(cmTile);
         enableCommand(cmCascade);
         }
-    else 
+    else
         {
         disableCommand(cmTile);
         disableCommand(cmCascade);
@@ -195,6 +207,7 @@ TMenuBar *TVDemo::initMenuBar(TRect r)
         *new TMenuItem( "Ca~l~endar", cmCalendarCmd, kbNoKey, hcSCalendar ) +
         *new TMenuItem( "Ascii ~T~able", cmAsciiCmd, kbNoKey, hcSAsciiTable ) +
         *new TMenuItem( "~C~alculator", cmCalcCmd, kbNoKey, hcCalculator ) +
+        *new TMenuItem( "~W~ebcam ASCII", cmWebcamAsciiCmd, kbAltW, hcNoContext, "Alt-W" ) +
         *new TMenuItem( "~E~vent Viewer", cmEventViewCmd, kbAlt0, hcNoContext, "Alt-0" );
 
     TSubMenu& sub2 =

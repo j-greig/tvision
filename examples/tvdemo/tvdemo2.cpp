@@ -36,6 +36,7 @@
 #include "calc.h"
 #include "evntview.h"
 #include "backgrnd.h"
+#include "webcam.h"
 
 #include <stdlib.h>
 #include <signal.h>
@@ -97,10 +98,14 @@ void TVDemo::handleEvent(TEvent &event)
                 colors();
                 break;
 
+            case cmWebcamAsciiCmd:      //  Webcam ASCII Art
+                webcamAscii();
+                break;
+
         case cmSaveCmd:             //  Save current desktop
                 saveDesktop();
                 break;
- 
+
         case cmRestoreCmd:          //  Restore saved desktop
                 retrieveDesktop();
                 break;
@@ -214,6 +219,20 @@ void TVDemo::printEvent(const TEvent &event)
     TEventViewer *viewer = (TEventViewer *) message(deskTop, evBroadcast, cmFndEventView, 0);
     if( viewer != 0 )
         viewer->print(event);
+}
+
+//
+// Webcam ASCII Art function
+//
+
+void TVDemo::webcamAscii()
+{
+    TWebcamAsciiWindow *webcam = (TWebcamAsciiWindow *) validView(new TWebcamAsciiWindow);
+
+    if(webcam != 0)
+    {
+        deskTop->insert(webcam);
+    }
 }
 
 //

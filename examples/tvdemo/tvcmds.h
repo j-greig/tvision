@@ -29,5 +29,6 @@ const int cmEventViewCmd= 112;
 const int cmChBackground= 113;
 const int cmFndEventView= 114;
 const int cmVideoMode   = 115;
+const int cmWebcamAsciiCmd = 116;
 
 #endif // __TVCMDS_H

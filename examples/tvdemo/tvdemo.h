@@ -52,6 +52,7 @@ private:
     void changeDir();                 // Change directory
     void mouse();                     // Mouse control dialog box
     void colors();                    // Color control dialog box
+    void webcamAscii();               // Webcam ASCII art
     void outOfMemory();               // For validView() function
     void loadDesktop(fpstream& s);    // Load and restore the
     void retrieveDesktop();           //  previously saved desktop
