@@ -4,7 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is **Turbo Vision** - a modern port of the classic 1990s text-based UI framework originally by Borland. It's a C++ library for building TUI (Terminal User Interface) applications that work across platforms (Linux, Windows, macOS) with Unicode support.
+This repository contains **wibwob-dos** - a text-native operating system for text-native intelligence, built on **Turbo Vision**, the modern port of Borland's classic 1990s text-based UI framework.
+
+**wibwob-dos** is a sophisticated TUI application enabling equal control between human and AI intelligences:
+- **Wib** (つ◕‿◕‿⚆༽つ): The artist - chaotic creativity, generative art, surreal experiences
+- **Wob** (つ⚆‿◕‿◕༽つ): The scientist - methodical analysis, API control, structured systems
+
+**Key Features:**
+- 60+ menu commands across 5 menus (File, Edit, View, Window, Tools, Help)
+- Unlimited concurrent windows (test patterns, gradients, generative art, text editors)
+- REST API + MCP for programmatic control (FastAPI server at tools/api_server/)
+- Embedded AI chat (Wib&Wob) using Claude Code CLI + MCP tools
+- 8+ generative art engines (Verse Field, Mycelium, Monster Portal, etc.)
+- Workspace save/load (JSON format)
+- Screenshot capture
+- Glitch effects engine
+
+The underlying framework is **Turbo Vision** - a modern C++ library for building TUI applications that work across platforms (Linux, Windows, macOS) with full Unicode support.
 
 ## Build Commands
 

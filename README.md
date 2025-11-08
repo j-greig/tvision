@@ -1,8 +1,17 @@
-# Turbo Vision
+# wibwob-dos
 
-A modern port of Turbo Vision 2.0, the classical framework for text-based user interfaces. Now cross-platform and with Unicode support.
+**A text-native operating system for text-native intelligence**
 
-## Quick Start - Test Applications
+Built on Turbo Vision, wibwob-dos is a sophisticated TUI application where humans and AI have equal control. Featuring 60+ commands, generative art engines, API automation, and an embedded AI chat interface (Wib&Wob).
+
+```
+つ◕‿◕‿⚆༽つ Wib: The artist - chaotic creativity, surreal ASCII experiences
+つ⚆‿◕‿◕༽つ Wob: The scientist - methodical analysis, precise control
+```
+
+**Key Features:** Unlimited windows • 8+ generative art modes • REST API + MCP • Workspace persistence • Screenshot capture • Glitch effects • AI chat
+
+## Quick Start
 
 ```bash
 cd test-tui
@@ -26,21 +35,28 @@ tail -f test_pattern_debug.log      # Watch logs live (separate terminal)
 "args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.local.json", "--output-format", "json"]
 ```
 
-![tvedit in Konsole](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)
+![wibwob-dos in terminal](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)
 
-I started this as a personal project at the very end of 2018. By May 2020 I considered it was very close to feature parity with the original, and decided to make it open.
+## About Turbo Vision (The Framework)
 
-The original goals of this project were:
+wibwob-dos is built on **Turbo Vision** - a modern port of Borland's classic 1990s text-based UI framework. This C++ library enables building sophisticated TUI applications that work across platforms (Linux, Windows, macOS) with full Unicode support.
 
-* Making Turbo Vision work on Linux by altering the legacy codebase as little as possible.
-* Keeping it functional on DOS/Windows.
-* Being as compatible as possible at the source code level with old Turbo Vision applications. This led me to implement some of the Borland C++ RTL functions, as explained below.
+**Framework History:** Started as a personal project in late 2018 by [magiblot](https://github.com/magiblot), reaching feature parity with the original Turbo Vision 2.0 by May 2020. Between July-August 2020, full Unicode support was integrated into the existing architecture, proving that Turbo Vision can meet modern expectations.
 
-At one point I considered I had done enough, and that any attempts at revamping the library and overcoming its original limitations would require either extending the API or breaking backward compatibility, and that a major rewrite would be most likely necessary.
+**Original Goals:**
+* Make Turbo Vision work on Linux with minimal changes to legacy codebase
+* Maintain functionality on DOS/Windows
+* Maximum source-code compatibility with old Turbo Vision applications
 
-However, between July and August 2020 I found the way to integrate full-fledged Unicode support into the existing architecture, wrote the [Turbo](https://github.com/magiblot/turbo) text editor and also made the new features available on Windows. So I am confident that Turbo Vision can now meet many of the expectations of modern users and programmers.
+**Modern Enhancements:**
+* UTF-8 Unicode support throughout
+* 24-bit color support (extends original 16 colors)
+* Mouse wheel and middle button support
+* System clipboard integration
+* Resizable windows and responsive layouts
+* Cross-platform terminal support (ncurses/Win32 Console)
 
-The original location of this project is https://github.com/magiblot/tvision.
+**Framework Location:** https://github.com/magiblot/tvision
 
 # Table of contents
 
