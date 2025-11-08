@@ -1,4 +1,6 @@
 *
+# mcp memory tool secrets
+.mcp.json
 
 # Manually include root-level directories
 !examples/
