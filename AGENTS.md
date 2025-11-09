@@ -18,6 +18,7 @@
   - Or run the binary: `./build/tvision-test`
 - Web terminal (browser-hosted TUI):
   - `cd web-terminal && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && python main.py`
+  - Override the spawned program by setting `TUI_APP_CMD="/path/to/app [args]"` before launching `main.py` (default falls back to `test-tui/build/test_pattern`).
 
 ## test-tui App Focus
 - Purpose: playground for MS‑DOS‑era, ASCII/ANSI art TUIs (patterns, gradients, animation, painting).

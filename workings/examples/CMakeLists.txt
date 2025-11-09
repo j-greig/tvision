@@ -39,7 +39,7 @@ if (TV_BUILD_EXAMPLES)
     list(APPEND TVAPPS tvedit tvdemo tvdir tvforms tvhc mmenu palette)
     list(APPEND TVINSTALLAPPS tvedit tvdemo tvhc)
 
-    add_executable(hello "${PROJECT_SOURCE_DIR}/hello.cpp")
+    add_executable(hello "${CMAKE_CURRENT_LIST_DIR}/hello/hello.cpp")
     target_link_libraries(hello PUBLIC ${PROJECT_NAME})
     tv_app_common(hello)
 
