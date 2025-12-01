@@ -67,6 +67,8 @@
 #include "text_editor_view.h"
 // Wib&Wob AI chat interface
 #include "wibwob_view.h"
+// Scrollbar fix prototypes (test versions)
+#include "wibwob_scroll_test.h"
 // Custom frame for windows without titles
 #include "notitle_frame.h"
 // Transparent background text view
@@ -151,6 +153,9 @@ const ushort cmAnimationStudio = 127;
 const ushort cmQuantumPrinter = 128;
 const ushort cmWibWobChat = 131;
 const ushort cmSendToBack = 133;
+const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
+const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
+const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -515,6 +520,9 @@ private:
     // void newMechWindow();
     void newDonutWindow();
     void newWibWobWindow();
+    void newWibWobTestWindowA();
+    void newWibWobTestWindowB();
+    void newWibWobTestWindowC();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
     void openAnimationFilePath(const std::string& path, const TRect& bounds);
@@ -918,6 +926,18 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 newWibWobWindow();
                 clearEvent(event);
                 break;
+            case cmWibWobTestA:
+                newWibWobTestWindowA();
+                clearEvent(event);
+                break;
+            case cmWibWobTestB:
+                newWibWobTestWindowB();
+                clearEvent(event);
+                break;
+            case cmWibWobTestC:
+                newWibWobTestWindowC();
+                clearEvent(event);
+                break;
             case cmAnsiEditor:
                 messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -1290,6 +1310,84 @@ void TTestPatternApp::newWibWobWindow()
     window->select();
 }
 
+void TTestPatternApp::newWibWobTestWindowA()
+{
+    // Test window A: standardScrollBar() fix (minimal change approach)
+    windowNumber++;
+    std::stringstream title;
+    title << "Test A: stdScrollBar " << windowNumber;
+
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,
+        1 + offset,
+        82 + offset * 2,
+        28 + offset
+    );
+
+    TWindow* window = createWibWobTestWindowA(bounds, title.str());
+    if (!window) {
+        messageBox("Failed to create Test A window.", mfError | mfOKButton);
+        return;
+    }
+
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
+}
+
+void TTestPatternApp::newWibWobTestWindowB()
+{
+    // Test window B: TScroller-based (proper TV architecture)
+    windowNumber++;
+    std::stringstream title;
+    title << "Test B: TScroller " << windowNumber;
+
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,
+        1 + offset,
+        82 + offset * 2,
+        28 + offset
+    );
+
+    TWindow* window = createWibWobTestWindowB(bounds, title.str());
+    if (!window) {
+        messageBox("Failed to create Test B window.", mfError | mfOKButton);
+        return;
+    }
+
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
+}
+
+void TTestPatternApp::newWibWobTestWindowC()
+{
+    // Test window C: Split view architecture (MessageView + InputView)
+    windowNumber++;
+    std::stringstream title;
+    title << "Test C: Split Arch " << windowNumber;
+
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,
+        1 + offset,
+        82 + offset * 2,
+        28 + offset
+    );
+
+    TWindow* window = createWibWobTestWindowC(bounds, title.str());
+    if (!window) {
+        messageBox("Failed to create Test C window.", mfError | mfOKButton);
+        return;
+    }
+
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
+}
+
 void TTestPatternApp::openAnimationFile()
 {
     char fileName[MAXPATH];
@@ -1569,6 +1667,9 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
         *new TSubMenu("~T~ools", kbAltT) +
             *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+            *new TMenuItem("  Test A (stdScrollBar)", cmWibWobTestA, kbNoKey) +
+            *new TMenuItem("  Test B (TScroller)", cmWibWobTestB, kbNoKey) +
+            *new TMenuItem("  Test C (Split Arch)", cmWibWobTestC, kbNoKey) +
             newLine() +
             (TMenuItem&) (
                 *new TSubMenu("~G~litch Effects", kbNoKey) +

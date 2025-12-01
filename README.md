@@ -14,25 +14,39 @@ Built on Turbo Vision, wibwob-dos is a sophisticated TUI application where human
 ## Quick Start
 
 ```bash
-cd test-tui
+cd app
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
-./build/test_pattern  # Main test app with unlimited windows, patterns, gradients
+./build/test_pattern  # Main wibwob-dos app with unlimited windows, patterns, gradients
 ./build/simple_tui    # Basic TUI demo
 ```
 
 **Debug Logging**: Capture stderr debug output (session IDs, raw JSON, IPC logs):
 ```bash
-cd test-tui
+cd app
 ./run_test_pattern_logged.sh        # Logs to test_pattern_debug.log
 tail -f test_pattern_debug.log      # Watch logs live (separate terminal)
 ```
 
 **Programmatic Control**: The `test_pattern` app can be controlled via REST API + MCP for AI agents. See [tools/api_server/README.md](tools/api_server/README.md) and [CLAUDE.md](CLAUDE.md) for setup.
 
-**Wib&Wob Chat LLM Model**: The embedded chat window uses Claude Code CLI with **Haiku by default**. To use Sonnet instead, edit `test-tui/llm/config/llm_config.json` and change the `claude_code` provider's `args` array to include `"--model"` and `"sonnet"`:
+**Wib&Wob Chat LLM Model**: The embedded chat window uses Claude Code CLI with **Haiku by default**. To use Sonnet instead, edit `app/llm/config/llm_config.json` and change the `claude_code` provider's `args` array to include `"--model"` and `"sonnet"`:
 ```json
 "args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.local.json", "--output-format", "json"]
+```
+
+---
+
+### Legacy: test-tui/ (deprecated)
+
+> **Note**: The `test-tui/` directory was renamed to `app/` in the repository restructure. If you have an older checkout or see references to `test-tui/`, use the instructions below. New development should use `app/` above.
+
+```bash
+cd test-tui
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+./build/test_pattern  # Main test app
+./build/simple_tui    # Basic TUI demo
 ```
 
 ![wibwob-dos in terminal](https://user-images.githubusercontent.com/20713561/81506401-4fffdd80-92f6-11ea-8826-ee42612eb82a.png)

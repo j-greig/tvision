@@ -147,7 +147,43 @@ for (TView* v = deskTop->first(); v; v = v->nextView()) {  // ✅ Returns nullpt
 
 **Why it matters**: This bug causes 100% CPU spin in IPC handlers, API timeouts, and crashes when searching for windows that don't exist (e.g., auto-spawning text editors). Always use `nextView()` or a sentinel check (`v != start`) when iterating `TGroup` children.
 
-**See**: `test-tui/test_pattern_app.cpp:2291` (fixed in api_send_text), `test-tui/test_pattern_app.cpp:2353` (fixed in api_send_figlet)
+**See**: `app/test_pattern_app.cpp` (api_send_text, api_send_figlet functions)
+
+### Scrollable Views (TScroller Pattern)
+
+**IMPORTANT**: For scrollable content, use `TScroller` base class, NOT `TView` with manual scrollbar.
+
+**Wrong** (manual scrollbar - breaks on resize):
+```cpp
+class MyView : public TView {  // ❌ Wrong base class
+    TScrollBar* vScrollBar;
+    int scrollOffset = 0;  // ❌ Manual tracking
+};
+// In window constructor:
+TRect scrollBarRect = client;
+scrollBarRect.a.x = scrollBarRect.b.x - 1;
+vScrollBar = new TScrollBar(scrollBarRect);  // ❌ Manual positioning
+vScrollBar->growMode = gfGrowLoY | gfGrowHiY;  // ❌ Wrong flags
+```
+
+**Correct** (TScroller pattern - automatic resize/scroll):
+```cpp
+class MyView : public TScroller {  // ✅ Correct base class
+    // Use inherited: delta.y for scroll position, setLimit() for content bounds
+};
+// In window constructor:
+vScrollBar = standardScrollBar(sbVertical | sbHandleKeyboard);  // ✅ Frame area, auto-resize
+myView = new MyView(client, nullptr, vScrollBar);  // ✅ Pass scrollbar to TScroller
+```
+
+**Key differences**:
+- `standardScrollBar()` creates scrollbar in FRAME area with correct growMode
+- `TScroller` handles `cmScrollBarChanged` automatically
+- Use `delta.y` for scroll position (not custom `scrollOffset`)
+- Use `setLimit(width, totalLines)` when content changes
+- Override `scrollDraw()` for scroll-triggered redraws
+
+**Reference**: `app/ansi_view.cpp` (working TScroller), `source/tvision/twindow.cpp:197-210` (standardScrollBar)
 
 ## Environment Variables
 
@@ -168,25 +204,29 @@ for (TView* v = deskTop->first(); v; v = v->nextView()) {  // ✅ Returns nullpt
 - xsel/xclip (X11 clipboard)
 - wl-clipboard (Wayland clipboard)
 
-## Test Applications (test-tui/)
+## wibwob-dos Applications (app/)
 
-The **test-tui/** directory contains experimental TUI applications for testing and development:
+The **app/** directory contains the main wibwob-dos TUI applications:
 
 ### Available Applications
-- **test_pattern** - Multi-window test pattern generator with gradients, wallpaper, screenshot capability
+- **test_pattern** - Main wibwob-dos app: unlimited windows, patterns, gradients, AI chat, API control
 - **simple_tui** - Basic TUI demonstrating fundamental TV usage patterns
 - **frame_file_player** - Timer-based ASCII animation player (loads frame files, no threads)
+- **paint_tui** - ASCII painting canvas with tools and palette
 
-### Build Test Apps
+### Build (from project root)
 ```bash
-cd test-tui
+# IMPORTANT: Build from project ROOT, not from app/ directory
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
 
-# Run applications (examples)
-./build/test_pattern                              # Pattern generator
-./build/frame_file_player --file frames_demo.txt # Animation player
+# Run applications (from project root) - note: executables are in ./build/app/
+./build/app/test_pattern                              # Main wibwob-dos app
+./build/app/simple_tui                                # Basic TUI demo
+./build/app/frame_file_player --file frames_demo.txt  # Animation player
 ```
+
+**Note**: Building standalone from `app/` causes CMake circular dependency errors. Always build from project root.
 
 ## Common Development Tasks
 
@@ -198,14 +238,14 @@ cmake --build ./build
 
 ### Testing Changes
 ```bash
-# Build and run the demo app to test UI changes
+# Build and run demo app for UI changes
 cmake --build ./build && ./build/tvdemo
 
-# Test the editor for text handling
+# Test editor for text handling
 ./build/tvedit test.txt
 
-# Test with experimental apps
-cd test-tui && cmake --build ./build && ./build/test_pattern
+# Test wibwob-dos app
+cmake --build ./build && ./build/app/test_pattern
 ```
 
 ### Animation Development
@@ -214,9 +254,9 @@ cd test-tui && cmake --build ./build && ./build/test_pattern
 - **No threads**: Keep animations on main UI thread via TV timer system
 
 ### Debugging
-- Use `TVISION_MAX_FPS=-1` for immediate screen updates (useful for debugging)
+- `TVISION_MAX_FPS=-1` for immediate screen updates
 - Event viewer in tvdemo helps debug input events
-- Claude should never attempt to run tvision apps using bash as it borks the REPL - only humans should run the apps. Claude should ask the human to run if required and tell the human how. eg "cd test-tui && ./build/simple_tui"
+- **Claude must NOT run TUI apps via bash** - borks the REPL. Ask user to run: `./build/app/test_pattern`
 
 ## Programmatic Control API
 
@@ -225,7 +265,7 @@ The **tools/api_server** directory contains a FastAPI-based REST API server that
 ### Architecture
 
 - **FastAPI Server** (`tools/api_server/`) - REST API with WebSocket events
-- **Unix Socket IPC** (`test-tui/api_ipc.*`) - Bridge between Python API and C++ TUI apps
+- **Unix Socket IPC** (`app/api_ipc.*`) - Bridge between Python API and C++ TUI apps
 - **Window Registry** - Stable window ID management in C++ applications
 - **State Sync** - Real-time bidirectional state synchronization
 
@@ -250,9 +290,8 @@ The API server will be available at: **http://127.0.0.1:8089**
 
 #### 3. Run a Compatible TUI Application
 ```bash
-# In a separate terminal
-cd test-tui
-./build/test_pattern
+# In a separate terminal (from project root)
+./build/app/test_pattern
 ```
 
 The TUI app automatically creates a Unix socket at `/tmp/test_pattern_app.sock` for IPC communication.
@@ -413,11 +452,11 @@ lsof /tmp/test_pattern_app.sock
 echo "cmd:get_state" | nc -U /tmp/test_pattern_app.sock
 ```
 
-#### Socket Permission Issues  
+#### Socket Permission Issues
 ```bash
-# Remove stale socket and restart TUI app
+# Remove stale socket and restart TUI app (from project root)
 rm -f /tmp/test_pattern_app.sock
-cd test-tui && ./build/test_pattern
+./build/app/test_pattern
 ```
 
 The API provides full programmatic control over TUI applications, enabling powerful automation and integration capabilities while maintaining real-time responsiveness.
@@ -548,7 +587,7 @@ This enables AI agents to:
 
 ### Integration Workflow
 
-1. **Start TUI Application**: `cd test-tui && ./build/test_pattern`
+1. **Start TUI Application**: `./build/app/test_pattern` (from project root)
 2. **Start MCP-enabled API Server**: `python -m tools.api_server.main --port=8089`
 3. **Use Claude Code Headless**: `claude -p --mcp-config=.mcp.json "<command>"`
 
@@ -606,14 +645,14 @@ The `test_pattern` app includes an **embedded AI chat window** with full MCP sup
 # Terminal 1: Start API server
 ./start_api_server.sh
 
-# Terminal 2: Run TUI app
-cd test-tui && ./build/test_pattern
+# Terminal 2: Run TUI app (from project root)
+./build/app/test_pattern
 # Then: Tools → Wib&Wob Chat
 ```
 
 ### How It Works
 
-The chat window uses the **Claude Code CLI** as its LLM backend, configured in [test-tui/llm/config/llm_config.json](test-tui/llm/config/llm_config.json):
+The chat window uses the **Claude Code CLI** as its LLM backend, configured in [app/llm/config/llm_config.json](app/llm/config/llm_config.json):
 
 ```json
 {
@@ -632,14 +671,14 @@ This configuration makes the TUI chat **functionally identical to using Claude C
 
 ### Available MCP Servers
 
-Configured in [test-tui/.claude/settings.local.json](test-tui/.claude/settings.local.json):
+Configured in [app/.claude/settings.local.json](app/.claude/settings.local.json):
 
 - **`tui-control`** - Window management, pattern control, screenshot, workspace (http://127.0.0.1:8089/mcp)
 - **`symbient-brain`** - Memory storage and retrieval for persistent context
 
 ### Wib&Wob Personality
 
-The chat loads its personality from [test-tui/wibandwob.prompt.md](test-tui/wibandwob.prompt.md):
+The chat loads its personality from [app/wibandwob.prompt.md](app/wibandwob.prompt.md):
 - **Wib** ```つ◕‿◕‿⚆༽つ``` - Chaotic artist, ASCII art creator, surreal phrasing
 - **Wob** ```つ⚆‿◕‿◕༽つ``` - Precise scientist, methodical analysis, complex systems
 
@@ -665,7 +704,7 @@ Wib&Wob: つ◕‿◕‿⚆༽つ The eternal now collapses to...
 
 ### Chat Logs
 
-Sessions are automatically logged to `test-tui/logs/chat_YYYYMMDD_HHMMSS_<session-id>.log` for debugging and conversation history.
+Sessions are automatically logged to `app/logs/chat_YYYYMMDD_HHMMSS_<session-id>.log` for debugging and conversation history.
 
 ### Switching Providers
 
