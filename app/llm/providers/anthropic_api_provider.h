@@ -35,8 +35,8 @@ public:
     // Session management
     void resetSession() override;
     
-    // Tool support
-    bool supportsTools() const override { return true; }
+    // Tool support (disabled for now to avoid tool_use path on simple sync client)
+    bool supportsTools() const override { return false; }
     void registerTool(const Tool& tool) override;
     void clearTools() override;
 

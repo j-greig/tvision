@@ -156,6 +156,7 @@ const ushort cmSendToBack = 133;
 const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
 const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
 const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
+const ushort cmRepaint = 161;      // Force repaint
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -938,6 +939,12 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 newWibWobTestWindowC();
                 clearEvent(event);
                 break;
+            case cmRepaint:
+                if (deskTop) {
+                    deskTop->drawView();
+                }
+                clearEvent(event);
+                break;
             case cmAnsiEditor:
                 messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -1703,7 +1710,7 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
         *new TStatusDef(0, 0xFFFF) +
             *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
             *new TStatusItem("~Ctrl-N~ New Window", kbCtrlN, cmNewWindow) +
-            *new TStatusItem("~F5~ Zoom", kbF5, cmZoom) +
+        *new TStatusItem("~F5~ Repaint", kbF5, cmRepaint) +
             *new TStatusItem("~F6~ Next", kbF6, cmNext) +
             *new TStatusItem("~Alt-F3~ Close", kbAltF3, cmClose) +
             *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +

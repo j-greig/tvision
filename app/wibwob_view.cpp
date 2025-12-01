@@ -40,8 +40,6 @@ TWibWobMessageView::TWibWobMessageView(const TRect& bounds, TScrollBar* hScroll,
 void TWibWobMessageView::draw() {
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
-    TColorAttr userColor = getColor(2);
-    TColorAttr wibColor = getColor(3);
     TColorAttr errorColor = getColor(4);
 
     int totalLines = static_cast<int>(wrappedLines.size());
@@ -53,15 +51,7 @@ void TWibWobMessageView::draw() {
 
         if (lineIdx >= 0 && lineIdx < totalLines) {
             const auto& wl = wrappedLines[lineIdx];
-            TColorAttr msgColor = normalColor;
-            if (wl.is_error) {
-                msgColor = errorColor;
-            } else if (wl.sender == "User") {
-                msgColor = userColor;
-            } else if (wl.sender == "Wib" || wl.sender == "Wob" ||
-                       wl.sender == "Wib&Wob" || wl.sender == "System") {
-                msgColor = wibColor;
-            }
+            TColorAttr msgColor = wl.is_error ? errorColor : normalColor;
             buf.moveStr(0, wl.text.c_str(), msgColor);
         }
 
@@ -234,8 +224,8 @@ TWibWobInputView::TWibWobInputView(const TRect& bounds)
     eventMask |= evKeyDown | evBroadcast;
     statusText = "Type a message and press Enter";
 
-    // Blink the prompt every second while focused.
-    promptTimerId = setTimer(1000, 1000);
+    // Prompt starts visible; timer is started on focus.
+    promptVisible = true;
 }
 
 TWibWobInputView::~TWibWobInputView() {
@@ -380,7 +370,10 @@ void TWibWobInputView::handleEvent(TEvent& event) {
             if (state & sfFocused) {
                 promptVisible = !promptVisible;
             } else {
+                // If we lost focus but timer still exists, stop blinking and reset.
                 promptVisible = true;
+                killTimer(promptTimerId);
+                promptTimerId = nullptr;
             }
             drawView();
             clearEvent(event);
@@ -391,10 +384,20 @@ void TWibWobInputView::handleEvent(TEvent& event) {
 void TWibWobInputView::setState(ushort aState, Boolean enable) {
     TView::setState(aState, enable);
     if (aState & sfFocused) {
-        drawView();
-        if (!enable) {
-            promptVisible = true;  // Ensure prompt is visible when unfocused
+        // Always reset prompt visible on focus transitions, then redraw.
+        promptVisible = true;
+        if (enable) {
+            if (!promptTimerId) {
+                // Start the prompt timer only after the view is owned/inserted.
+                promptTimerId = setTimer(500, 500);
+            }
+        } else {
+            if (promptTimerId) {
+                killTimer(promptTimerId);
+                promptTimerId = nullptr;
+            }
         }
+        drawView();
     }
 }
 
@@ -404,27 +407,15 @@ void TWibWobInputView::setStatus(const std::string& status) {
 }
 
 void TWibWobInputView::startSpinner() {
-    if (showSpinner) return;
-
-    showSpinner = true;
-    spinnerFrame = 0;
-    spinnerTimerId = setTimer(200, 200);
+    // Spinner disabled (synchronous request path).
 }
 
 void TWibWobInputView::stopSpinner() {
-    if (!showSpinner) return;
-
-    showSpinner = false;
-    if (spinnerTimerId) {
-        killTimer(spinnerTimerId);
-        spinnerTimerId = nullptr;
-    }
+    // Spinner disabled (synchronous request path).
 }
 
 void TWibWobInputView::updateSpinner() {
-    if (!showSpinner) return;
-    spinnerFrame++;
-    drawView();
+    // Spinner disabled (synchronous request path).
 }
 
 /*---------------------------------------------------------*/
@@ -603,7 +594,6 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     std::string statusMsg = statusOptions[rand() % (sizeof(statusOptions) / sizeof(statusOptions[0]))];
     inputView->setStatus(statusMsg);
     inputView->setInputEnabled(false);
-    inputView->startSpinner();
 
     // Log provider info
     logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
@@ -614,7 +604,6 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-        inputView->stopSpinner();
         inputView->setInputEnabled(true);
 
         if (response.is_error) {

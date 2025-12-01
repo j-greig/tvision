@@ -203,8 +203,8 @@ void TWibWobTestViewA::updateScrollBar() {
 void TWibWobTestViewA::draw() {
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
-    TColorAttr userColor = getColor(2);
-    TColorAttr wibColor = getColor(3);
+    TColorAttr userColor = getColor(1);
+    TColorAttr wibColor = getColor(1);
 
     int y = 0;
     int maxY = getMessageAreaHeight();
@@ -418,8 +418,8 @@ void TWibWobTestViewB::rebuildWrappedLines() {
 void TWibWobTestViewB::draw() {
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
-    TColorAttr userColor = getColor(2);
-    TColorAttr wibColor = getColor(3);
+    TColorAttr userColor = getColor(1);
+    TColorAttr wibColor = getColor(1);
 
     for (int y = 0; y < size.y; y++) {
         int lineIdx = delta.y + y;  // KEY: Use TScroller's delta.y for scroll position

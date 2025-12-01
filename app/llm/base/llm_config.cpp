@@ -44,9 +44,16 @@ bool ProviderConfig::getParameterBool(const std::string& key, bool defaultValue)
 }
 
 LLMConfig::LLMConfig() {
-    // Load .env file first to set environment variables
-    loadDotEnv("../.env");  // Load from parent directory when running from build/
-    
+    // Load .env files to set environment variables; try multiple relative paths.
+    const char* envPaths[] = {
+        ".env",        // repo root if run from root
+        "../.env",     // common when run from build/app
+        "../../.env"   // fallback if deeper
+    };
+    for (const auto& p : envPaths) {
+        loadDotEnv(p);
+    }
+
     // Set up default configuration
     loadFromString(getDefaultConfigJson());
 }
@@ -326,7 +333,7 @@ bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, b
 
 std::string LLMConfig::getDefaultConfigJson() {
     return R"({
-  "activeProvider": "claude_code",
+  "activeProvider": "anthropic_api",
   "providers": {
     "claude_code": {
       "enabled": true,
@@ -335,7 +342,7 @@ std::string LLMConfig::getDefaultConfigJson() {
     },
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-3-5-haiku-latest",
+      "model": "claude-haiku-4-5",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",
@@ -343,7 +350,7 @@ std::string LLMConfig::getDefaultConfigJson() {
     },
     "openrouter": {
       "enabled": true,
-      "model": "anthropic/claude-3-haiku",
+      "model": "anthropic/claude-haiku-4-5",
       "endpoint": "https://openrouter.ai/api/v1/chat/completions",
       "apiKeyEnv": "OPENROUTER_API_KEY"
     }

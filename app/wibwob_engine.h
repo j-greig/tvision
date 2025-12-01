@@ -58,6 +58,7 @@ public:
     void clearTools();
 
 private:
+    // Configuration / provider
     std::unique_ptr<LLMConfig> config;
     std::unique_ptr<ILLMProvider> currentProvider;
     std::string systemPrompt;

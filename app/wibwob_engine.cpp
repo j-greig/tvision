@@ -97,7 +97,7 @@ bool WibWobEngine::sendQuery(const std::string& query, ResponseCallback callback
         }
     };
     
-    // Send to current provider
+    // Send to current provider (synchronous or provider-managed async)
     return currentProvider->sendQuery(request, wrappedCallback);
 }
 
@@ -191,24 +191,47 @@ std::string WibWobEngine::getSessionId() const {
 void WibWobEngine::loadConfiguration() {
     config = std::make_unique<LLMConfig>();
     
-    // Try to load from config file
-    bool loadResult = config->loadFromFile("llm/config/llm_config.json");
-    fprintf(stderr, "DEBUG: Config file load result: %s\n", loadResult ? "SUCCESS" : "FAILED");
-    if (loadResult) {
-        // Initialize the active provider
-        std::string activeProvider = config->getActiveProvider();
-        fprintf(stderr, "DEBUG: Config loaded successfully, active provider: %s\n", activeProvider.c_str());
-        if (!activeProvider.empty()) {
-            if (initializeProvider(activeProvider)) {
-                fprintf(stderr, "DEBUG: Successfully initialized provider: %s\n", activeProvider.c_str());
-            } else {
-                fprintf(stderr, "ERROR: Failed to initialize provider: %s\n", activeProvider.c_str());
-            }
+    // Try to load from config file (multiple candidate paths depending on CWD).
+    const std::vector<std::string> cfgPaths = {
+        "llm/config/llm_config.json",
+        "../llm/config/llm_config.json",
+        "../../llm/config/llm_config.json"
+    };
+    bool loadResult = false;
+    std::string usedPath;
+    for (const auto& path : cfgPaths) {
+        if (config->loadFromFile(path)) {
+            loadResult = true;
+            usedPath = path;
+            break;
         }
+    }
+
+    fprintf(stderr, "DEBUG: Config file load result: %s%s\n",
+            loadResult ? "SUCCESS " : "FAILED",
+            loadResult ? ("(" + usedPath + ")").c_str() : "");
+
+    // Pick desired provider based on env/config: prefer Anthropic if key present, else Claude Code.
+    auto hasAnthropicKey = []() -> bool {
+        const char* v = std::getenv("ANTHROPIC_API_KEY");
+        return v && *v;
+    };
+    std::string desiredProvider = config->getActiveProvider();
+
+    if (hasAnthropicKey() && config->hasProvider("anthropic_api")) {
+        desiredProvider = "anthropic_api";
+    } else if (config->hasProvider("claude_code")) {
+        desiredProvider = "claude_code";
+    }
+    if (!desiredProvider.empty())
+        config->setActiveProvider(desiredProvider);
+
+    if (loadResult) {
+        fprintf(stderr, "DEBUG: Config loaded successfully, active provider: %s\n", desiredProvider.c_str());
     } else {
         // Config file missing or invalid - create default but DON'T overwrite existing file
         fprintf(stderr, "ERROR: Failed to load llm/config/llm_config.json\n");
-        fprintf(stderr, "DEBUG: Using default config with activeProvider: %s\n", config->getActiveProvider().c_str());
+        fprintf(stderr, "DEBUG: Using default config with activeProvider: %s\n", desiredProvider.c_str());
         
         // Check validation errors
         auto errors = config->getValidationErrors();
@@ -227,7 +250,7 @@ void WibWobEngine::loadConfiguration() {
         }
         
         // Try the default active provider
-        std::string defaultProvider = config->getActiveProvider();
+        std::string defaultProvider = desiredProvider.empty() ? config->getActiveProvider() : desiredProvider;
         if (!initializeProvider(defaultProvider)) {
             // If default provider fails, try any available provider
             auto availableProviders = config->getAvailableProviders();
@@ -237,6 +260,24 @@ void WibWobEngine::loadConfiguration() {
                     break;
                 }
             }
+        }
+    }
+
+    // Initialize desired provider with fallback sequence: desired first, then the rest.
+    std::vector<std::string> candidates;
+    if (!desiredProvider.empty())
+        candidates.push_back(desiredProvider);
+    auto available = config->getAvailableProviders();
+    for (const auto& p : available) {
+        if (std::find(candidates.begin(), candidates.end(), p) == candidates.end())
+            candidates.push_back(p);
+    }
+    for (const auto& name : candidates) {
+        if (initializeProvider(name)) {
+            fprintf(stderr, "DEBUG: Successfully initialized provider: %s\n", name.c_str());
+            break;
+        } else {
+            fprintf(stderr, "ERROR: Failed to initialize provider: %s\n", name.c_str());
         }
     }
 }

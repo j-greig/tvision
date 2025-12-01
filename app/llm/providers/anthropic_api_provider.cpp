@@ -14,14 +14,14 @@
 #include <sstream>
 #include <chrono>
 #include <fstream>
+#include <algorithm>
 
 // Register this provider with the factory
 REGISTER_LLM_PROVIDER("anthropic_api", AnthropicAPIProvider);
 
 AnthropicAPIProvider::AnthropicAPIProvider() {
     endpoint = "https://api.anthropic.com/v1/messages";
-    // model = "claude-3-5-haiku-latest";
-    model = "claude-sonnet-4-5";
+    model = "claude-haiku-4-5";
     maxTokens = 4096;
     temperature = 1.0;
 }
@@ -68,14 +68,53 @@ void AnthropicAPIProvider::poll() {
 
 std::vector<std::string> AnthropicAPIProvider::getSupportedModels() const {
     return {
-        "claude-3-5-haiku-latest",
-        "claude-3-5-sonnet-latest"
+        "claude-haiku-4-5",
+        "claude-sonnet-4-5"
     };
 }
 
 bool AnthropicAPIProvider::configure(const std::string& config) {
-    // Pull API key from environment (with optional local fallback).
-    apiKey = ApiConfig::anthropicApiKey();
+    // Pull API key from the configured env var (apiKeyEnv), then fallback helper.
+    std::string keyEnv = "ANTHROPIC_API_KEY";
+    auto parseStringField = [](const std::string& src, const std::string& field) -> std::string {
+        std::string pat = "\"" + field + "\"";
+        size_t pos = src.find(pat);
+        if (pos == std::string::npos) return {};
+        size_t start = src.find("\"", pos + pat.size());
+        if (start == std::string::npos) return {};
+        start++;
+        size_t end = src.find("\"", start);
+        if (end == std::string::npos) return {};
+        return src.substr(start, end - start);
+    };
+
+    std::string cfgModel     = parseStringField(config, "model");
+    std::string cfgEndpoint  = parseStringField(config, "endpoint");
+    std::string cfgApiKeyEnv = parseStringField(config, "apiKeyEnv");
+
+    if (!cfgModel.empty()) {
+        model = cfgModel;
+    }
+    if (!cfgEndpoint.empty()) {
+        endpoint = cfgEndpoint;
+    }
+    if (!cfgApiKeyEnv.empty()) {
+        keyEnv = cfgApiKeyEnv;
+    }
+
+    const char* envVal = std::getenv(keyEnv.c_str());
+    if (envVal) {
+        apiKey = envVal;
+    } else {
+        apiKey = ApiConfig::anthropicApiKey();
+    }
+
+    if (apiKey.empty()) {
+        fprintf(stderr, "ERROR: Anthropic API key not found. Expected env var %s\n", keyEnv.c_str());
+    } else {
+        fprintf(stderr, "DEBUG: Anthropic API key loaded from %s (len=%zu)\n", keyEnv.c_str(), apiKey.size());
+    }
+
     return !apiKey.empty();
 }
 
@@ -106,14 +145,16 @@ LLMResponse AnthropicAPIProvider::makeSimpleAPIRequest(const LLMRequest& request
     outFile.close();
     
     // Build curl command
-    std::string curlCmd = "curl -s --max-time 30 ";
+    std::string curlCmd = "curl -sS --max-time 30 ";
     curlCmd += "-H \"Content-Type: application/json\" ";
     curlCmd += "-H \"x-api-key: " + apiKey + "\" ";
     curlCmd += "-H \"anthropic-version: 2023-06-01\" ";
     curlCmd += "-X POST ";
     curlCmd += "\"" + endpoint + "\" ";
     curlCmd += "--data @" + tempFile;
-    
+
+    fprintf(stderr, "DEBUG: Anthropic curl command: %s\n", curlCmd.c_str());
+
     // Execute curl and capture output
     FILE* pipe = popen(curlCmd.c_str(), "r");
     if (!pipe) {
@@ -320,7 +361,7 @@ LLMResponse AnthropicAPIProvider::parseSimpleResponse(const std::string& respons
     size_t contentPos = response.find("\"content\"");
     if (contentPos == std::string::npos) {
         result.is_error = true;
-        result.error_message = "No content found in response";
+        result.error_message = "No content found in response. Raw: " + result.session_id;
         return result;
     }
     
@@ -332,7 +373,7 @@ LLMResponse AnthropicAPIProvider::parseSimpleResponse(const std::string& respons
             return result; // Valid tool_use response
         }
         result.is_error = true; 
-        result.error_message = "No text field found";
+        result.error_message = "No text field found. Raw: " + result.session_id;
         return result;
     }
     
