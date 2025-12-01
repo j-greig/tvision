@@ -1,6 +1,7 @@
 /*---------------------------------------------------------*/
 /*                                                         */
 /*   wibwob_view.h - Wib&Wob AI Chat Interface            */
+/*   Split Architecture: MessageView + InputView           */
 /*                                                         */
 /*---------------------------------------------------------*/
 
@@ -15,13 +16,17 @@
 #define Uses_TWindow
 #define Uses_TFrame
 #define Uses_TScrollBar
+#define Uses_TScroller
+#define Uses_TGroup
 #include <tvision/tv.h>
 
 #include <string>
 #include <vector>
+#include <functional>
 
-// Forward declaration
+// Forward declarations
 class WibWobEngine;
+class TWibWobWindow;
 
 struct ChatMessage {
     std::string sender;  // "User" or "Wib"
@@ -30,99 +35,133 @@ struct ChatMessage {
     bool is_error = false;
 };
 
-class TWibWobView : public TView {
+/*---------------------------------------------------------*/
+/*  TWibWobMessageView - Scrollable message display        */
+/*  Extends TScroller for proper scroll handling           */
+/*---------------------------------------------------------*/
+class TWibWobMessageView : public TScroller {
 public:
-    TWibWobView(const TRect& bounds);
-    virtual ~TWibWobView();
+    TWibWobMessageView(const TRect& bounds, TScrollBar* hScroll, TScrollBar* vScroll);
+
+    virtual void draw() override;
+    virtual void changeBounds(const TRect& bounds) override;
+
+    // Message operations
+    void addMessage(const std::string& sender, const std::string& content, bool is_error = false);
+    void clear();
+    void scrollToBottom();
+    void scrollToTop();
+    void scrollLineUp();
+    void scrollLineDown();
+    void scrollPageUp();
+    void scrollPageDown();
+
+    // Access for window
+    const std::vector<ChatMessage>& getMessages() const { return messages; }
+
+private:
+    struct WrappedLine {
+        std::string text;
+        std::string sender;
+        bool is_error;
+    };
+
+    std::vector<ChatMessage> messages;
+    std::vector<WrappedLine> wrappedLines;
+
+    void rebuildWrappedLines();
+    std::vector<std::string> wrapText(const std::string& text, int width) const;
+};
+
+/*---------------------------------------------------------*/
+/*  TWibWobInputView - Fixed input area at bottom          */
+/*  Simple TView for status + input line                   */
+/*---------------------------------------------------------*/
+class TWibWobInputView : public TView {
+public:
+    TWibWobInputView(const TRect& bounds);
+    virtual ~TWibWobInputView();
 
     virtual void draw() override;
     virtual void handleEvent(TEvent& event) override;
     virtual void setState(ushort aState, Boolean enable) override;
-    virtual void changeBounds(const TRect& bounds) override;
 
-    // Chat operations
-    void sendMessage(const std::string& message);
-    void addMessage(const std::string& sender, const std::string& content, bool is_error = false);
+    // Input operations
     void setStatus(const std::string& status);
-    void clearChat();
+    std::string getCurrentInput() const { return currentInput; }
+    void clearInput() { currentInput.clear(); }
+    void setInputEnabled(bool enabled) { inputEnabled = enabled; }
 
-    // Scrollbar synchronization (public for parent window access)
-    int calculateTotalWrappedLines() const;
-    int getMessageAreaHeight() const;
-    int getScrollOffset() const { return scrollOffset; }
-    void notifyScrollBarUpdate();
+    // Spinner control
+    void startSpinner();
+    void stopSpinner();
+
+    // Callback when user submits input
+    std::function<void(const std::string&)> onSubmit;
 
 private:
-    // UI state
-    std::vector<ChatMessage> messages;
     std::string currentInput;
     std::string statusText;
-    int scrollOffset = 0;
-    int maxVisibleLines = 0;
-    bool inputActive = true;
-    
+    bool inputEnabled = true;
+
     // Spinner animation
     bool showSpinner = false;
     int spinnerFrame = 0;
     void* spinnerTimerId = nullptr;
-    
+
+    // Prompt blink
+    bool promptVisible = true;
+    void* promptTimerId = nullptr;
+
+    void drawStatus();
+    void drawInputLine();
+    void updateSpinner();
+};
+
+/*---------------------------------------------------------*/
+/*  TWibWobWindow - Coordinates message + input views      */
+/*  Owns the engine and logging                            */
+/*---------------------------------------------------------*/
+class TWibWobWindow : public TWindow {
+public:
+    TWibWobWindow(const TRect& bounds, const std::string& title);
+    virtual ~TWibWobWindow();
+
+    virtual void changeBounds(const TRect& bounds) override;
+    virtual void handleEvent(TEvent& event) override;
+    void updateTitleWithSession(const std::string& sessionId);
+
+    // Public access to views for external control
+    TWibWobMessageView* getMessageView() { return messageView; }
+    TWibWobInputView* getInputView() { return inputView; }
+
+private:
+    static TFrame* initFrame(TRect r);
+
+    TGroup* messagePane = nullptr;
+    TWibWobMessageView* messageView = nullptr;
+    TWibWobInputView* inputView = nullptr;
+    TScrollBar* vScrollBar = nullptr;
+    std::string baseTitle;
+
     // Engine
     WibWobEngine* engine = nullptr;
     bool engineInitialized = false;
-    
+
     // Logging
     std::string sessionId;
     std::string logFilePath;
-    
-    // Lazy initialization
+
     void ensureEngineInitialized();
-    
+    void processUserInput(const std::string& input);
+    void layoutMessagePaneChildren();
+
     // Logging
     void initializeLogging();
     void logMessage(const std::string& sender, const std::string& content, bool is_error = false);
     std::string generateSessionId() const;
     std::string getTimestamp() const;
-    
-    // Drawing helpers
-    void drawMessages();
-    void drawInputLine();
-    void drawStatus();
-    void scrollUp(int lines = 1);
-    void scrollDown(int lines = 1);
-    void ensureInputVisible();
-    
-    // Input handling
-    void handleKeyDown(TEvent& event);
-    void handleChar(TEvent& event);
-    void processInput();
-    
-    // Animation
-    void startSpinner();
-    void stopSpinner();
-    void updateSpinner();
-    
-    // Text formatting
-    std::vector<std::string> wrapText(const std::string& text, int width) const;
     std::string getCurrentTime() const;
-    
-    // Layout calculations
-    int getInputAreaHeight() const { return 1; }
-    int getStatusAreaHeight() const { return 1; }
-};
-
-class TWibWobWindow : public TWindow {
-public:
-    TWibWobWindow(const TRect& bounds, const std::string& title);
-
-    virtual void changeBounds(const TRect& bounds) override;
-    void updateTitleWithSession(const std::string& sessionId);
-    void updateScrollBarLimit();
-
-private:
-    static TFrame* initFrame(TRect r);
-    TWibWobView* chatView {nullptr};
-    TScrollBar* vScrollBar {nullptr};
-    std::string baseTitle;
 };
 
 TWindow* createWibWobWindow(const TRect& bounds, const std::string& title);
