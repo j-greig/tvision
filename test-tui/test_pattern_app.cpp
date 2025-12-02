@@ -38,6 +38,7 @@
 #include "gradient.h"
 #include "glitch_engine.h"
 #include "frame_capture.h"
+#include "svg_exporter.h"
 #include "frame_file_player_view.h"
 #include "ascii_image_view.h"
 // Animated blocks view/window
@@ -109,6 +110,7 @@ const ushort cmOpenImageFile = 114;
 
 // Edit menu commands
 const ushort cmScreenshot = 101;
+const ushort cmExportSvg = 0xF201;
 const ushort cmPatternContinuous = 106;
 const ushort cmPatternTiled = 107;
 // Edit menu commands
@@ -134,6 +136,7 @@ const ushort cmCubeField = 153;
 const ushort cmMonsterPortal = 154;
 const ushort cmMonsterVerse = 155;
 const ushort cmMonsterCam   = 156;
+const ushort cmAsciiPatterns = 157;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -214,6 +217,321 @@ public:
             writeBuf(xPos, 0, kaomojiWidth, 1, b);
         }
     }
+};
+
+/*---------------------------------------------------------*/
+/* TAsciiPatternView - Interactive ASCII Pattern Display  */
+/*---------------------------------------------------------*/
+class TAsciiPatternView : public TView
+{
+private:
+    int currentPattern;
+    int animFrame;
+    TTimerId timerId;
+    
+    enum PatternType {
+        PATTERN_MAZE,
+        PATTERN_WAVES,
+        PATTERN_MANDALA,
+        PATTERN_CIRCUIT,
+        PATTERN_STARS,
+        PATTERN_TRIBAL,
+        PATTERN_COUNT
+    };
+    
+public:
+    TAsciiPatternView(const TRect& bounds) : TView(bounds), currentPattern(0), animFrame(0), timerId(nullptr)
+    {
+        options |= ofSelectable;
+        growMode = gfGrowHiX | gfGrowHiY;
+        eventMask |= evKeyboard | evBroadcast;
+        startAnimation();
+    }
+    
+    ~TAsciiPatternView() {
+        stopAnimation();
+    }
+    
+    void startAnimation() {
+        if (!timerId) {
+            timerId = setTimer(500, 500); // 500ms updates
+        }
+    }
+    
+    void stopAnimation() {
+        if (timerId) {
+            killTimer(timerId);
+            timerId = nullptr;
+        }
+    }
+    
+    virtual void handleEvent(TEvent& event) {
+        TView::handleEvent(event);
+        
+        if (event.what == evKeyDown) {
+            switch (event.keyDown.keyCode) {
+                case 32: // Space key
+                    nextPattern();
+                    clearEvent(event);
+                    break;
+                case kbLeft:
+                    prevPattern();
+                    clearEvent(event);
+                    break;
+                case kbRight:
+                    nextPattern();
+                    clearEvent(event);
+                    break;
+            }
+        } else if (event.what == evBroadcast && event.message.command == cmReceivedFocus) {
+            startAnimation();
+        } else if (event.what == evBroadcast && event.message.command == cmReleasedFocus) {
+            stopAnimation();
+        }
+    }
+    
+    void nextPattern() {
+        currentPattern = (currentPattern + 1) % PATTERN_COUNT;
+        animFrame = 0;
+        drawView();
+    }
+    
+    void prevPattern() {
+        currentPattern = (currentPattern - 1 + PATTERN_COUNT) % PATTERN_COUNT;
+        animFrame = 0;
+        drawView();
+    }
+    
+    virtual void draw() {
+        drawPattern();
+    }
+    
+private:
+    void drawPattern() {
+        TDrawBuffer b;
+        
+        for (int y = 0; y < size.y; y++) {
+            switch (currentPattern) {
+                case PATTERN_MAZE:
+                    drawMazePattern(b, y);
+                    break;
+                case PATTERN_WAVES:
+                    drawWavePattern(b, y);
+                    break;
+                case PATTERN_MANDALA:
+                    drawMandalaPattern(b, y);
+                    break;
+                case PATTERN_CIRCUIT:
+                    drawCircuitPattern(b, y);
+                    break;
+                case PATTERN_STARS:
+                    drawStarPattern(b, y);
+                    break;
+                case PATTERN_TRIBAL:
+                    drawTribalPattern(b, y);
+                    break;
+            }
+            writeLine(0, y, size.x, 1, b);
+        }
+        
+        // Draw pattern info in bottom right
+        if (size.y > 2 && size.x > 20) {
+            const char* patternNames[] = {"MAZE", "WAVES", "MANDALA", "CIRCUIT", "STARS", "TRIBAL"};
+            std::string info = std::string("[") + patternNames[currentPattern] + " - SPACE/ARROWS]";
+            int infoLen = info.length();
+            if (infoLen < size.x - 2) {
+                TDrawBuffer infoBuf;
+                TColorAttr infoAttr(TColorRGB(255, 255, 0), TColorRGB(0, 0, 0)); // Yellow on black
+                infoBuf.moveStr(size.x - infoLen - 1, TStringView(info.c_str(), infoLen), infoAttr);
+                writeLine(size.x - infoLen - 1, size.y - 1, infoLen, 1, infoBuf);
+            }
+        }
+        
+        animFrame++;
+    }
+    
+    void drawMazePattern(TDrawBuffer& b, int y) {
+        for (int x = 0; x < size.x; x++) {
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(100, 100, 100), TColorRGB(0, 0, 0));
+            
+            // Create maze-like pattern
+            int cellX = x / 3;
+            int cellY = y / 2;
+            bool isWall = ((cellX + cellY + animFrame/10) % 3 == 0) || 
+                         ((cellX * 3 + cellY * 7) % 5 == 0);
+            
+            if (isWall) {
+                ch = (x % 3 == 0) ? '|' : ((y % 2 == 0) ? '-' : '+');
+                attr = TColorAttr(TColorRGB(150, 150, 255), TColorRGB(0, 0, 50));
+            } else {
+                ch = ((x + y + animFrame/20) % 8 == 0) ? '.' : ' ';
+                attr = TColorAttr(TColorRGB(80, 80, 120), TColorRGB(0, 0, 0));
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+    
+    void drawWavePattern(TDrawBuffer& b, int y) {
+        for (int x = 0; x < size.x; x++) {
+            // Multiple sine waves
+            float wave1 = std::sin((x * 0.3f) + (animFrame * 0.1f));
+            float wave2 = std::sin((x * 0.1f) + (y * 0.2f) + (animFrame * 0.05f));
+            float combined = (wave1 + wave2) * 0.5f;
+            
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(0, 150, 255), TColorRGB(0, 0, 0));
+            
+            if (std::abs(combined - (y - size.y/2) * 0.1f) < 0.3f) {
+                ch = '~';
+                int intensity = (int)(128 + combined * 127);
+                attr = TColorAttr(TColorRGB(0, intensity, 255), TColorRGB(0, 0, intensity/4));
+            } else if (std::abs(combined) > 0.7f) {
+                ch = (combined > 0) ? '^' : 'v';
+                attr = TColorAttr(TColorRGB(100, 200, 255), TColorRGB(0, 0, 0));
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+    
+    void drawMandalaPattern(TDrawBuffer& b, int y) {
+        int centerX = size.x / 2;
+        int centerY = size.y / 2;
+        
+        for (int x = 0; x < size.x; x++) {
+            float dx = x - centerX;
+            float dy = y - centerY;
+            float radius = std::sqrt(dx*dx + dy*dy);
+            float angle = std::atan2(dy, dx);
+            
+            // Create mandala-like pattern
+            float pattern = std::sin(radius * 0.5f) * std::cos(angle * 8.0f + animFrame * 0.1f);
+            pattern += std::sin(radius * 0.2f + animFrame * 0.05f) * std::cos(angle * 4.0f);
+            
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(255, 100, 150), TColorRGB(0, 0, 0));
+            
+            if (pattern > 0.5f) {
+                ch = '*';
+                attr = TColorAttr(TColorRGB(255, 150, 200), TColorRGB(100, 0, 50));
+            } else if (pattern > 0.0f) {
+                ch = '+';
+                attr = TColorAttr(TColorRGB(200, 100, 150), TColorRGB(50, 0, 25));
+            } else if (pattern > -0.5f) {
+                ch = '.';
+                attr = TColorAttr(TColorRGB(150, 50, 100), TColorRGB(0, 0, 0));
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+    
+    void drawCircuitPattern(TDrawBuffer& b, int y) {
+        for (int x = 0; x < size.x; x++) {
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(0, 255, 0), TColorRGB(0, 0, 0));
+            
+            // Circuit board style pattern
+            bool isTrace = ((x % 8 == 0) && ((y + animFrame/10) % 4 < 2)) ||
+                          ((y % 6 == 0) && ((x + animFrame/8) % 3 < 1));
+                          
+            bool isComponent = ((x % 12 == 6) && (y % 8 == 4)) ||
+                              ((x % 16 == 8) && (y % 10 == 5));
+            
+            if (isComponent) {
+                ch = ((x + y + animFrame/15) % 4 == 0) ? '#' : 'O';
+                attr = TColorAttr(TColorRGB(255, 255, 0), TColorRGB(0, 100, 0));
+            } else if (isTrace) {
+                ch = ((x % 8 == 0) ? '|' : '-');
+                int brightness = 100 + (animFrame % 60) * 2;
+                attr = TColorAttr(TColorRGB(0, brightness, 0), TColorRGB(0, 0, 0));
+            } else if ((x + y) % 20 == 0) {
+                ch = '.';
+                attr = TColorAttr(TColorRGB(0, 150, 0), TColorRGB(0, 0, 0));
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+    
+    void drawStarPattern(TDrawBuffer& b, int y) {
+        for (int x = 0; x < size.x; x++) {
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 50));
+            
+            // Starfield with twinkling
+            int starSeed = x * 47 + y * 73 + (x * y) % 97;
+            bool isStar = (starSeed % 100) < 8;
+            
+            if (isStar) {
+                int twinkle = (animFrame + starSeed) % 60;
+                if (twinkle < 30) {
+                    ch = (twinkle < 15) ? '*' : '.';
+                    int brightness = 150 + (twinkle % 15) * 7;
+                    attr = TColorAttr(TColorRGB(brightness, brightness, 255), TColorRGB(0, 0, 20));
+                }
+            } else if ((x + y * 3 + animFrame/5) % 200 == 0) {
+                ch = ':';
+                attr = TColorAttr(TColorRGB(100, 100, 200), TColorRGB(0, 0, 0));
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+    
+    void drawTribalPattern(TDrawBuffer& b, int y) {
+        for (int x = 0; x < size.x; x++) {
+            char ch = ' ';
+            TColorAttr attr(TColorRGB(200, 100, 50), TColorRGB(0, 0, 0));
+            
+            // Tribal/geometric pattern
+            int pattern = 0;
+            pattern += (x % 8 < 2) ? 1 : 0;
+            pattern += (y % 6 < 1) ? 2 : 0;
+            pattern += ((x + y) % 10 < 3) ? 4 : 0;
+            pattern += ((x - y + animFrame/10) % 12 < 2) ? 8 : 0;
+            
+            switch (pattern & 7) {
+                case 0: ch = ' '; break;
+                case 1: ch = '/'; attr = TColorAttr(TColorRGB(255, 150, 100), TColorRGB(50, 25, 0)); break;
+                case 2: ch = '\\'; attr = TColorAttr(TColorRGB(255, 150, 100), TColorRGB(50, 25, 0)); break;
+                case 3: ch = 'X'; attr = TColorAttr(TColorRGB(255, 200, 150), TColorRGB(100, 50, 0)); break;
+                case 4: ch = '|'; attr = TColorAttr(TColorRGB(200, 100, 50), TColorRGB(0, 0, 0)); break;
+                case 5: ch = '-'; attr = TColorAttr(TColorRGB(200, 100, 50), TColorRGB(0, 0, 0)); break;
+                case 6: ch = '+'; attr = TColorAttr(TColorRGB(255, 180, 120), TColorRGB(75, 37, 0)); break;
+                case 7: ch = '#'; attr = TColorAttr(TColorRGB(255, 220, 180), TColorRGB(150, 75, 25)); break;
+            }
+            
+            b.moveChar(x, ch, attr, 1);
+        }
+    }
+};
+
+/*---------------------------------------------------------*/
+/* TAsciiPatternWindow - Window for ASCII Pattern Display */
+/*---------------------------------------------------------*/
+class TAsciiPatternWindow : public TWindow
+{
+private:
+    TAsciiPatternView* patternView;
+    
+public:
+    TAsciiPatternWindow(const TRect& bounds, const char* aTitle) :
+        TWindow(bounds, aTitle, wnNoNumber),
+        TWindowInit(&TAsciiPatternWindow::initFrame)
+    {
+        options |= ofTileable;
+        
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+        
+        patternView = new TAsciiPatternView(interior);
+        insert(patternView);
+    }
+    
+    TAsciiPatternView* getPatternView() { return patternView; }
 };
 
 /*---------------------------------------------------------*/
@@ -424,6 +742,7 @@ public:
 private:
     void newTestWindow();
     void newTestWindow(const TRect& bounds);
+    void newAsciiPatternWindow();
     void newGradientWindow(TGradientWindow::GradientType type);
     void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
     // void newMechWindow();
@@ -438,6 +757,7 @@ private:
     void tile();
     void closeAll();
     void takeScreenshot();
+    void exportSvg();
     void setPatternMode(bool continuous);
     void saveWorkspace();
     TRect calculateWindowBounds(const std::string& filePath);
@@ -576,6 +896,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 newDonutWindow();
                 clearEvent(event);
                 break;
+            case cmAsciiPatterns:
+                newAsciiPatternWindow();
+                clearEvent(event);
+                break;
             case cmOpenAnimation:
                 openAnimationFile();
                 clearEvent(event);
@@ -598,6 +922,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmScreenshot:
                 takeScreenshot();
+                clearEvent(event);
+                break;
+            case cmExportSvg:
+                exportSvg();
                 clearEvent(event);
                 break;
             case cmCascade:
@@ -805,7 +1133,7 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 
             // Tools menu commands
             case cmWibWobChat:
-                messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
+                newWibWobWindow();
                 clearEvent(event);
                 break;
             case cmAnsiEditor:
@@ -985,6 +1313,7 @@ void TTestPatternApp::newTestWindow()
     // Create and insert window
     TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
     deskTop->insert(window);
+
 }
 
 void TTestPatternApp::newTestWindow(const TRect& bounds)
@@ -998,6 +1327,28 @@ void TTestPatternApp::newTestWindow(const TRect& bounds)
     TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
     deskTop->insert(window);
     registerWindow(window);
+}
+
+void TTestPatternApp::newAsciiPatternWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "ASCII Patterns " << windowNumber;
+    
+    // Calculate window position (cascade effect) - make it larger for patterns
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        70 + offset * 2,          // right (wider for patterns)
+        25 + offset               // bottom (taller for patterns)
+    );
+    
+    // Create and insert window
+    TAsciiPatternWindow* window = new TAsciiPatternWindow(bounds, title.str().c_str());
+    deskTop->insert(window);
+    window->select(); // Focus the new window
 }
 
 void TTestPatternApp::cascade()
@@ -1157,13 +1508,14 @@ void TTestPatternApp::newWibWobWindow()
         28 + offset               // bottom (much taller for chat)
     );
     
-    // Create the chat view - temporarily disabled
-    // TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
+    // Create the chat view with new streaming SDK integration
+    TWibWobView* chatView = new TWibWobView(TRect(1, 1, bounds.b.x - bounds.a.x - 1, bounds.b.y - bounds.a.y - 1));
     
-    // Temporarily disabled - just show message
-    messageBox("Wib&Wob Chat temporarily disabled for build.", mfInformation | mfOKButton);
-    
-    // Focus disabled - was: window->select();
+    // Create window and insert chat view
+    TWindow* window = new TWindow(bounds, title.str().c_str(), wnNoNumber);
+    window->insert(chatView);
+    deskTop->insert(window);
+    window->select();
 }
 
 void TTestPatternApp::openAnimationFile()
@@ -1293,6 +1645,38 @@ void TTestPatternApp::takeScreenshot()
     }
 }
 
+void TTestPatternApp::exportSvg()
+{
+    // Create snapshots directory if it doesn't exist
+    mkdir("build", 0755);
+    mkdir("build/snapshots", 0755);
+    
+    // Generate timestamp for filename
+    time_t rawtime;
+    struct tm* timeinfo;
+    char timestamp[80];
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", timeinfo);
+    
+    // Build filename
+    std::stringstream filename;
+    filename << "build/snapshots/screen-" << timestamp << ".svg";
+    
+    // Export using svg_exporter
+    bool success = saveCurrentScreenAsSvg(filename.str());
+    
+    // Show result message
+    if (success) {
+        std::stringstream msg;
+        msg << "SVG exported to " << filename.str();
+        messageBox(msg.str().c_str(), mfInformation | mfOKButton);
+    } else {
+        messageBox("SVG export failed. No screen buffer available.", 
+                   mfError | mfOKButton);
+    }
+}
+
 // Custom monochrome palette with reversed main areas
 // Palette indices:
 // 0-7:   Desktop/Background (black background with pattern)
@@ -1335,9 +1719,15 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
             *new TMenuItem("New ~M~echs Grid", cmNewMechs, kbCtrlM) +
             *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
+            *new TMenuItem("ASCII ~P~atterns", cmAsciiPatterns, kbNoKey) +
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
+            newLine() +
+            (TMenuItem&) (
+                *new TSubMenu("~E~xport", kbNoKey) +
+                    *new TMenuItem("Save ~S~VG...", cmExportSvg, kbF12)
+            ) +
             newLine() +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
             *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
@@ -1386,7 +1776,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             newLine() +
             *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
         *new TSubMenu("~T~ools", kbAltT) +
-            *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+            *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbNoKey) +
             newLine() +
             (TMenuItem&) (
                 *new TSubMenu("~G~litch Effects", kbNoKey) +
@@ -1424,7 +1814,8 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
             *new TStatusItem("~F6~ Next", kbF6, cmNext) +
             *new TStatusItem("~Alt-F3~ Close", kbAltF3, cmClose) +
             *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
-            *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu)
+            *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu) +
+            *new TStatusItem("~F12~ Save SVG", kbF12, cmExportSvg)
     );
 }
 
