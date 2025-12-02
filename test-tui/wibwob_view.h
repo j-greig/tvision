@@ -16,6 +16,7 @@
 
 #include <string>
 #include <vector>
+#include <chrono>
 
 // Forward declaration
 class WibWobEngine;
@@ -25,6 +26,8 @@ struct ChatMessage {
     std::string content;
     std::string timestamp;
     bool is_error = false;
+    bool is_streaming = false;  // Currently being streamed
+    bool is_complete = true;    // Message is complete
 };
 
 class TWibWobView : public TView {
@@ -42,6 +45,12 @@ public:
     void addMessage(const std::string& sender, const std::string& content, bool is_error = false);
     void setStatus(const std::string& status);
     void clearChat();
+    
+    // Streaming operations
+    void startStreamingMessage(const std::string& sender);
+    void appendToStreamingMessage(const std::string& content);
+    void finishStreamingMessage();
+    void cancelStreamingMessage();
 
 private:
     // UI state
@@ -51,6 +60,11 @@ private:
     int scrollOffset = 0;
     int maxVisibleLines = 0;
     bool inputActive = true;
+    
+    // Streaming state
+    bool isReceivingStream = false;
+    size_t streamingMessageIndex = 0;
+    std::chrono::steady_clock::time_point lastStreamUpdate;
     
     // Spinner animation
     bool showSpinner = false;
@@ -86,6 +100,8 @@ private:
     void handleKeyDown(TEvent& event);
     void handleChar(TEvent& event);
     void processInput();
+    void fallbackToRegularQuery(const std::string& userMessage, 
+                               std::chrono::steady_clock::time_point start);
     
     // Animation
     void startSpinner();

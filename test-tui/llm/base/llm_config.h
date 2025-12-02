@@ -59,7 +59,7 @@ public:
     static std::string getDefaultConfigJson();
 
 private:
-    std::string activeProvider = "claude_code";
+    std::string activeProvider = "claude_code_sdk";
     std::map<std::string, ProviderConfig> providers;
     mutable std::vector<std::string> validationErrors;
     

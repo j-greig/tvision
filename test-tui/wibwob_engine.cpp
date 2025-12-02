@@ -158,9 +158,11 @@ std::string WibWobEngine::getCurrentModel() const {
     
     ProviderConfig providerConfig = config->getProviderConfig(provider);
     
-    // For claude_code, we don't know the exact model, just return generic name
+    // For claude_code and claude_code_sdk, return appropriate model name
     if (provider == "claude_code") {
         return "Claude Code";
+    } else if (provider == "claude_code_sdk") {
+        return "sonnet";  // Show the actual alias we send to Claude Code
     }
     
     return providerConfig.model.empty() ? "unknown" : providerConfig.model;
@@ -168,6 +170,13 @@ std::string WibWobEngine::getCurrentModel() const {
 
 std::vector<std::string> WibWobEngine::getAvailableProviders() const {
     return LLMProviderFactory::getInstance().getAvailableProviders();
+}
+
+ILLMProvider* WibWobEngine::getCurrentProviderPtr() const {
+    if (!currentProvider) {
+        const_cast<WibWobEngine*>(this)->loadConfiguration();
+    }
+    return currentProvider.get();
 }
 
 bool WibWobEngine::isBusy() const {

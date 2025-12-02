@@ -22,6 +22,7 @@
 #include <random>
 #include <sys/stat.h>
 #include <iterator>
+#include "llm/providers/claude_code_sdk_provider.h"
 
 TWibWobView::TWibWobView(const TRect& bounds) : TView(bounds) {
     options |= ofSelectable;
@@ -138,8 +139,14 @@ void TWibWobView::drawMessages() {
             msgColor = wibColor;
         }
         
+        // Add streaming indicator for incomplete messages
+        std::string senderPrefix = msg.sender;
+        if (msg.is_streaming && !msg.is_complete) {
+            senderPrefix += " [STREAMING]";
+        }
+        
         // Format message: "Sender: Content"
-        std::string displayText = msg.sender + ": " + msg.content;
+        std::string displayText = senderPrefix + ": " + msg.content;
         
         // Word wrap if needed
         auto wrappedLines = wrapText(displayText, size.x);
@@ -321,36 +328,51 @@ void TWibWobView::processInput() {
     // Log provider info to chat log
     logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
     
-    engine->sendQuery(userMessage, [this, start](const ClaudeResponse& response) {
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    // Try to get SDK provider for streaming
+    auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(engine->getCurrentProviderPtr());
+    
+    if (sdkProvider && sdkProvider->isAvailable()) {
+        // Use streaming mode
+        startStreamingMessage("Wib&Wob");
         
-        stopSpinner();
-        inputActive = true;
-        if (response.is_error) {
-            addMessage("System", "Error (" + std::to_string(duration.count()) + "ms): " + response.error_message, true);
-            
-            // Log raw API response on errors too
-            if (!response.session_id.empty() && response.session_id.find("RAW_API_RESPONSE:") == 0) {
-                logMessage("API_RAW_ERROR", response.session_id.substr(17));
-            }
-            
-            setStatus("Error - Try again");
-        } else {
-            // Log debug info including raw API response
-            logMessage("Debug", "Response length: " + std::to_string(response.result.length()) + " chars");
-            logMessage("Debug", "Provider: " + response.provider_name + ", Model: " + response.model_used);
-            
-            // Log raw API response if available
-            if (!response.session_id.empty() && response.session_id.find("RAW_API_RESPONSE:") == 0) {
-                logMessage("API_RAW", response.session_id.substr(17)); // Remove "RAW_API_RESPONSE: " prefix
-            }
-            
-            addMessage("Wib&Wob", response.result);
-            setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
+        bool streamingSuccess = sdkProvider->sendStreamingQuery(userMessage, 
+            [this, start](const StreamChunk& chunk) {
+                auto now = std::chrono::steady_clock::now();
+                lastStreamUpdate = now;
+                
+                if (chunk.type == StreamChunk::CONTENT_DELTA) {
+                    appendToStreamingMessage(chunk.content);
+                    setStatus("Streaming response...");
+                    
+                } else if (chunk.type == StreamChunk::MESSAGE_COMPLETE) {
+                    auto end = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                    
+                    finishStreamingMessage();
+                    stopSpinner();
+                    inputActive = true;
+                    setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
+                    
+                } else if (chunk.type == StreamChunk::ERROR_OCCURRED) {
+                    cancelStreamingMessage();
+                    stopSpinner();
+                    inputActive = true;
+                    addMessage("System", "Streaming error: " + chunk.error_message, true);
+                    setStatus("Error - Try again");
+                }
+                
+                drawView();
+            });
+        
+        if (!streamingSuccess) {
+            // Fall back to regular query
+            cancelStreamingMessage();
+            fallbackToRegularQuery(userMessage, start);
         }
-        drawView();
-    });
+    } else {
+        // Fall back to regular query
+        fallbackToRegularQuery(userMessage, start);
+    }
 }
 
 void TWibWobView::sendMessage(const std::string& message) {
@@ -541,4 +563,87 @@ std::string TWibWobView::getTimestamp() const {
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
     ss << "." << std::setfill('0') << std::setw(3) << ms.count();
     return ss.str();
+}
+
+// Streaming message methods
+void TWibWobView::startStreamingMessage(const std::string& sender) {
+    if (isReceivingStream) {
+        finishStreamingMessage(); // Finish any existing stream
+    }
+    
+    ChatMessage msg;
+    msg.sender = sender;
+    msg.content = "";
+    msg.timestamp = getCurrentTime();
+    msg.is_error = false;
+    msg.is_streaming = true;
+    msg.is_complete = false;
+    
+    messages.push_back(msg);
+    streamingMessageIndex = messages.size() - 1;
+    isReceivingStream = true;
+    lastStreamUpdate = std::chrono::steady_clock::now();
+    
+    // Auto-scroll to show new message
+    ensureInputVisible();
+}
+
+void TWibWobView::appendToStreamingMessage(const std::string& content) {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+    
+    messages[streamingMessageIndex].content += content;
+    lastStreamUpdate = std::chrono::steady_clock::now();
+    
+    // Log the streaming content
+    logMessage(messages[streamingMessageIndex].sender + " [STREAM]", content);
+    
+    // Trigger incremental redraw
+    drawView();
+}
+
+void TWibWobView::finishStreamingMessage() {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+    
+    messages[streamingMessageIndex].is_streaming = false;
+    messages[streamingMessageIndex].is_complete = true;
+    
+    // Log the complete message
+    logMessage(messages[streamingMessageIndex].sender, 
+               messages[streamingMessageIndex].content);
+    
+    isReceivingStream = false;
+}
+
+void TWibWobView::cancelStreamingMessage() {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+    
+    // Remove the incomplete streaming message
+    messages.erase(messages.begin() + streamingMessageIndex);
+    isReceivingStream = false;
+}
+
+// Fallback to regular query for non-SDK providers
+void TWibWobView::fallbackToRegularQuery(const std::string& userMessage, 
+                                         std::chrono::steady_clock::time_point start) {
+    engine->sendQuery(userMessage, [this, start](const ClaudeResponse& response) {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        stopSpinner();
+        inputActive = true;
+        if (response.is_error) {
+            addMessage("System", "Error (" + std::to_string(duration.count()) + "ms): " + response.error_message, true);
+            setStatus("Error - Try again");
+        } else {
+            addMessage("Wib&Wob", response.result);
+            setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
+        }
+        drawView();
+    });
 }
