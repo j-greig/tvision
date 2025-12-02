@@ -144,7 +144,7 @@ def make_app() -> FastAPI:
             wtype = WindowType(payload.type)
         except ValueError:
             raise HTTPException(status_code=400, detail="unknown window type")
-        rect = Rect(**payload.rect.dict()) if payload.rect else None
+        rect = Rect(**payload.rect.model_dump()) if payload.rect else None
         win = await ctl.create_window(wtype, title=payload.title, rect=rect, props=payload.props)
         return WindowState(
             id=win.id,
@@ -215,21 +215,33 @@ def make_app() -> FastAPI:
 
     @app.post("/windows/{win_id}/send_text")
     async def send_text(win_id: str, payload: SendTextReq) -> Dict[str, Any]:
-        return await ctl.send_text(win_id, payload.content, payload.mode, payload.position)
+        res = await ctl.send_text(win_id, payload.content, payload.mode, payload.position)
+        if not res.get("ok"):
+            raise HTTPException(status_code=502, detail=res.get("error", "ipc_send_text_failed"))
+        return res
 
     @app.post("/text_editor/send_text")
     async def send_text_auto(payload: SendTextReq) -> Dict[str, Any]:
         """Send text to any text editor window, creating one if none exists"""
-        return await ctl.send_text("auto", payload.content, payload.mode, payload.position)
+        res = await ctl.send_text("auto", payload.content, payload.mode, payload.position)
+        if not res.get("ok"):
+            raise HTTPException(status_code=502, detail=res.get("error", "ipc_send_text_failed"))
+        return res
 
     @app.post("/windows/{win_id}/send_figlet")
     async def send_figlet(win_id: str, payload: SendFigletReq) -> Dict[str, Any]:
-        return await ctl.send_figlet(win_id, payload.text, payload.font, payload.width or 0, payload.mode)
+        res = await ctl.send_figlet(win_id, payload.text, payload.font, payload.width or 0, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=502, detail=res.get("error", "ipc_send_figlet_failed"))
+        return res
 
     @app.post("/text_editor/send_figlet")
     async def send_figlet_auto(payload: SendFigletReq) -> Dict[str, Any]:
         """Send figlet ASCII art to any text editor window, creating one if none exists"""
-        return await ctl.send_figlet("auto", payload.text, payload.font, payload.width or 0, payload.mode)
+        res = await ctl.send_figlet("auto", payload.text, payload.font, payload.width or 0, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=502, detail=res.get("error", "ipc_send_figlet_failed"))
+        return res
 
     @app.post("/windows/{win_id}/send_multi_figlet")
     async def send_multi_figlet(win_id: str, payload: SendMultiFigletReq) -> Dict[str, Any]:
