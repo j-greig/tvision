@@ -15,6 +15,7 @@ set(TV_COMMON_SOURCES
     gradient.cpp
     glitch_engine.cpp
     frame_capture.cpp
+    svg_exporter.cpp
     api_ipc.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
@@ -22,6 +23,7 @@ set(TV_COMMON_SOURCES
     llm/base/llm_provider_factory.cpp
     llm/base/tool_executor.cpp
     llm/providers/claude_code_provider.cpp
+    llm/providers/claude_code_sdk_provider.cpp
     llm/providers/anthropic_api_provider.cpp
     llm/tools/time_tools.cpp
     llm/tools/tui_tools.cpp
@@ -53,6 +55,7 @@ target_link_libraries(test_pattern PRIVATE tvision)
 # simple_tui (minimal reference app)
 add_executable(simple_tui
     simple_tui.cpp
+    svg_exporter.cpp
 )
 target_link_libraries(simple_tui PRIVATE tvision)
 

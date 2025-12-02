@@ -69,3 +69,20 @@ CMakeScripts
 Makefile
 cmake_install.cmake
 compile_commands.json
+
+# Node.js dependencies (SDK bridge, web tools)
+node_modules/
+**/node_modules/
+
+# Python bytecode and cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build directories
+build/
+**/build/
+dist/
+**/dist/
