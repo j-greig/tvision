@@ -7,7 +7,8 @@
 
 #include "wibwob_view.h"
 #include "wibwob_engine.h"
-#include "llm/providers/claude_code_sdk_provider.h"  // For streaming
+#include "llm/providers/claude_code_sdk_provider.h"  // For SDK streaming
+#include "llm/providers/claude_code_provider.h"      // For CLI streaming
 
 #define Uses_TKeys
 #define Uses_TDrawBuffer
@@ -669,48 +670,76 @@ void TWibWobWindow::processUserInput(const std::string& input) {
 
     auto start = std::chrono::steady_clock::now();
 
-    // Try SDK provider for streaming
-    auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(
-        engine->getCurrentProviderPtr());
-
-    if (sdkProvider && sdkProvider->isAvailable()) {
-        // Streaming path - show response incrementally
-        messageView->startStreamingMessage("Wib&Wob");
-
-        bool success = sdkProvider->sendStreamingQuery(input,
-            [this, start](const StreamChunk& chunk) {
-                if (chunk.type == StreamChunk::CONTENT_DELTA) {
-                    messageView->appendToStreamingMessage(chunk.content);
-                    inputView->setStatus("Streaming...");
-
-                } else if (chunk.type == StreamChunk::MESSAGE_COMPLETE) {
-                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::steady_clock::now() - start);
-
-                    messageView->finishStreamingMessage();
-                    inputView->setInputEnabled(true);
-                    inputView->setStatus("Ready (" + std::to_string(duration.count()) +
-                                        "ms) - Type a message and press Enter");
-                    logMessage("Wib&Wob", "[streaming complete]");
-                    select();
-
-                } else if (chunk.type == StreamChunk::ERROR_OCCURRED) {
-                    messageView->cancelStreamingMessage();
-                    messageView->addMessage("System", "Error: " + chunk.error_message, true);
-                    logMessage("System", "Streaming error: " + chunk.error_message, true);
-                    inputView->setInputEnabled(true);
-                    inputView->setStatus("Error - Try again");
-                    select();
-                }
-            });
-
-        if (!success) {
-            // Streaming failed to start, fall back
-            messageView->cancelStreamingMessage();
-            fallbackToRegularQuery(input, start);
+    // Streaming callback - shared between SDK and CLI providers
+    auto streamCallback = [this, start](const StreamChunk& chunk) {
+        // Log all chunks for debugging
+        std::string chunkType;
+        switch (chunk.type) {
+            case StreamChunk::CONTENT_DELTA: chunkType = "CONTENT_DELTA"; break;
+            case StreamChunk::MESSAGE_COMPLETE: chunkType = "MESSAGE_COMPLETE"; break;
+            case StreamChunk::ERROR_OCCURRED: chunkType = "ERROR_OCCURRED"; break;
+            case StreamChunk::SESSION_UPDATE: chunkType = "SESSION_UPDATE"; break;
+            default: chunkType = "UNKNOWN"; break;
         }
-    } else {
-        // Non-streaming fallback
+        logMessage("Stream", "[chunk] type=" + chunkType +
+                  " content_len=" + std::to_string(chunk.content.length()) +
+                  (chunk.error_message.empty() ? "" : " err=" + chunk.error_message));
+
+        if (chunk.type == StreamChunk::CONTENT_DELTA) {
+            messageView->appendToStreamingMessage(chunk.content);
+            inputView->setStatus("Streaming...");
+
+        } else if (chunk.type == StreamChunk::MESSAGE_COMPLETE) {
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start);
+
+            messageView->finishStreamingMessage();
+            inputView->setInputEnabled(true);
+            inputView->setStatus("Ready (" + std::to_string(duration.count()) +
+                                "ms) - Type a message and press Enter");
+            logMessage("Wib&Wob", "[streaming complete]");
+            select();
+
+        } else if (chunk.type == StreamChunk::ERROR_OCCURRED) {
+            messageView->cancelStreamingMessage();
+            messageView->addMessage("System", "Error: " + chunk.error_message, true);
+            logMessage("System", "Streaming error: " + chunk.error_message, true);
+            inputView->setInputEnabled(true);
+            inputView->setStatus("Error - Try again");
+            select();
+        }
+    };
+
+    // Try providers in order: SDK (needs API key) → CLI (uses OAuth) → fallback
+    ILLMProvider* provider = engine->getCurrentProviderPtr();
+    bool streamingStarted = false;
+
+    // Try SDK provider first (if API key present)
+    auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(provider);
+    if (sdkProvider && sdkProvider->isAvailable()) {
+        logMessage("Stream", "[streaming] Trying SDK provider...");
+        messageView->startStreamingMessage("Wib&Wob");
+        streamingStarted = sdkProvider->sendStreamingQuery(input, streamCallback);
+        logMessage("Stream", "[streaming] SDK sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
+    }
+
+    // Try CLI provider (uses OAuth, no API key needed)
+    if (!streamingStarted) {
+        auto* cliProvider = dynamic_cast<ClaudeCodeProvider*>(provider);
+        if (cliProvider && cliProvider->isAvailable()) {
+            logMessage("Stream", "[streaming] Trying CLI provider...");
+            if (!sdkProvider) {  // Only start message if SDK didn't already
+                messageView->startStreamingMessage("Wib&Wob");
+            }
+            streamingStarted = cliProvider->sendStreamingQuery(input, streamCallback);
+            logMessage("Stream", "[streaming] CLI sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
+        }
+    }
+
+    // Fall back to non-streaming if neither worked
+    if (!streamingStarted) {
+        logMessage("Stream", "[streaming] No streaming provider available, using fallback");
+        messageView->cancelStreamingMessage();
         fallbackToRegularQuery(input, start);
     }
 }

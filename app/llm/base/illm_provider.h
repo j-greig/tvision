@@ -34,16 +34,35 @@ struct LLMRequest {
     std::string message;
     std::string system_prompt;
     std::string session_id;
-    
+
     // Provider-specific options
     double temperature = 0.7;
     int max_tokens = 4096;
     bool stream = false;
-    
+
     // Tool support
     std::vector<Tool> tools;
     std::vector<ToolResult> tool_results;
 };
+
+// Streaming response chunk (for providers that support streaming)
+struct StreamChunk {
+    enum Type {
+        CONTENT_DELTA,      // Partial content update
+        MESSAGE_COMPLETE,   // Message finished
+        ERROR_OCCURRED,     // Error in stream
+        SESSION_UPDATE      // Session state change
+    };
+
+    Type type;
+    std::string content;
+    std::string session_id;
+    std::string error_message;
+    bool is_final = false;
+};
+
+// Streaming callback for real-time updates
+using StreamingCallback = std::function<void(const StreamChunk&)>;
 
 class ILLMProvider {
 public:

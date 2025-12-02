@@ -41,6 +41,10 @@ public:
     void registerTool(const Tool& tool) override;
     void clearTools() override;
 
+    // Streaming support (uses --output-format stream-json)
+    bool sendStreamingQuery(const std::string& query, StreamingCallback streamCallback);
+    bool isStreamingActive() const { return streamingActive; }
+
 private:
     bool busy = false;
     std::string claudePath = "claude";
@@ -50,11 +54,17 @@ private:
     // Tool support
     std::vector<Tool> registeredTools;
     
-    // Async execution state  
+    // Async execution state
     FILE* activePipe = nullptr;
     std::string outputBuffer;
     ResponseCallback pendingCallback;
     LLMRequest pendingRequest;
+
+    // Streaming state
+    bool streamingActive = false;
+    bool streamingMode = false;
+    StreamingCallback activeStreamCallback;
+    std::string lineBuffer;  // For accumulating partial JSONL lines
     
     // Claude Code execution
     LLMResponse executeClaudeCommand(const LLMRequest& request);
@@ -67,6 +77,9 @@ private:
     std::string extractJsonField(const std::string& json, const std::string& field) const;
     bool extractJsonBool(const std::string& json, const std::string& field) const;
     double extractJsonNumber(const std::string& json, const std::string& field) const;
+
+    // Streaming JSONL parsing
+    void processStreamLine(const std::string& line);
     
     // Error handling
     void setError(const std::string& error);

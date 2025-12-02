@@ -200,11 +200,9 @@ std::string WibWobEngine::getSessionId() const {
 void WibWobEngine::loadConfiguration() {
     config = std::make_unique<LLMConfig>();
     
-    // Try to load from config file (multiple candidate paths depending on CWD).
+    // Config file path - assumes running from repo root (./build/app/test_pattern)
     const std::vector<std::string> cfgPaths = {
-        "llm/config/llm_config.json",
-        "../llm/config/llm_config.json",
-        "../../llm/config/llm_config.json"
+        "app/llm/config/llm_config.json"
     };
     bool loadResult = false;
     std::string usedPath;
@@ -220,17 +218,24 @@ void WibWobEngine::loadConfiguration() {
             loadResult ? "SUCCESS " : "FAILED",
             loadResult ? ("(" + usedPath + ")").c_str() : "");
 
-    // Pick desired provider based on env/config: prefer Anthropic if key present, else Claude Code.
+    // Pick desired provider based on env/config
+    // Only override if ANTHROPIC_API_KEY is set and anthropic_api is configured
     auto hasAnthropicKey = []() -> bool {
         const char* v = std::getenv("ANTHROPIC_API_KEY");
         return v && *v;
     };
     std::string desiredProvider = config->getActiveProvider();
+    fprintf(stderr, "DEBUG: Config activeProvider: %s\n", desiredProvider.c_str());
 
+    // Only auto-switch to anthropic if key is present - otherwise respect config
     if (hasAnthropicKey() && config->hasProvider("anthropic_api")) {
         desiredProvider = "anthropic_api";
-    } else if (config->hasProvider("claude_code")) {
+        fprintf(stderr, "DEBUG: Overriding to anthropic_api (API key present)\n");
+    }
+    // Only fall back to claude_code if no provider configured
+    else if (desiredProvider.empty() && config->hasProvider("claude_code")) {
         desiredProvider = "claude_code";
+        fprintf(stderr, "DEBUG: Falling back to claude_code (no provider configured)\n");
     }
     if (!desiredProvider.empty())
         config->setActiveProvider(desiredProvider);

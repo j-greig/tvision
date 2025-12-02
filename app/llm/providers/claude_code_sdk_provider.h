@@ -22,24 +22,7 @@
 struct uv_loop_s;
 struct uv_async_s;
 
-// Streaming response chunk
-struct StreamChunk {
-    enum Type {
-        CONTENT_DELTA,      // Partial content update
-        MESSAGE_COMPLETE,   // Message finished
-        ERROR_OCCURRED,     // Error in stream
-        SESSION_UPDATE      // Session state change
-    };
-    
-    Type type;
-    std::string content;
-    std::string session_id;
-    std::string error_message;
-    bool is_final = false;
-};
-
-// Streaming callback for real-time updates
-using StreamingCallback = std::function<void(const StreamChunk&)>;
+// StreamChunk and StreamingCallback now in illm_provider.h
 
 class ClaudeCodeSDKProvider : public ILLMProvider {
 public:

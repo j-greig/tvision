@@ -216,61 +216,7 @@ bool ClaudeCodeProvider::startAsyncCommand(const LLMRequest& request, ResponseCa
     return true;
 }
 
-void ClaudeCodeProvider::pollAsyncExecution() {
-    if (!busy || !activePipe) {
-        return;
-    }
-    
-    // Read available data from pipe (non-blocking)
-    char buffer[4096];
-    clearerr(activePipe); // Clear any previous error flags
-    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
-    
-    if (bytesRead > 0) {
-        buffer[bytesRead] = '\0';
-        outputBuffer += buffer;
-    }
-    
-    // Check if process is done (only check EOF, not errors for non-blocking)
-    if (feof(activePipe)) {
-        int exitCode = pclose(activePipe);
-        activePipe = nullptr;
-        busy = false;
-        
-        // Parse response and call callback
-        LLMResponse response;
-        response.provider_name = getProviderName();
-        
-        if (exitCode == 0) {
-            fprintf(stderr, "DEBUG: Raw Claude JSON response:\n%s\n", outputBuffer.c_str());
-            response = parseClaudeResponse(outputBuffer);
-            response.provider_name = getProviderName();
-
-            // Update session ID if we got one
-            if (!response.session_id.empty()) {
-                currentSessionId = response.session_id;
-                fprintf(stderr, "DEBUG: Session ID updated: %s\n", currentSessionId.c_str());
-            } else {
-                fprintf(stderr, "DEBUG: No session ID in response\n");
-            }
-        } else {
-            response.is_error = true;
-            response.error_message = "Claude command failed with exit code " + std::to_string(exitCode);
-            if (!outputBuffer.empty()) {
-                response.error_message += ": " + outputBuffer;
-            }
-            setError(response.error_message);
-        }
-        
-        // Call the callback
-        if (pendingCallback) {
-            pendingCallback(response);
-            pendingCallback = nullptr;
-        }
-        
-        outputBuffer.clear();
-    }
-}
+// pollAsyncExecution is in the streaming section at end of file
 
 LLMResponse ClaudeCodeProvider::executeClaudeCommand(const LLMRequest& request) {
     LLMResponse response;
@@ -558,4 +504,205 @@ void ClaudeCodeProvider::registerTool(const Tool& tool) {
 
 void ClaudeCodeProvider::clearTools() {
     registeredTools.clear();
+}
+
+// ============================================================================
+// Streaming Support (using --output-format stream-json)
+// ============================================================================
+
+bool ClaudeCodeProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback) {
+    if (busy || query.empty()) {
+        return false;
+    }
+
+    clearError();
+    streamingMode = true;
+    streamingActive = true;
+    activeStreamCallback = streamCallback;
+    lineBuffer.clear();
+
+    // Build streaming command
+    std::ostringstream cmd;
+    cmd << claudePath;
+
+    // Add configured args
+    for (const std::string& arg : commandArgs) {
+        if (arg.find("--output-format") != std::string::npos) continue;
+        cmd << " " << arg;
+    }
+
+    // Use stream-json for streaming output
+    cmd << " --output-format stream-json";
+
+    // Session management
+    if (!currentSessionId.empty()) {
+        cmd << " --resume " << currentSessionId;
+        fprintf(stderr, "DEBUG: [streaming] Using session: %s\n", currentSessionId.c_str());
+    }
+
+    // System prompt file
+    FILE* promptCheck = fopen("app/wibandwob.prompt.md", "r");
+    if (promptCheck) {
+        fclose(promptCheck);
+        cmd << " --system-prompt-file app/wibandwob.prompt.md";
+    }
+
+    // Escape the query
+    cmd << " \"";
+    for (char c : query) {
+        if (c == '"' || c == '\\' || c == '$' || c == '`') {
+            cmd << '\\';
+        }
+        cmd << c;
+    }
+    cmd << "\" 2>&1";
+
+    fprintf(stderr, "DEBUG: [streaming] Command: %s\n", cmd.str().c_str());
+
+    // Start async execution
+    activePipe = popen(cmd.str().c_str(), "r");
+    if (!activePipe) {
+        streamingMode = false;
+        streamingActive = false;
+        StreamChunk chunk;
+        chunk.type = StreamChunk::ERROR_OCCURRED;
+        chunk.error_message = "Failed to execute streaming command";
+        if (activeStreamCallback) activeStreamCallback(chunk);
+        return false;
+    }
+
+    // Set non-blocking
+    int fd = fileno(activePipe);
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    busy = true;
+    outputBuffer.clear();
+
+    return true;
+}
+
+void ClaudeCodeProvider::pollAsyncExecution() {
+    if (!busy || !activePipe) {
+        return;
+    }
+
+    // Read available data from pipe (non-blocking)
+    char buffer[4096];
+    clearerr(activePipe);
+    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
+
+    if (bytesRead > 0) {
+        buffer[bytesRead] = '\0';
+
+        if (streamingMode) {
+            // Streaming: accumulate and process JSONL lines
+            lineBuffer += buffer;
+
+            // Process complete lines
+            size_t pos;
+            while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+                std::string line = lineBuffer.substr(0, pos);
+                lineBuffer = lineBuffer.substr(pos + 1);
+
+                if (line.empty()) continue;
+
+                // Parse the JSON line
+                processStreamLine(line);
+            }
+        } else {
+            // Non-streaming: just accumulate
+            outputBuffer += buffer;
+        }
+    }
+
+    // Check if process is done
+    if (feof(activePipe)) {
+        int exitCode = pclose(activePipe);
+        activePipe = nullptr;
+        busy = false;
+
+        if (streamingMode) {
+            // Process any remaining data in lineBuffer
+            if (!lineBuffer.empty()) {
+                processStreamLine(lineBuffer);
+                lineBuffer.clear();
+            }
+
+            // Send completion chunk
+            StreamChunk chunk;
+            chunk.type = StreamChunk::MESSAGE_COMPLETE;
+            chunk.is_final = true;
+            if (activeStreamCallback) activeStreamCallback(chunk);
+
+            streamingMode = false;
+            streamingActive = false;
+            activeStreamCallback = nullptr;
+        } else {
+            // Non-streaming: parse and callback
+            LLMResponse response;
+            response.provider_name = getProviderName();
+
+            if (exitCode == 0) {
+                fprintf(stderr, "DEBUG: Raw Claude JSON response:\n%s\n", outputBuffer.c_str());
+                response = parseClaudeResponse(outputBuffer);
+                response.provider_name = getProviderName();
+
+                if (!response.session_id.empty()) {
+                    currentSessionId = response.session_id;
+                }
+            } else {
+                response.is_error = true;
+                response.error_message = "Claude command failed with exit code " + std::to_string(exitCode);
+                if (!outputBuffer.empty()) {
+                    response.error_message += ": " + outputBuffer.substr(0, 200);
+                }
+            }
+
+            if (pendingCallback) {
+                pendingCallback(response);
+                pendingCallback = nullptr;
+            }
+        }
+
+        outputBuffer.clear();
+    }
+}
+
+void ClaudeCodeProvider::processStreamLine(const std::string& line) {
+    // Parse JSONL line from stream-json output
+    // Format: {"type":"assistant","message":{"content":"..."},...}
+
+    std::string type = extractJsonField(line, "type");
+
+    if (type == "assistant") {
+        // Extract content from nested message object
+        size_t msgPos = line.find("\"message\":");
+        if (msgPos != std::string::npos) {
+            std::string msgPart = line.substr(msgPos);
+            std::string content = extractJsonField(msgPart, "content");
+
+            if (!content.empty()) {
+                StreamChunk chunk;
+                chunk.type = StreamChunk::CONTENT_DELTA;
+                chunk.content = content;
+                if (activeStreamCallback) activeStreamCallback(chunk);
+            }
+        }
+    } else if (type == "result") {
+        // End of conversation turn
+        std::string sessionId = extractJsonField(line, "session_id");
+        if (!sessionId.empty()) {
+            currentSessionId = sessionId;
+        }
+        // MESSAGE_COMPLETE is sent when pipe closes
+    } else if (type == "error") {
+        StreamChunk chunk;
+        chunk.type = StreamChunk::ERROR_OCCURRED;
+        chunk.error_message = extractJsonField(line, "error");
+        if (activeStreamCallback) activeStreamCallback(chunk);
+    }
+
+    // Debug: log all stream lines
+    fprintf(stderr, "DEBUG: [stream] type=%s line=%s\n", type.c_str(), line.substr(0, 100).c_str());
 }
