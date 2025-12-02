@@ -6,7 +6,6 @@
 
 #include "anthropic_api_provider.h"
 #include "../base/llm_provider_factory.h"
-#include "../../api_config_temp.h"  
 
 #include <cstdio>
 #include <cstdlib>
@@ -105,9 +104,8 @@ bool AnthropicAPIProvider::configure(const std::string& config) {
     const char* envVal = std::getenv(keyEnv.c_str());
     if (envVal) {
         apiKey = envVal;
-    } else {
-        apiKey = ApiConfig::anthropicApiKey();
     }
+    // Note: ApiConfig fallback removed - use environment variable only
 
     if (apiKey.empty()) {
         fprintf(stderr, "ERROR: Anthropic API key not found. Expected env var %s\n", keyEnv.c_str());

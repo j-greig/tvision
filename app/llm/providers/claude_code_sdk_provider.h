@@ -81,7 +81,7 @@ public:
     std::string getCurrentSystemPrompt() const;
     
     // Session state
-    std::string getSessionId() const { return currentSessionId; }
+    std::string getSessionId() const override { return currentSessionId; }
     bool isStreamingActive() const { return streamingActive; }
 
 private:
