@@ -450,10 +450,11 @@ class ClaudeSDKBridge {
     
     normalizeModelId(model) {
         const m = (model || '').toLowerCase();
+        // Map common aliases (incl. "4-5" wording) to current Agent SDK IDs
         if (m.includes('opus')) return 'claude-3-opus-20240229';
         if (m.includes('sonnet')) return 'claude-3-5-sonnet-latest';
-        if (m.includes('haiku')) return 'claude-3-5-haiku-latest';
-        return model || 'claude-3-5-haiku-latest';
+        if (m.includes('haiku')) return 'claude-3-5-haiku-20241022'; // haiku 4.5 alias
+        return model || 'claude-3-5-haiku-20241022';
     }
     
     
