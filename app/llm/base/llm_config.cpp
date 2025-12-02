@@ -5,7 +5,6 @@
 /*---------------------------------------------------------*/
 
 #include "llm_config.h"
-#include "../../api_config_temp.h"  // TEMP: Hardcoded provider selection
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
@@ -74,6 +73,9 @@ bool LLMConfig::loadFromFile(const std::string& configPath) {
 bool LLMConfig::loadFromString(const std::string& jsonConfig) {
     validationErrors.clear();
     bool result = parseJson(jsonConfig);
+
+    // Config loading complete - activeProvider set from JSON or default config
+    fprintf(stderr, "DEBUG: Config loaded, activeProvider: %s\n", activeProvider.c_str());
 
     return result;
 }
@@ -157,6 +159,7 @@ bool LLMConfig::parseJson(const std::string& json) {
     if (providersStart == std::string::npos) return false;
     
     // Parse each provider
+    parseProvider(json, "claude_code_sdk");
     parseProvider(json, "claude_code");
     parseProvider(json, "anthropic_api");  
     parseProvider(json, "openrouter");
@@ -192,11 +195,24 @@ void LLMConfig::parseProvider(const std::string& json, const std::string& provid
     config.apiKeyEnv = parseJsonString(providerJson, "apiKeyEnv");
     config.command = parseJsonString(providerJson, "command");
     
-    // Parse maxTokens and temperature as parameters
+    // Parse common parameters
     std::string maxTokens = parseJsonString(providerJson, "maxTokens");
     std::string temperature = parseJsonString(providerJson, "temperature");
     if (!maxTokens.empty()) config.parameters["maxTokens"] = maxTokens;
     if (!temperature.empty()) config.parameters["temperature"] = temperature;
+    
+    // Parse claude_code_sdk specific parameters
+    if (providerName == "claude_code_sdk") {
+        std::string maxTurns = parseJsonString(providerJson, "maxTurns");
+        std::string nodeScriptPath = parseJsonString(providerJson, "nodeScriptPath");
+        std::string sessionTimeout = parseJsonString(providerJson, "sessionTimeout");
+        std::string allowedTools = parseJsonString(providerJson, "allowedTools");
+        
+        if (!maxTurns.empty()) config.parameters["maxTurns"] = maxTurns;
+        if (!nodeScriptPath.empty()) config.parameters["nodeScriptPath"] = nodeScriptPath;
+        if (!sessionTimeout.empty()) config.parameters["sessionTimeout"] = sessionTimeout;
+        if (!allowedTools.empty()) config.parameters["allowedTools"] = allowedTools;
+    }
     
     providers[providerName] = config;
 }
@@ -333,8 +349,15 @@ bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, b
 
 std::string LLMConfig::getDefaultConfigJson() {
     return R"({
-  "activeProvider": "anthropic_api",
+  "activeProvider": "claude_code_sdk",
   "providers": {
+    "claude_code_sdk": {
+      "enabled": true,
+      "maxTurns": 50,
+      "allowedTools": ["Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"],
+      "nodeScriptPath": "llm/sdk_bridge/claude_sdk_bridge.js",
+      "sessionTimeout": 3600
+    },
     "claude_code": {
       "enabled": true,
       "command": "claude",

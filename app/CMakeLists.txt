@@ -26,6 +26,7 @@ set(TV_COMMON_SOURCES
     llm/base/llm_provider_factory.cpp
     llm/base/tool_executor.cpp
     llm/providers/claude_code_provider.cpp
+    llm/providers/claude_code_sdk_provider.cpp
     llm/providers/anthropic_api_provider.cpp
     llm/tools/time_tools.cpp
     llm/tools/tui_tools.cpp

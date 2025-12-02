@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <chrono>
 
 // Forward declarations
 class WibWobEngine;
@@ -33,6 +34,8 @@ struct ChatMessage {
     std::string content;
     std::string timestamp;
     bool is_error = false;
+    bool is_streaming = false;
+    bool is_complete = true;
 };
 
 /*---------------------------------------------------------*/
@@ -56,6 +59,12 @@ public:
     void scrollPageUp();
     void scrollPageDown();
 
+    // Streaming operations
+    void startStreamingMessage(const std::string& sender);
+    void appendToStreamingMessage(const std::string& content);
+    void finishStreamingMessage();
+    void cancelStreamingMessage();
+
     // Access for window
     const std::vector<ChatMessage>& getMessages() const { return messages; }
 
@@ -68,6 +77,11 @@ private:
 
     std::vector<ChatMessage> messages;
     std::vector<WrappedLine> wrappedLines;
+
+    // Streaming state
+    bool isReceivingStream = false;
+    size_t streamingMessageIndex = 0;
+    std::chrono::steady_clock::time_point lastStreamUpdate;
 
     void rebuildWrappedLines();
     std::vector<std::string> wrapText(const std::string& text, int width) const;

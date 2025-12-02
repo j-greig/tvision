@@ -122,6 +122,74 @@ void TWibWobMessageView::scrollPageDown() {
     scrollTo(delta.x, newY);
 }
 
+// Streaming message methods
+void TWibWobMessageView::startStreamingMessage(const std::string& sender) {
+    if (isReceivingStream) {
+        finishStreamingMessage(); // Finish any existing stream
+    }
+
+    ChatMessage msg;
+    msg.sender = sender;
+    msg.content = "";
+    msg.is_error = false;
+    msg.is_streaming = true;
+    msg.is_complete = false;
+
+    // Get timestamp
+    std::time_t now = std::time(nullptr);
+    std::tm* local = std::localtime(&now);
+    std::ostringstream oss;
+    oss << std::put_time(local, "%H:%M:%S");
+    msg.timestamp = oss.str();
+
+    messages.push_back(msg);
+    streamingMessageIndex = messages.size() - 1;
+    isReceivingStream = true;
+    lastStreamUpdate = std::chrono::steady_clock::now();
+
+    // Auto-scroll to show new message
+    scrollToBottom();
+}
+
+void TWibWobMessageView::appendToStreamingMessage(const std::string& content) {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+
+    messages[streamingMessageIndex].content += content;
+    lastStreamUpdate = std::chrono::steady_clock::now();
+
+    // Trigger incremental redraw
+    rebuildWrappedLines();
+    scrollToBottom();
+    drawView();
+}
+
+void TWibWobMessageView::finishStreamingMessage() {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+
+    messages[streamingMessageIndex].is_streaming = false;
+    messages[streamingMessageIndex].is_complete = true;
+
+    isReceivingStream = false;
+    rebuildWrappedLines();
+    drawView();
+}
+
+void TWibWobMessageView::cancelStreamingMessage() {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+
+    // Remove the incomplete streaming message
+    messages.erase(messages.begin() + streamingMessageIndex);
+    isReceivingStream = false;
+    rebuildWrappedLines();
+    drawView();
+}
+
 void TWibWobMessageView::rebuildWrappedLines() {
     wrappedLines.clear();
 

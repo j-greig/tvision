@@ -46,6 +46,7 @@ public:
     std::string getCurrentProvider() const;
     std::string getCurrentModel() const;
     std::vector<std::string> getAvailableProviders() const;
+    ILLMProvider* getCurrentProviderPtr() const;
     
     // Status
     bool isBusy() const;
