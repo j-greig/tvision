@@ -283,12 +283,14 @@ class Controller:
 
             # Forward to the live app via IPC
             print(f"[DEBUG] Calling send_cmd...")
-            send_cmd("send_text", {
+            resp = send_cmd("send_text", {
                 "id": win_id,
                 "content": content,
                 "mode": mode,
                 "position": position
             })
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
             print(f"[DEBUG] send_cmd completed successfully")
 
             # Persist injected content for debugging/traceability
@@ -340,13 +342,15 @@ class Controller:
         """Send figlet ASCII art to a text editor window"""
         try:
             # Forward to the live app via IPC
-            send_cmd("send_figlet", {
+            resp = send_cmd("send_figlet", {
                 "id": win_id,
                 "text": text,
                 "font": font,
                 "width": str(width) if width > 0 else "",
                 "mode": mode
             })
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
             
             # Update in-memory state (simplified)
             async with self._lock:
