@@ -139,7 +139,7 @@ class ClaudeSDKBridge {
                 systemPrompt: this.systemPrompt,
                 maxTurns: data.maxTurns || this.maxTurns,
                 allowedTools: data.allowedTools || this.allowedTools,
-                model: data.model || 'sonnet'  // Default to sonnet if not specified
+                model: data.model || 'claude-3-5-haiku-latest'  // Default to latest haiku if not specified
             };
 
             this.sendResponse('SESSION_STARTED', {
@@ -172,14 +172,21 @@ class ClaudeSDKBridge {
             console.error('MCP Server initialized:', !!this.mcpServer);
             console.error('=== END BRIDGE DEBUG ===');
             
+            // Build Agent SDK messages stream. System prompt is passed via options, so only send user content.
+            const messages = [{
+                role: 'user',
+                content: [{ type: 'text', text: data.query }]
+            }];
+
             // Start streaming query
             this.sendResponse('QUERY_STARTED', { 
                 sessionId: this.sessionId,
                 query: data.query 
             });
             let fullResponse = '';
+            let finishReason = null;
             
-            // Use Claude Code SDK with proper customSystemPrompt and MCP tools
+            // Use Claude Agent SDK with proper messages + MCP tools
             console.error('DEBUG: About to query with model:', this.sessionConfig.model);
             console.error('DEBUG: MCP server initialized:', !!this.mcpServer);
             
@@ -196,15 +203,17 @@ class ClaudeSDKBridge {
             ];
             
             const allAllowedTools = [...this.sessionConfig.allowedTools, ...mcpTools];
-            console.error('DEBUG: Allowed tools:', allAllowedTools);
-            
-            // Build query options - Agent SDK uses 'systemPrompt' not 'customSystemPrompt'
+            const toolList = this.mcpServer ? [...new Set(allAllowedTools)] : [...new Set(this.sessionConfig.allowedTools)];
+            const modelId = this.normalizeModelId(this.sessionConfig.model);
+
             const queryOptions = {
                 systemPrompt: this.systemPrompt,
                 maxTurns: this.sessionConfig.maxTurns,
-                allowedTools: this.mcpServer ? allAllowedTools : this.sessionConfig.allowedTools,
-                model: this.sessionConfig.model || 'haiku',
-                includePartialMessages: true  // Enable SDKPartialAssistantMessage for streaming
+                model: modelId,
+                tools: toolList,          // Agent SDK expects tools list; keep allowedTools for compat
+                allowedTools: toolList,
+                includePartialMessages: true,  // Enable partial events
+                stderr: (msg) => console.error('[CLAUDE STDERR]', String(msg).trim())
             };
 
             // Add resume option if we have a previous SDK session ID (multi-turn)
@@ -220,9 +229,33 @@ class ClaudeSDKBridge {
 
             console.error('[BRIDGE] Query options:', JSON.stringify({
                 ...queryOptions,
-                systemPrompt: queryOptions.systemPrompt?.substring(0, 50) + '...'
+                systemPrompt: this.systemPrompt ? this.systemPrompt.substring(0, 50) + '...' : undefined
             }));
             console.error('[BRIDGE] About to call SDK query() using', this.sdkSource, '...');
+
+            // Helper to emit deltas and accumulate full response
+            const pushDelta = (text) => {
+                if (!text) return;
+                this.sendResponse('CONTENT_DELTA', {
+                    sessionId: this.sessionId,
+                    content: text,
+                    isPartial: true
+                });
+                fullResponse += text;
+            };
+
+            const textFromContentArray = (contentArray) => {
+                if (!Array.isArray(contentArray)) {
+                    return typeof contentArray === 'string' ? contentArray : '';
+                }
+                let text = '';
+                for (const block of contentArray) {
+                    if (block?.type === 'text' && typeof block.text === 'string') {
+                        text += block.text;
+                    }
+                }
+                return text;
+            };
 
             let messageCount = 0;
             try {
@@ -230,104 +263,82 @@ class ClaudeSDKBridge {
                     throw new Error('SDK query function not loaded');
                 }
 
+                const promptStream = this.buildPromptStream(messages);
+
                 for await (const message of this.queryFn({
-                    // Provide a plain string prompt; system prompt is injected via options.
-                    prompt: data.query,
+                    prompt: promptStream,
                     options: queryOptions
                 })) {
                     messageCount++;
                     console.error('=== SDK MESSAGE DEBUG #' + messageCount + ' ===');
-                console.error('Message type:', message.type);
-                console.error('Message data:', JSON.stringify(message, null, 2));
-                console.error('=== END SDK MESSAGE DEBUG ===');
+                    console.error('Message type:', message.type);
+                    console.error('Message data:', JSON.stringify(message, null, 2));
+                    console.error('=== END SDK MESSAGE DEBUG ===');
 
-                // Handle SDKPartialAssistantMessage - real-time streaming deltas
-                if (message.type === 'partial_assistant') {
-                    // Extract delta text from partial message
-                    const deltaText = message.delta?.text || '';
-                    if (deltaText) {
-                        console.error('[BRIDGE] Partial delta:', deltaText.substring(0, 50));
-                        this.sendResponse('CONTENT_DELTA', {
-                            sessionId: this.sessionId,
-                            content: deltaText,
-                            isPartial: true
-                        });
-                        fullResponse += deltaText;
-                    }
+                    // Legacy partials (Agent SDK still emits these when includePartialMessages is true)
+                    if (message.type === 'partial_assistant') {
+                        pushDelta(message.delta?.text || message.delta?.partial_text || '');
 
-                } else if (message.type === 'assistant') {
-                    // SDKAssistantMessage - full message (may duplicate partial content)
-                    const contentArray = message.message?.content;
-                    let textContent = '';
-                    if (Array.isArray(contentArray)) {
-                        for (const block of contentArray) {
-                            if (block.type === 'text') {
-                                textContent += block.text;
+                    } else if (message.type === 'assistant') {
+                        const textContent = textFromContentArray(message.message?.content);
+                        if (textContent && !fullResponse) {
+                            pushDelta(textContent);
+                        }
+
+                    // Rich stream events from Agent SDK (content/message start/delta/stop)
+                    } else if (message.type === 'content_block_delta') {
+                        pushDelta(message.delta?.text || message.delta?.partial_text || '');
+
+                    } else if (message.type === 'message_delta') {
+                        pushDelta(message.delta?.text || message.delta?.partial_text || '');
+
+                    } else if (message.type === 'content_block_start') {
+                        // Some SDKs include initial text on start; include if present
+                        pushDelta(message.content_block?.text || '');
+
+                    } else if (message.type === 'message_stop' || message.type === 'content_block_stop') {
+                        const fr = message.finish_reason || message.finishReason || message.reason;
+                        finishReason = fr || finishReason;
+
+                    } else if (message.type === 'result') {
+                        // SDKResultMessage - capture session_id for multi-turn resume
+                        console.error('[BRIDGE] Result message:', message.subtype, 'result:',
+                                      typeof message.result === 'string' ? message.result.substring(0, 100) : message.result);
+
+                        if (message.session_id) {
+                            this.sdkSessionId = message.session_id;
+                            console.error('[BRIDGE] Captured SDK session_id:', this.sdkSessionId);
+                        }
+
+                        if (message.result === 'error_max_turns') {
+                            this.sendResponse('ERROR_OCCURRED', {
+                                sessionId: this.sessionId,
+                                error: 'MAX_TURNS_EXCEEDED',
+                                message: 'Conversation turn limit reached'
+                            });
+                            return;
+                        } else if (message.result === 'error_during_execution') {
+                            this.sendResponse('ERROR_OCCURRED', {
+                                sessionId: this.sessionId,
+                                error: 'EXECUTION_ERROR',
+                                message: message.error?.message || 'Unknown execution error'
+                            });
+                            return;
+                        } else if (message.subtype === 'success' && typeof message.result === 'string') {
+                            if (message.result && !fullResponse) {
+                                fullResponse = message.result;
                             }
                         }
-                    } else if (typeof contentArray === 'string') {
-                        textContent = contentArray;
-                    }
 
-                    console.error('[BRIDGE] Assistant content:', textContent.substring(0, 100));
-
-                    // Only send if we haven't already sent partials
-                    if (!fullResponse && textContent) {
-                        this.sendResponse('CONTENT_DELTA', {
-                            sessionId: this.sessionId,
-                            content: textContent,
-                            isPartial: true
-                        });
-                        fullResponse = textContent;
-                    }
-
-                } else if (message.type === 'stream_event') {
-                    // Legacy stream event handling (fallback)
-                    const evt = message.event;
-                    const deltaText = evt?.delta?.text || evt?.delta?.partial_text || '';
-                    const isTextDelta = evt && (evt.type === 'content_block_delta' || evt.type === 'message_delta');
-                    if (isTextDelta && deltaText) {
-                        this.sendResponse('CONTENT_DELTA', {
-                            sessionId: this.sessionId,
-                            content: deltaText,
-                            isPartial: true
-                        });
-                        fullResponse += deltaText;
-                    }
-
-                } else if (message.type === 'result') {
-                    // SDKResultMessage - capture session_id for multi-turn resume
-                    console.error('[BRIDGE] Result message:', message.subtype, 'result:',
-                                  typeof message.result === 'string' ? message.result.substring(0, 100) : message.result);
-
-                    // Capture SDK session ID for session resume on next query
-                    if (message.session_id) {
-                        this.sdkSessionId = message.session_id;
-                        console.error('[BRIDGE] Captured SDK session_id:', this.sdkSessionId);
-                    }
-
-                    if (message.result === 'error_max_turns') {
-                        this.sendResponse('ERROR_OCCURRED', {
-                            sessionId: this.sessionId,
-                            error: 'MAX_TURNS_EXCEEDED',
-                            message: 'Conversation turn limit reached'
-                        });
-                        return;
-                    } else if (message.result === 'error_during_execution') {
-                        this.sendResponse('ERROR_OCCURRED', {
-                            sessionId: this.sessionId,
-                            error: 'EXECUTION_ERROR',
-                            message: message.error?.message || 'Unknown execution error'
-                        });
-                        return;
-                    } else if (message.subtype === 'success' && typeof message.result === 'string') {
-                        // Successful completion - result may contain final text
-                        console.error('[BRIDGE] Success result text:', message.result.substring(0, 100));
-                        if (message.result && !fullResponse) {
-                            fullResponse = message.result;
+                    } else if (message.type === 'stream_event') {
+                        // Legacy stream event handling (fallback)
+                        const evt = message.event;
+                        const deltaText = evt?.delta?.text || evt?.delta?.partial_text || '';
+                        const isTextDelta = evt && (evt.type === 'content_block_delta' || evt.type === 'message_delta');
+                        if (isTextDelta && deltaText) {
+                            pushDelta(deltaText);
                         }
                     }
-                }
                 } // close for await loop
                 console.error('[BRIDGE] SDK loop complete. Messages:', messageCount, 'Response length:', fullResponse.length);
             } catch (sdkError) {
@@ -342,6 +353,7 @@ class ClaudeSDKBridge {
             this.sendResponse('MESSAGE_COMPLETE', {
                 sessionId: this.sessionId,
                 fullResponse: fullResponse,
+                finishReason: finishReason || 'unknown',
                 isPartial: false
             });
 
@@ -359,6 +371,27 @@ class ClaudeSDKBridge {
                 content: userQuery
             }
         };
+    }
+
+    async* buildPromptStream(messages) {
+        if (!Array.isArray(messages)) return;
+        for (const msg of messages) {
+            const role = msg.role || 'user';
+            if (role === 'system') {
+                console.error('[BRIDGE] Skipping system role in prompt stream; system prompt is sent via options.');
+                continue;
+            }
+            const content = msg.content || [];
+            yield {
+                type: role === 'assistant' ? 'assistant' : 'user',
+                session_id: "",
+                message: {
+                    role,
+                    content
+                },
+                parent_tool_use_id: null
+            };
+        }
     }
     
     async updateSystemPrompt(data) {
@@ -401,6 +434,14 @@ class ClaudeSDKBridge {
             allowedTools: this.allowedTools,
             maxTurns: this.maxTurns
         });
+    }
+    
+    normalizeModelId(model) {
+        const m = (model || '').toLowerCase();
+        if (m.includes('opus')) return 'claude-3-opus-20240229';
+        if (m.includes('sonnet')) return 'claude-3-5-sonnet-latest';
+        if (m.includes('haiku')) return 'claude-3-5-haiku-latest';
+        return model || 'claude-3-5-haiku-latest';
     }
     
     
