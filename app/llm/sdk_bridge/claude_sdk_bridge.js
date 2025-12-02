@@ -161,7 +161,7 @@ class ClaudeSDKBridge {
                 systemPrompt: this.systemPrompt,
                 maxTurns: data.maxTurns || this.maxTurns,
                 allowedTools: data.allowedTools || this.allowedTools,
-                model: data.model || 'claude-3-5-haiku-latest'  // Default to latest haiku if not specified
+                model: data.model || 'claude-haiku-4-5'  // Default to haiku 4.5 if not specified
             };
 
             this.sendResponse('SESSION_STARTED', {
@@ -450,11 +450,11 @@ class ClaudeSDKBridge {
     
     normalizeModelId(model) {
         const m = (model || '').toLowerCase();
-        // Map common aliases (incl. "4-5" wording) to current Agent SDK IDs
-        if (m.includes('opus')) return 'claude-3-opus-20240229';
-        if (m.includes('sonnet')) return 'claude-3-5-sonnet-latest';
-        if (m.includes('haiku')) return 'claude-3-5-haiku-20241022'; // haiku 4.5 alias
-        return model || 'claude-3-5-haiku-20241022';
+        // Map common aliases to current 4.5 IDs (avoid 3.5)
+        if (m.includes('opus')) return 'claude-opus-4-5';
+        if (m.includes('sonnet')) return 'claude-sonnet-4-5';
+        if (m.includes('haiku')) return 'claude-haiku-4-5';
+        return model || 'claude-haiku-4-5';
     }
     
     
