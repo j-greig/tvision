@@ -55,7 +55,8 @@ public:
 
     // SDK-specific features
     bool startStreamingSession(const std::string& customSystemPrompt = "");
-    bool sendStreamingQuery(const std::string& query, StreamingCallback streamCallback);
+    bool sendStreamingQuery(const std::string& query, StreamingCallback streamCallback,
+                            const std::string& systemPrompt = "");
     void endStreamingSession();
     bool hasActiveSession() const;
     
@@ -73,6 +74,7 @@ private:
     bool sessionStarted = false;
     std::string currentSessionId;
     std::string currentSystemPrompt;
+    std::string configuredModel = "haiku";  // Default to haiku
     std::string lastError;
     
     // Tool support

@@ -15,6 +15,7 @@
 #include <sstream>
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -23,6 +24,64 @@
 
 // Register this provider with the factory
 REGISTER_LLM_PROVIDER("claude_code_sdk", ClaudeCodeSDKProvider);
+
+// Helper: escape string for JSON embedding
+static std::string escapeJsonString(const std::string& s) {
+    std::ostringstream out;
+    for (char c : s) {
+        switch (c) {
+            case '"':  out << "\\\""; break;
+            case '\\': out << "\\\\"; break;
+            case '\n': out << "\\n"; break;
+            case '\r': out << "\\r"; break;
+            case '\t': out << "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    // Control char: output as \uXXXX
+                    out << "\\u" << std::hex << std::setfill('0')
+                        << std::setw(4) << static_cast<int>(c);
+                } else {
+                    out << c;
+                }
+        }
+    }
+    return out.str();
+}
+
+// Minimal JSON string extractor for our bridge responses (handles common escapes)
+static std::string extractJsonStringField(const std::string& json, const std::string& key) {
+    const std::string pattern = "\"" + key + "\":\"";
+    size_t pos = json.find(pattern);
+    if (pos == std::string::npos)
+        return "";
+    pos += pattern.size();
+    std::string out;
+    bool escape = false;
+    for (size_t i = pos; i < json.size(); ++i) {
+        char c = json[i];
+        if (escape) {
+            switch (c) {
+                case '\\': out.push_back('\\'); break;
+                case '"':  out.push_back('"'); break;
+                case 'n':  out.push_back('\n'); break;
+                case 'r':  out.push_back('\r'); break;
+                case 't':  out.push_back('\t'); break;
+                default:   out.push_back(c); break;
+            }
+            escape = false;
+            continue;
+        }
+        if (c == '\\') {
+            escape = true;
+            continue;
+        }
+        if (c == '"') {
+            break; // end of field
+        }
+        out.push_back(c);
+    }
+    return out;
+}
 
 // Node.js bridge process management
 struct ClaudeCodeSDKProvider::NodeBridge {
@@ -199,6 +258,9 @@ bool ClaudeCodeSDKProvider::sendQuery(const LLMRequest& request, ResponseCallbac
                 // Convert to LLMResponse format
                 LLMResponse response;
                 response.provider_name = getProviderName();
+                if (!chunk.content.empty() && responseBuffer->empty()) {
+                    *responseBuffer = chunk.content;
+                }
                 response.result = *responseBuffer;
                 response.session_id = chunk.session_id;
                 response.is_error = false;
@@ -242,32 +304,51 @@ bool ClaudeCodeSDKProvider::tryFallback(const LLMRequest& request, ResponseCallb
 }
 
 bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSystemPrompt) {
+    fprintf(stderr, "[SDK] startStreamingSession called, prompt=%zu chars\n", customSystemPrompt.size());
+
     if (streamingActive) {
-        return true; // Already active
+        fprintf(stderr, "[SDK] Session already active, reusing\n");
+        return true;
     }
-    
+
     if (!initializeSDK()) {
+        fprintf(stderr, "[SDK] ERROR: initializeSDK failed\n");
         setError("Failed to initialize Claude Code SDK");
         return false;
     }
-    
-    // Send session start command
+    fprintf(stderr, "[SDK] SDK initialized OK\n");
+
+    // Send session start command (escape prompt for JSON)
+    std::string escapedPrompt = escapeJsonString(customSystemPrompt);
+    fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+            customSystemPrompt.size(), escapedPrompt.size());
+
     std::ostringstream command;
-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")" 
-            << customSystemPrompt << R"(","maxTurns":)" << maxTurns 
-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":"sonnet"}})";
-    
-    if (!nodeBridge->sendCommand(command.str())) {
+    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+            << configuredModel << R"("}})";
+
+    std::string cmdStr = command.str();
+    fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+
+    if (!nodeBridge->sendCommand(cmdStr)) {
+        fprintf(stderr, "[SDK] ERROR: sendCommand failed\n");
         setError("Failed to send session start command");
         return false;
     }
-    
+    fprintf(stderr, "[SDK] Command sent, waiting for SESSION_STARTED...\n");
+
     // Wait for session confirmation
     for (int i = 0; i < 50; ++i) { // 5 second timeout
         std::string response = nodeBridge->readResponse();
         if (!response.empty()) {
+            fprintf(stderr, "[SDK] Got response: %.80s%s\n",
+                    response.c_str(), response.size() > 80 ? "..." : "");
+
             // Parse JSON response (simplified)
             if (response.find("SESSION_STARTED") != std::string::npos) {
+                fprintf(stderr, "[SDK] Session started OK!\n");
                 streamingActive = true;
                 sessionStarted = true;
                 currentSystemPrompt = customSystemPrompt;
@@ -295,30 +376,51 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
     return false;
 }
 
-bool ClaudeCodeSDKProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback) {
-    if (!streamingActive || !nodeBridge->active) {
-        return false;
+bool ClaudeCodeSDKProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback,
+                                                const std::string& systemPrompt) {
+    fprintf(stderr, "[SDK] sendStreamingQuery: %.60s%s\n",
+            query.c_str(), query.size() > 60 ? "..." : "");
+
+    // Auto-start session if not active
+    if (!streamingActive || !nodeBridge || !nodeBridge->active) {
+        fprintf(stderr, "[SDK] Session not active, auto-starting...\n");
+        std::string promptToUse = systemPrompt.empty() ? currentSystemPrompt : systemPrompt;
+        if (promptToUse.empty()) {
+            promptToUse = "You are a helpful AI assistant.";  // Fallback
+        }
+        if (!startStreamingSession(promptToUse)) {
+            fprintf(stderr, "[SDK] ERROR: Failed to auto-start session\n");
+            return false;
+        }
+        fprintf(stderr, "[SDK] Session auto-started OK\n");
     }
-    
+
     busy.store(true);
     activeStreamCallback = streamCallback;
-    
-    // Send query command
+
+    // Send query command (escape user input for JSON)
     std::ostringstream command;
-    command << R"({"type":"SEND_QUERY","data":{"query":")" << query << R"("}})";
-    
-    if (!nodeBridge->sendCommand(command.str())) {
+    command << R"({"type":"SEND_QUERY","data":{"query":")" << escapeJsonString(query) << R"("}})";
+    std::string cmdStr = command.str();
+    fprintf(stderr, "[SDK] Sending SEND_QUERY: %zu bytes\n", cmdStr.size());
+
+    if (!nodeBridge->sendCommand(cmdStr)) {
+        fprintf(stderr, "[SDK] ERROR: sendCommand failed for query\n");
         setError("Failed to send query command");
         busy.store(false);
         return false;
     }
-    
-    // Start processing thread
-    if (!processingActive.load()) {
-        processingActive.store(true);
-        processingThread = std::make_unique<std::thread>(&ClaudeCodeSDKProvider::processStreamingThread, this);
+    fprintf(stderr, "[SDK] Query sent, starting processing thread\n");
+
+    // Start processing thread; always join any previous one to avoid std::terminate on destruction.
+    if (processingThread && processingThread->joinable()) {
+        processingActive.store(false);
+        processingThread->join();
+        processingThread.reset();
     }
-    
+    processingActive.store(true);
+    processingThread = std::make_unique<std::thread>(&ClaudeCodeSDKProvider::processStreamingThread, this);
+
     return true;
 }
 
@@ -329,44 +431,38 @@ void ClaudeCodeSDKProvider::processStreamingThread() {
         if (!response.empty()) {
             StreamChunk chunk;
             
-            // Parse response (simplified JSON parsing)
+            // Parse response (lightweight JSON parsing)
             if (response.find("CONTENT_DELTA") != std::string::npos) {
                 chunk.type = StreamChunk::CONTENT_DELTA;
-                
-                // Extract content
-                size_t contentPos = response.find("\"content\":\"");
-                if (contentPos != std::string::npos) {
-                    contentPos += 11; // Length of "content":"
-                    size_t endPos = response.find("\"", contentPos);
-                    if (endPos != std::string::npos) {
-                        chunk.content = response.substr(contentPos, endPos - contentPos);
-                    }
-                }
-                
+                chunk.content = extractJsonStringField(response, "content");
+
                 if (activeStreamCallback) {
                     activeStreamCallback(chunk);
                 }
-                
+
             } else if (response.find("MESSAGE_COMPLETE") != std::string::npos) {
                 chunk.type = StreamChunk::MESSAGE_COMPLETE;
                 chunk.session_id = currentSessionId;
-                
+                chunk.content = extractJsonStringField(response, "fullResponse");
+
                 if (activeStreamCallback) {
                     activeStreamCallback(chunk);
                 }
-                
+
                 busy.store(false);
                 activeStreamCallback = nullptr;
                 break;
-                
+
             } else if (response.find("ERROR") != std::string::npos) {
                 chunk.type = StreamChunk::ERROR_OCCURRED;
-                chunk.error_message = response;
-                
+                chunk.error_message = extractJsonStringField(response, "message");
+                if (chunk.error_message.empty())
+                    chunk.error_message = response;
+
                 if (activeStreamCallback) {
                     activeStreamCallback(chunk);
                 }
-                
+
                 busy.store(false);
                 activeStreamCallback = nullptr;
                 break;
@@ -514,10 +610,21 @@ bool ClaudeCodeSDKProvider::configure(const std::string& config) {
     // sessionTimeout (quoted or numeric)
     sessionTimeout = parseIntField("sessionTimeout", sessionTimeout);
 
+    // model - extract short name (haiku/sonnet/opus) from full model name
+    std::string modelStr = parseStringField("model", "claude-haiku-4-5");
+    if (modelStr.find("opus") != std::string::npos) {
+        configuredModel = "opus";
+    } else if (modelStr.find("sonnet") != std::string::npos) {
+        configuredModel = "sonnet";
+    } else {
+        configuredModel = "haiku";  // Default
+    }
+    fprintf(stderr, "[SDK] Configured model: %s (from %s)\n", configuredModel.c_str(), modelStr.c_str());
+
     // allowedTools: if present, keep defaults for now
     allowedTools.clear();
     if (config.find("allowedTools") != std::string::npos) {
-        allowedTools = {"Read", "Write", "Grep", "Bash", "LS"};
+        allowedTools = {"Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"};
     }
 
     return true;

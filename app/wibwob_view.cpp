@@ -719,7 +719,8 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     if (sdkProvider && sdkProvider->isAvailable()) {
         logMessage("Stream", "[streaming] Trying SDK provider...");
         messageView->startStreamingMessage("Wib&Wob");
-        streamingStarted = sdkProvider->sendStreamingQuery(input, streamCallback);
+        // Pass system prompt for auto-session-start
+        streamingStarted = sdkProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
         logMessage("Stream", "[streaming] SDK sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
     }
 

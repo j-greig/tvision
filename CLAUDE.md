@@ -256,7 +256,39 @@ cmake --build ./build && ./build/app/test_pattern
 ### Debugging
 - `TVISION_MAX_FPS=-1` for immediate screen updates
 - Event viewer in tvdemo helps debug input events
-- **Claude must NOT run TUI apps via bash** - borks the REPL. Ask user to run: `./build/app/test_pattern`
+- **Claude must NOT run TUI apps via bash** - borks the REPL. Ask user to run the commands below
+
+### Running TUI with Debug Logging
+
+**IMPORTANT**: TUI apps output debug info to stderr. Redirect to file for analysis:
+
+```bash
+# User runs in terminal (Claude cannot run TUI apps directly):
+./build/app/test_pattern 2> /tmp/sdk_debug.log
+
+# Then open Wib&Wob Chat, send messages, etc.
+```
+
+**Claude can then read/grep the log file:**
+```bash
+# Read recent log output
+tail -100 /tmp/sdk_debug.log
+
+# Search for specific events
+grep "SDK session_id" /tmp/sdk_debug.log
+grep "BRIDGE" /tmp/sdk_debug.log
+grep "ERROR\|error\|Error" /tmp/sdk_debug.log
+
+# Watch live (user runs this)
+tail -f /tmp/sdk_debug.log
+```
+
+**Key log patterns to look for:**
+- `[BRIDGE]` - SDK bridge JS events
+- `[SDK]` - C++ SDK provider events
+- `Captured SDK session_id` - Session resume working
+- `Resuming session` - Multi-turn continuation
+- `MESSAGE_COMPLETE` - Response received successfully
 
 ## Programmatic Control API
 
@@ -716,12 +748,13 @@ To use direct Anthropic API instead of Claude Code CLI:
   "providers": {
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-3-5-haiku-latest",
+      "model": "claude-haiku-4-5",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY"
     }
   }
 }
 ```
-
-**Note**: `anthropic_api` provider does **not** have MCP support - it's a direct HTTP client without tool/server capabilities.
+**Note**:
+-`anthropic_api` provider does **not** have MCP support - it's a direct HTTP client without tool/server capabilities.
+- 2025 Anthropic model names: return claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-5

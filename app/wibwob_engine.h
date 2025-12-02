@@ -39,6 +39,7 @@ public:
     
     // Configuration
     void setSystemPrompt(const std::string& prompt);
+    const std::string& getSystemPrompt() const { return systemPrompt; }
     void setClaudePath(const std::string& path);  // Legacy compatibility
     
     // Provider management

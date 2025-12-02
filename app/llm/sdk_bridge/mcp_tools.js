@@ -5,7 +5,7 @@
  * with the TUI application's API server for programmatic control.
  */
 
-const { createSdkMcpServer, tool } = require('@anthropic-ai/claude-code');
+const { createSdkMcpServer, tool } = require('@anthropic-ai/claude-agent-sdk');
 const { z } = require('zod');
 const axios = require('axios');
 
