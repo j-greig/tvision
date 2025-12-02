@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import time
 from typing import Any, Dict, List, Optional
+from pathlib import Path
+import re
+from datetime import datetime
 
 from .events import EventHub
 from .models import AppState, Rect, Window, WindowType, new_id
@@ -35,6 +38,8 @@ class Controller:
         # Batch layout support
         self._requests: Dict[str, BatchLayoutResponse] = {}
         self._timelines: Dict[str, List[asyncio.Task]] = {}
+        # Repo root (two levels up from this file)
+        self._repo_root = Path(__file__).resolve().parents[2]
 
     # ----- Query -----
     async def get_state(self) -> AppState:
@@ -286,6 +291,9 @@ class Controller:
             })
             print(f"[DEBUG] send_cmd completed successfully")
 
+            # Persist injected content for debugging/traceability
+            self._maybe_write_spawn_log(win_id, content)
+
             # Update in-memory state (simplified)
             # Skip state update for "auto" (C++ side will find/create editor)
             if win_id != "auto":
@@ -306,6 +314,27 @@ class Controller:
 
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    def _maybe_write_spawn_log(self, win_id: str, content: str) -> None:
+        """Write injected content to a timestamped file at repo root for audit/debug."""
+        if not content:
+            return
+        try:
+            ts = datetime.now().strftime("%y%m%d-%H%M")
+            # Build a slug from window id and first few words
+            first_words = " ".join(content.strip().split()[:5])
+            raw_slug = f"{win_id}-{first_words}" if win_id else first_words
+            raw_slug = raw_slug or "content"
+            slug = re.sub(r"[^a-zA-Z0-9-]+", "-", raw_slug).strip("-")
+            if not slug:
+                slug = "content"
+            fname = f"{ts}-{slug[:40]}-spawned.txt"
+            target = self._repo_root / fname
+            with open(target, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"[DEBUG] spawn log written: {target}")
+        except Exception as e:
+            print(f"[WARN] failed to write spawn log: {e}")
 
     async def send_figlet(self, win_id: str, text: str, font: str = "standard", width: int = 0, mode: str = "append") -> Dict[str, Any]:
         """Send figlet ASCII art to a text editor window"""
