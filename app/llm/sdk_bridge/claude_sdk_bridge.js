@@ -6,18 +6,30 @@
  * Supports customSystemPrompt and real-time response streaming
  */
 
-const { query } = require('@anthropic-ai/claude-code');
 const process = require('process');
 const readline = require('readline');
 const { createTuiMcpServer } = require('./mcp_tools');
+const { loadSdk } = require('./sdk_loader');
 
 class ClaudeSDKBridge {
     constructor() {
         this.activeSession = null;
-        this.sessionId = null;
-        this.customSystemPrompt = null;
+        this.sessionId = null;           // Our internal session ID
+        this.sdkSessionId = null;        // SDK session ID for resume
+        this.systemPrompt = null;        // Agent SDK uses 'systemPrompt' not 'customSystemPrompt'
         this.allowedTools = ['Read', 'Write', 'Grep', 'Bash', 'LS', 'WebSearch', 'WebFetch'];
         this.maxTurns = 50;
+        this.sdkSource = 'unknown';
+        this.queryFn = null;
+
+        try {
+            const sdk = loadSdk();
+            this.queryFn = sdk.query;
+            this.sdkSource = sdk.source;
+            console.error('🔧 Loaded SDK:', this.sdkSource);
+        } catch (err) {
+            console.error('💥 SDK load failed:', err.message);
+        }
         
         // Initialize MCP server for TUI control tools
         try {
@@ -115,27 +127,29 @@ class ClaudeSDKBridge {
     
     async startSession(data) {
         try {
-            this.customSystemPrompt = data.customSystemPrompt;
+            // Agent SDK uses 'systemPrompt' - accept both for backwards compat
+            this.systemPrompt = data.systemPrompt || data.customSystemPrompt;
             this.sessionId = this.generateSessionId();
-            
-            console.error('DEBUG: Starting session with customSystemPrompt length:', this.customSystemPrompt?.length || 0);
-            
+            this.sdkSessionId = null;  // Reset SDK session on new session
+
+            console.error('DEBUG: Starting session with systemPrompt length:', this.systemPrompt?.length || 0);
+
             // Store session configuration
             this.sessionConfig = {
-                customSystemPrompt: this.customSystemPrompt,
+                systemPrompt: this.systemPrompt,
                 maxTurns: data.maxTurns || this.maxTurns,
                 allowedTools: data.allowedTools || this.allowedTools,
                 model: data.model || 'sonnet'  // Default to sonnet if not specified
             };
-            
+
             this.sendResponse('SESSION_STARTED', {
                 sessionId: this.sessionId,
-                customSystemPrompt: this.customSystemPrompt,
+                systemPrompt: this.systemPrompt,
                 configuration: this.sessionConfig
             });
-            
+
             console.error('DEBUG: Session started with model:', this.sessionConfig.model);
-            
+
         } catch (error) {
             this.sendError('SESSION_START_ERROR', error.message);
         }
@@ -163,10 +177,6 @@ class ClaudeSDKBridge {
                 sessionId: this.sessionId,
                 query: data.query 
             });
-            
-            // Create message generator for streaming input
-            const messageGenerator = this.createMessageGenerator(data.query);
-            
             let fullResponse = '';
             
             // Use Claude Code SDK with proper customSystemPrompt and MCP tools
@@ -188,37 +198,114 @@ class ClaudeSDKBridge {
             const allAllowedTools = [...this.sessionConfig.allowedTools, ...mcpTools];
             console.error('DEBUG: Allowed tools:', allAllowedTools);
             
-            for await (const message of query({
-                prompt: messageGenerator,
-                options: {
-                    customSystemPrompt: this.customSystemPrompt,  // Proper SDK parameter!
-                    maxTurns: this.sessionConfig.maxTurns,
-                    allowedTools: allAllowedTools,  // Include MCP tools in allowed list
-                    model: this.sessionConfig.model || 'sonnet',  // Model selection
-                    mcpServers: {
-                        "tui-control": this.mcpServer  // Pass as object/dictionary
-                    }
+            // Build query options - Agent SDK uses 'systemPrompt' not 'customSystemPrompt'
+            const queryOptions = {
+                systemPrompt: this.systemPrompt,
+                maxTurns: this.sessionConfig.maxTurns,
+                allowedTools: this.mcpServer ? allAllowedTools : this.sessionConfig.allowedTools,
+                model: this.sessionConfig.model || 'haiku',
+                includePartialMessages: true  // Enable SDKPartialAssistantMessage for streaming
+            };
+
+            // Add resume option if we have a previous SDK session ID (multi-turn)
+            if (this.sdkSessionId) {
+                queryOptions.resume = this.sdkSessionId;
+                console.error('[BRIDGE] Resuming session:', this.sdkSessionId);
+            }
+
+            // Only add MCP servers if server was successfully created
+            if (this.mcpServer) {
+                queryOptions.mcpServers = { "tui-control": this.mcpServer };
+            }
+
+            console.error('[BRIDGE] Query options:', JSON.stringify({
+                ...queryOptions,
+                systemPrompt: queryOptions.systemPrompt?.substring(0, 50) + '...'
+            }));
+            console.error('[BRIDGE] About to call SDK query() using', this.sdkSource, '...');
+
+            let messageCount = 0;
+            try {
+                if (!this.queryFn) {
+                    throw new Error('SDK query function not loaded');
                 }
-            })) {
-                console.error('=== SDK MESSAGE DEBUG ===');
+
+                for await (const message of this.queryFn({
+                    // Provide a plain string prompt; system prompt is injected via options.
+                    prompt: data.query,
+                    options: queryOptions
+                })) {
+                    messageCount++;
+                    console.error('=== SDK MESSAGE DEBUG #' + messageCount + ' ===');
                 console.error('Message type:', message.type);
                 console.error('Message data:', JSON.stringify(message, null, 2));
                 console.error('=== END SDK MESSAGE DEBUG ===');
 
-                if (message.type === 'assistant') {
-                    const content = message.message.content;
+                // Handle SDKPartialAssistantMessage - real-time streaming deltas
+                if (message.type === 'partial_assistant') {
+                    // Extract delta text from partial message
+                    const deltaText = message.delta?.text || '';
+                    if (deltaText) {
+                        console.error('[BRIDGE] Partial delta:', deltaText.substring(0, 50));
+                        this.sendResponse('CONTENT_DELTA', {
+                            sessionId: this.sessionId,
+                            content: deltaText,
+                            isPartial: true
+                        });
+                        fullResponse += deltaText;
+                    }
 
-                    // Send streaming chunk
-                    this.sendResponse('CONTENT_DELTA', {
-                        sessionId: this.sessionId,
-                        content: content,
-                        isPartial: true
-                    });
+                } else if (message.type === 'assistant') {
+                    // SDKAssistantMessage - full message (may duplicate partial content)
+                    const contentArray = message.message?.content;
+                    let textContent = '';
+                    if (Array.isArray(contentArray)) {
+                        for (const block of contentArray) {
+                            if (block.type === 'text') {
+                                textContent += block.text;
+                            }
+                        }
+                    } else if (typeof contentArray === 'string') {
+                        textContent = contentArray;
+                    }
 
-                    fullResponse += content;
+                    console.error('[BRIDGE] Assistant content:', textContent.substring(0, 100));
+
+                    // Only send if we haven't already sent partials
+                    if (!fullResponse && textContent) {
+                        this.sendResponse('CONTENT_DELTA', {
+                            sessionId: this.sessionId,
+                            content: textContent,
+                            isPartial: true
+                        });
+                        fullResponse = textContent;
+                    }
+
+                } else if (message.type === 'stream_event') {
+                    // Legacy stream event handling (fallback)
+                    const evt = message.event;
+                    const deltaText = evt?.delta?.text || evt?.delta?.partial_text || '';
+                    const isTextDelta = evt && (evt.type === 'content_block_delta' || evt.type === 'message_delta');
+                    if (isTextDelta && deltaText) {
+                        this.sendResponse('CONTENT_DELTA', {
+                            sessionId: this.sessionId,
+                            content: deltaText,
+                            isPartial: true
+                        });
+                        fullResponse += deltaText;
+                    }
 
                 } else if (message.type === 'result') {
-                    // Handle SDK result messages (errors and completion)
+                    // SDKResultMessage - capture session_id for multi-turn resume
+                    console.error('[BRIDGE] Result message:', message.subtype, 'result:',
+                                  typeof message.result === 'string' ? message.result.substring(0, 100) : message.result);
+
+                    // Capture SDK session ID for session resume on next query
+                    if (message.session_id) {
+                        this.sdkSessionId = message.session_id;
+                        console.error('[BRIDGE] Captured SDK session_id:', this.sdkSessionId);
+                    }
+
                     if (message.result === 'error_max_turns') {
                         this.sendResponse('ERROR_OCCURRED', {
                             sessionId: this.sessionId,
@@ -233,19 +320,33 @@ class ClaudeSDKBridge {
                             message: message.error?.message || 'Unknown execution error'
                         });
                         return;
+                    } else if (message.subtype === 'success' && typeof message.result === 'string') {
+                        // Successful completion - result may contain final text
+                        console.error('[BRIDGE] Success result text:', message.result.substring(0, 100));
+                        if (message.result && !fullResponse) {
+                            fullResponse = message.result;
+                        }
                     }
-                    // Normal completion handled after loop
                 }
+                } // close for await loop
+                console.error('[BRIDGE] SDK loop complete. Messages:', messageCount, 'Response length:', fullResponse.length);
+            } catch (sdkError) {
+                console.error('[BRIDGE] SDK query() ERROR:', sdkError.message);
+                console.error('[BRIDGE] SDK error stack:', sdkError.stack);
+                this.sendError('SDK_ERROR', sdkError.message);
+                return;
             }
 
             // Send completion
+            console.error('[BRIDGE] Sending MESSAGE_COMPLETE with', fullResponse.length, 'chars');
             this.sendResponse('MESSAGE_COMPLETE', {
                 sessionId: this.sessionId,
                 fullResponse: fullResponse,
                 isPartial: false
             });
-            
+
         } catch (error) {
+            console.error('[BRIDGE] Outer catch ERROR:', error.message);
             this.sendError('QUERY_ERROR', error.message);
         }
     }
@@ -261,26 +362,30 @@ class ClaudeSDKBridge {
     }
     
     async updateSystemPrompt(data) {
-        this.customSystemPrompt = data.customSystemPrompt;
+        // Accept both old and new names for backwards compat
+        this.systemPrompt = data.systemPrompt || data.customSystemPrompt;
         if (this.sessionConfig) {
-            this.sessionConfig.customSystemPrompt = this.customSystemPrompt;
+            this.sessionConfig.systemPrompt = this.systemPrompt;
         }
-        
+
         this.sendResponse('PROMPT_UPDATED', {
             sessionId: this.sessionId,
-            customSystemPrompt: this.customSystemPrompt
+            systemPrompt: this.systemPrompt
         });
     }
-    
+
     async endSession() {
         const oldSessionId = this.sessionId;
-        
+        const oldSdkSessionId = this.sdkSessionId;
+
         this.sessionId = null;
-        this.customSystemPrompt = null;
+        this.sdkSessionId = null;
+        this.systemPrompt = null;
         this.sessionConfig = null;
-        
+
         this.sendResponse('SESSION_ENDED', {
-            sessionId: oldSessionId
+            sessionId: oldSessionId,
+            sdkSessionId: oldSdkSessionId
         });
     }
     
