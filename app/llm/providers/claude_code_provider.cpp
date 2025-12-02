@@ -119,9 +119,8 @@ std::string ClaudeCodeProvider::getVersion() const {
 }
 
 std::vector<std::string> ClaudeCodeProvider::getSupportedModels() const {
-    // Claude Code uses whatever model is configured in Claude Code itself
-    return {"sonnet"};
-    // return {"claude-3-sonnet", "claude-3-opus", "claude-3-haiku"};
+    // Claude Code CLI model aliases
+    return {"claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"};
 }
 
 bool ClaudeCodeProvider::configure(const std::string& config) {

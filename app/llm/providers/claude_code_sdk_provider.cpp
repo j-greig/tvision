@@ -443,7 +443,7 @@ std::string ClaudeCodeSDKProvider::getVersion() const {
 }
 
 std::vector<std::string> ClaudeCodeSDKProvider::getSupportedModels() const {
-    return {"claude-3-opus", "claude-3-sonnet", "claude-3-haiku"};
+    return {"claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"};
 }
 
 bool ClaudeCodeSDKProvider::configure(const std::string& config) {
