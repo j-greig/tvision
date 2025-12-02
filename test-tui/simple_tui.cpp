@@ -30,13 +30,17 @@
 #define Uses_TStringCollection
 #include <tvision/tv.h>
 
+#include "svg_exporter.h"
 #include <string>
 #include <sstream>
+#include <sys/stat.h>
+#include <ctime>
 
 // Command constants
 const int cmShowMainDialog = 100;
 const int cmShowAbout = 101;
 const int cmTestAction = 102;
+const int cmExportSvg = 0xF201;
 
 class TSimpleApp : public TApplication
 {
@@ -50,6 +54,7 @@ private:
     void showMainDialog();
     void showAboutDialog();
     void showResultDialog(const std::string& title, const std::string& message);
+    void exportSvg();
 };
 
 TSimpleApp::TSimpleApp() :
@@ -75,6 +80,10 @@ void TSimpleApp::handleEvent(TEvent& event)
                 showAboutDialog();
                 clearEvent(event);
                 break;
+            case cmExportSvg:
+                exportSvg();
+                clearEvent(event);
+                break;
             default:
                 break;
         }
@@ -88,6 +97,11 @@ TMenuBar *TSimpleApp::initMenuBar(TRect r)
     return new TMenuBar(r,
         *new TSubMenu("~F~ile", kbAltF) +
             *new TMenuItem("~M~ain Dialog...", cmShowMainDialog, kbAltM) +
+            newLine() +
+            (TMenuItem&) (
+                *new TSubMenu("~E~xport", kbNoKey) +
+                    *new TMenuItem("Save ~S~VG...", cmExportSvg, kbF12)
+            ) +
             newLine() +
             *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
         *new TSubMenu("~T~est", kbAltT) +
@@ -106,6 +120,7 @@ TStatusLine *TSimpleApp::initStatusLine(TRect r)
             *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
             *new TStatusItem("~Alt-M~ Main Dialog", kbAltM, cmShowMainDialog) +
             *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
+            *new TStatusItem("~F12~ Save SVG", kbF12, cmExportSvg) +
             *new TStatusItem(0, kbAltF3, cmClose)
     );
 }
@@ -230,6 +245,37 @@ void TSimpleApp::showResultDialog(const std::string& title, const std::string& m
     
     deskTop->execView(dialog);
     destroy(dialog);
+}
+
+void TSimpleApp::exportSvg()
+{
+    // Create snapshots directory if it doesn't exist
+    mkdir("build", 0755);
+    mkdir("build/snapshots", 0755);
+    
+    // Generate timestamp for filename
+    time_t rawtime;
+    struct tm* timeinfo;
+    char timestamp[80];
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", timeinfo);
+    
+    // Build filename
+    std::stringstream filename;
+    filename << "build/snapshots/screen-" << timestamp << ".svg";
+    
+    // Export using svg_exporter
+    bool success = saveCurrentScreenAsSvg(filename.str());
+    
+    // Show result message
+    if (success) {
+        std::stringstream msg;
+        msg << "SVG exported to " << filename.str();
+        showResultDialog("SVG Export", msg.str());
+    } else {
+        showResultDialog("SVG Export Failed", "No screen buffer available.");
+    }
 }
 
 int main()

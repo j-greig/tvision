@@ -43,6 +43,11 @@ static const TColorRGB kAnsiBg[16] = {
     TColorRGB(0xFF,0xFF,0xFF), // White
 };
 
+// Forward declarations for live preview support
+static TBackgroundConfig *g_livePreviewTarget = nullptr;
+static TView *g_livePreviewView = nullptr;
+ushort runBgPaletteDialog(int &index);
+
 // Gradient rendering utilities extracted from gradient.cpp
 namespace {
     // Linear interpolation between two colors
@@ -618,15 +623,36 @@ public:
     }
 };
 
-// Simple enhanced background selector - extends the existing color grid
-class TEnhancedColorGridView : public TView {
+// Background color palette dialog
+ushort runBgPaletteDialog(int &index)
+{
+    TRect r(0, 0, 40, 8);
+    r.move((TProgram::deskTop->size.x - r.b.x) / 2, (TProgram::deskTop->size.y - r.b.y) / 2);
+    auto *dlg = new TDialog(r, "Background Color");
+    r = dlg->getExtent(); r.grow(-2, -1);
+    dlg->insert(new TColorGridView(r, index));
+    ushort result = TProgram::deskTop->execView(dlg);
+    if (result == cmOK) {
+        auto *grid = (TColorGridView*)dlg->firstThat([](TView *p, void*) -> Boolean {
+            return dynamic_cast<TColorGridView*>(p) != nullptr;
+        }, nullptr);
+        if (grid) index = grid->selected;
+    }
+    TObject::destroy(dlg);
+    return result;
+}
+
+// Advanced background selector with live preview and custom gradient colors
+class TAdvancedBgView : public TView {
 public:
     TBackgroundConfig config;
+    TBackgroundConfig *liveTarget; // For live preview
     int gridSelected {0};
-    int typeSelected {0}; // 0=solid, 1=transparent, 2=hgrad, 3=vgrad, 4=radial, 5=diagonal
+    int typeSelected {0}; // 0=solid, 1=transparent, 2=hgrad, 3=vgrad
+    int gradientMode {0}; // 0=preset colors, 1=custom colors
     
-    TEnhancedColorGridView(const TRect &r, const TBackgroundConfig& currentConfig) 
-        : TView(r), config(currentConfig) { 
+    TAdvancedBgView(const TRect &r, const TBackgroundConfig& currentConfig, TBackgroundConfig *target = nullptr) 
+        : TView(r), config(currentConfig), liveTarget(target) { 
         options |= ofSelectable; 
         gridSelected = currentConfig.solidColorIndex;
         typeSelected = (int)currentConfig.type;
@@ -651,7 +677,21 @@ public:
         
         writeLine(0, 0, size.x, 1, b);
         
-        // Draw color grid (starting at row 2)
+        // Draw gradient controls for gradient types
+        if (typeSelected >= 2) {
+            b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+            if (gradientMode == 0) b.moveStr(0, ">Preset", TColorAttr(0x0F));
+            else b.moveStr(0, " Preset", TColorAttr(0x07));
+            
+            if (gradientMode == 1) b.moveStr(9, ">Custom", TColorAttr(0x0F));
+            else b.moveStr(9, " Custom", TColorAttr(0x07));
+            
+            b.moveStr(17, "C=Customize", TColorAttr(0x0B));
+            writeLine(0, 1, size.x, 1, b);
+        }
+        
+        // Draw color grid (starting at appropriate row)
+        int gridStartRow = (typeSelected >= 2) ? 2 : 1;
         const int cols = 4, rows = 4; 
         int cellW = (size.x - 2) / cols; 
         if (cellW < 8) cellW = 8;
@@ -674,72 +714,186 @@ public:
                 }
                 xPos += cellW;
             }
-            writeLine(0, ry + 2, size.x, 1, b);
+            writeLine(0, ry + gridStartRow, size.x, 1, b);
         }
+    }
+    
+    void updateLivePreview() {
+        if (!liveTarget) return;
+        
+        // Update configuration for live preview
+        liveTarget->type = (TBackgroundType)typeSelected;
+        liveTarget->solidColorIndex = gridSelected;
+        
+        if (typeSelected == 2) { // Horizontal gradient
+            if (gradientMode == 0) { // Preset colors
+                liveTarget->gradientStart = TColorRGB(0x00, 0x00, 0xFF);
+                liveTarget->gradientEnd = TColorRGB(0xFF, 0x00, 0xFF);
+            } else {
+                liveTarget->gradientStart = config.gradientStart;
+                liveTarget->gradientEnd = config.gradientEnd;
+            }
+        } else if (typeSelected == 3) { // Vertical gradient
+            if (gradientMode == 0) { // Preset colors
+                liveTarget->gradientStart = TColorRGB(0xFF, 0x00, 0x00);
+                liveTarget->gradientEnd = TColorRGB(0xFF, 0xFF, 0x00);
+            } else {
+                liveTarget->gradientStart = config.gradientStart;
+                liveTarget->gradientEnd = config.gradientEnd;
+            }
+        }
+        
+        // Trigger redraw of the target view for live preview
+        if (g_livePreviewView) {
+            g_livePreviewView->drawView();
+        }
+    }
+    
+    bool openGradientColorPicker() {
+        TBackgroundConfig tempConfig = config;
+        
+        // Pick start color
+        int startIdx = 0; // Default to black
+        if (runBgPaletteDialog(startIdx) == cmCancel) return false;
+        tempConfig.gradientStart = kAnsiBg[startIdx];
+        
+        // Pick end color
+        int endIdx = 15; // Default to white
+        if (runBgPaletteDialog(endIdx) == cmCancel) return false;
+        tempConfig.gradientEnd = kAnsiBg[endIdx];
+        
+        // Update configuration
+        config.gradientStart = tempConfig.gradientStart;
+        config.gradientEnd = tempConfig.gradientEnd;
+        gradientMode = 1; // Switch to custom mode
+        
+        updateLivePreview();
+        drawView();
+        return true;
     }
     
     virtual void handleEvent(TEvent &ev) override {
         if (ev.what == evKeyDown) {
             switch (ev.keyDown.keyCode) {
                 case kbTab:
-                    typeSelected = (typeSelected + 1) % 4; // Cycle through types
+                    if (typeSelected >= 2) { // Gradient types
+                        gradientMode = (gradientMode + 1) % 2;
+                    } else {
+                        typeSelected = (typeSelected + 1) % 4; // Cycle through types
+                    }
+                    updateLivePreview();
                     clearEvent(ev); drawView(); break;
-                case kbLeft: if (gridSelected > 0) gridSelected--; clearEvent(ev); drawView(); break;
-                case kbRight: if (gridSelected < 15) gridSelected++; clearEvent(ev); drawView(); break;
-                case kbUp: if (gridSelected >= 4) gridSelected -= 4; clearEvent(ev); drawView(); break;
-                case kbDown: if (gridSelected <= 11) gridSelected += 4; clearEvent(ev); drawView(); break;
+                    
+                case 'c': case 'C':
+                    if (typeSelected >= 2) { // Only for gradients
+                        openGradientColorPicker();
+                    }
+                    clearEvent(ev); break;
+                    
+                case kbLeft: 
+                    if (gridSelected > 0) gridSelected--;
+                    updateLivePreview();
+                    clearEvent(ev); drawView(); break;
+                    
+                case kbRight: 
+                    if (gridSelected < 15) gridSelected++;
+                    updateLivePreview();
+                    clearEvent(ev); drawView(); break;
+                    
+                case kbUp: 
+                    if (typeSelected >= 2 && gradientMode == 1) {
+                        // Switch type for gradients in custom mode
+                        typeSelected = typeSelected == 2 ? 3 : 2;
+                    } else if (gridSelected >= 4) {
+                        gridSelected -= 4;
+                    } else {
+                        // Switch type
+                        typeSelected = (typeSelected + 3) % 4; // Go backwards
+                    }
+                    updateLivePreview();
+                    clearEvent(ev); drawView(); break;
+                    
+                case kbDown: 
+                    if (typeSelected >= 2 && gradientMode == 1) {
+                        // Switch type for gradients in custom mode
+                        typeSelected = typeSelected == 2 ? 3 : 2;
+                    } else if (gridSelected <= 11) {
+                        gridSelected += 4;
+                    } else {
+                        // Switch type
+                        typeSelected = (typeSelected + 1) % 4; // Go forward
+                    }
+                    updateLivePreview();
+                    clearEvent(ev); drawView(); break;
+                    
                 case kbEnter: case ' ': 
-                    // Update config based on selection
+                    // Update final config based on selection
                     config.type = (TBackgroundType)typeSelected;
                     config.solidColorIndex = gridSelected;
                     if (typeSelected == 2) { // Horizontal gradient
-                        config.gradientStart = TColorRGB(0x00, 0x00, 0xFF);
-                        config.gradientEnd = TColorRGB(0xFF, 0x00, 0xFF);
+                        if (gradientMode == 0) {
+                            config.gradientStart = TColorRGB(0x00, 0x00, 0xFF);
+                            config.gradientEnd = TColorRGB(0xFF, 0x00, 0xFF);
+                        }
+                        // Custom colors already in config
                     } else if (typeSelected == 3) { // Vertical gradient
-                        config.gradientStart = TColorRGB(0xFF, 0x00, 0x00);
-                        config.gradientEnd = TColorRGB(0xFF, 0xFF, 0x00);
+                        if (gradientMode == 0) {
+                            config.gradientStart = TColorRGB(0xFF, 0x00, 0x00);
+                            config.gradientEnd = TColorRGB(0xFF, 0xFF, 0x00);
+                        }
+                        // Custom colors already in config
                     }
                     endModal(cmOK); clearEvent(ev); break;
-                case kbEsc: endModal(cmCancel); clearEvent(ev); break;
+                    
+                case kbEsc: 
+                    endModal(cmCancel); clearEvent(ev); break;
             }
         }
         TView::handleEvent(ev);
     }
 };
 
-static ushort runEnhancedBgDialog(TBackgroundConfig &config)
+static ushort runAdvancedBgDialog(TBackgroundConfig &config, TBackgroundConfig *liveTarget = nullptr, TView *targetView = nullptr)
 {
-    TRect r(0, 0, 40, 8);
+    TRect r(0, 0, 40, 9); // Taller to accommodate gradient controls
     r.move((TProgram::deskTop->size.x - r.b.x) / 2, (TProgram::deskTop->size.y - r.b.y) / 2);
     auto *dlg = new TDialog(r, "Background Options");
     r = dlg->getExtent(); r.grow(-2, -1);
-    auto *view = new TEnhancedColorGridView(r, config);
+    
+    // Store original config for restore on cancel
+    TBackgroundConfig originalConfig = liveTarget ? *liveTarget : config;
+    
+    auto *view = new TAdvancedBgView(r, config, liveTarget);
     dlg->insert(view);
+    
+    // Enable live preview by triggering target view redraws
+    g_livePreviewTarget = liveTarget;
+    g_livePreviewView = targetView;
+    
+    view->updateLivePreview(); // Initial preview
+    if (targetView) targetView->drawView();
+    
     ushort result = TProgram::deskTop->execView(dlg);
+    
     if (result == cmOK) {
         config = view->config;
+        if (liveTarget) *liveTarget = config; // Keep the live changes
+    } else if (liveTarget) {
+        *liveTarget = originalConfig; // Restore original on cancel
+        if (targetView) targetView->drawView(); // Restore visual
     }
+    
+    g_livePreviewTarget = nullptr;
+    g_livePreviewView = nullptr;
     TObject::destroy(dlg);
     return result;
 }
 
-static ushort runBgPaletteDialog(int &index)
+static ushort runEnhancedBgDialog(TBackgroundConfig &config)
 {
-    TRect r(0, 0, 40, 8);
-    r.move((TProgram::deskTop->size.x - r.b.x) / 2, (TProgram::deskTop->size.y - r.b.y) / 2);
-    auto *dlg = new TDialog(r, "Background Color");
-    r = dlg->getExtent(); r.grow(-2, -1);
-    dlg->insert(new TColorGridView(r, index));
-    ushort result = TProgram::deskTop->execView(dlg);
-    if (result == cmOK) {
-        auto *grid = (TColorGridView*)dlg->firstThat([](TView *p, void*) -> Boolean {
-            return dynamic_cast<TColorGridView*>(p) != nullptr;
-        }, nullptr);
-        if (grid) index = grid->selected;
-    }
-    TObject::destroy(dlg);
-    return result;
+    return runAdvancedBgDialog(config);
 }
+
 } // namespace
 
 void FrameFilePlayerView::setBackgroundConfig(const TBackgroundConfig& config)
@@ -759,7 +913,7 @@ void FrameFilePlayerView::setBackgroundIndex(int idx)
 bool FrameFilePlayerView::openBackgroundDialog()
 {
     TBackgroundConfig config = bgConfig;
-    if (runEnhancedBgDialog(config) == cmCancel)
+    if (runAdvancedBgDialog(config, &bgConfig, this) == cmCancel)
         return false;
     setBackgroundConfig(config);
     return true;
@@ -782,7 +936,7 @@ void TTextFileView::setBackgroundIndex(int idx)
 bool TTextFileView::openBackgroundDialog()
 {
     TBackgroundConfig config = bgConfig;
-    if (runEnhancedBgDialog(config) == cmCancel)
+    if (runAdvancedBgDialog(config, &bgConfig, this) == cmCancel)
         return false;
     setBackgroundConfig(config);
     return true;
