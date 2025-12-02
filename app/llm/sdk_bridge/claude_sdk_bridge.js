@@ -8,7 +8,7 @@
 
 const process = require('process');
 const readline = require('readline');
-const { createTuiMcpServer, buildNativeTools } = require('./mcp_tools');
+const { createTuiMcpServer } = require('./mcp_tools');
 const { loadSdk } = require('./sdk_loader');
 
 class ClaudeSDKBridge {
@@ -21,10 +21,7 @@ class ClaudeSDKBridge {
         this.maxTurns = 50;
         this.sdkSource = 'unknown';
         this.queryFn = null;
-        this.nativeTools = [];
-        this.nativeToolNames = [];
-        this.enableNativeTools = process.env.TVISION_DISABLE_NATIVE_TOOLS === '1' ? false : true;
-        this.enableMcpServer = process.env.TVISION_ENABLE_MCP_SERVER === '1'; // fallback
+        this.enableMcpServer = true; // MCP server is the primary tool path
 
         try {
             const sdk = loadSdk();
@@ -35,39 +32,21 @@ class ClaudeSDKBridge {
             console.error('💥 SDK load failed:', err.message);
         }
         
-        // Initialize native tools (preferred)
-        if (this.enableNativeTools) {
-            try {
-                const { tools, toolNames } = buildNativeTools();
-                this.nativeTools = tools;
-                this.nativeToolNames = toolNames;
-                console.error('🔧 Native tools loaded:', toolNames);
-            } catch (error) {
-                console.error('💥 Native tools load FAILED:', error.message);
-                this.nativeTools = [];
-                this.nativeToolNames = [];
+        // Always initialize MCP server (primary tool path)
+        try {
+            console.error('🔧 Creating MCP server...');
+            this.mcpServer = createTuiMcpServer();
+            console.error('🔧 MCP server created successfully');
+            console.error('🔧 MCP server name:', this.mcpServer.name);
+            console.error('🔧 MCP server object keys:', Object.keys(this.mcpServer));
+            console.error('🔧 MCP server tools property:', typeof this.mcpServer.tools);
+            console.error('🔧 MCP server tools count:', this.mcpServer.tools ? Object.keys(this.mcpServer.tools).length : 'NO TOOLS');
+            if (this.mcpServer.tools) {
+                console.error('🔧 Tool names:', Object.keys(this.mcpServer.tools));
             }
-        }
-
-        // Optional MCP server fallback (disabled unless explicitly enabled)
-        if (this.enableMcpServer) {
-            try {
-                console.error('🔧 Creating MCP server...');
-                this.mcpServer = createTuiMcpServer();
-                console.error('🔧 MCP server created successfully');
-                console.error('🔧 MCP server name:', this.mcpServer.name);
-                console.error('🔧 MCP server object keys:', Object.keys(this.mcpServer));
-                console.error('🔧 MCP server tools property:', typeof this.mcpServer.tools);
-                console.error('🔧 MCP server tools count:', this.mcpServer.tools ? Object.keys(this.mcpServer.tools).length : 'NO TOOLS');
-                if (this.mcpServer.tools) {
-                    console.error('🔧 Tool names:', Object.keys(this.mcpServer.tools));
-                }
-            } catch (error) {
-                console.error('💥 MCP server creation FAILED:', error.message);
-                console.error('💥 Stack:', error.stack);
-                this.mcpServer = null;
-            }
-        } else {
+        } catch (error) {
+            console.error('💥 MCP server creation FAILED:', error.message);
+            console.error('💥 Stack:', error.stack);
             this.mcpServer = null;
         }
         
@@ -212,25 +191,25 @@ class ClaudeSDKBridge {
             console.error('DEBUG: About to query with model:', this.sessionConfig.model);
             console.error('DEBUG: MCP server initialized:', !!this.mcpServer);
             
-            // Build allowed tools list (native preferred)
+            // Build allowed tools list including MCP tool IDs
             const baseTools = this.sessionConfig.allowedTools || [];
-            const nativeToolNames = this.enableNativeTools ? this.nativeToolNames : [];
-            const toolList = this.enableNativeTools && nativeToolNames.length
-                ? [...new Set(nativeToolNames)]
-                : [...new Set(baseTools)];
+            const mcpTools = [
+                "mcp__tui-control__tui_create_window",
+                "mcp__tui-control__tui_move_window", 
+                "mcp__tui-control__tui_get_state",
+                "mcp__tui-control__tui_close_window",
+                "mcp__tui-control__tui_cascade_windows",
+                "mcp__tui-control__tui_tile_windows",
+                "mcp__tui-control__tui_send_text",
+                "mcp__tui-control__tui_send_figlet"
+            ];
+            const toolList = [...new Set([...baseTools, ...mcpTools])];
             const modelId = this.normalizeModelId(this.sessionConfig.model);
-
-            if (this.enableNativeTools) {
-                console.error('[BRIDGE] Native tools enabled:', nativeToolNames);
-            } else {
-                console.error('[BRIDGE] Native tools disabled; using base tools only.');
-            }
 
             const queryOptions = {
                 systemPrompt: this.systemPrompt,
                 maxTurns: this.sessionConfig.maxTurns,
                 model: modelId,
-                tools: this.enableNativeTools && this.nativeTools.length ? this.nativeTools : undefined,
                 allowedTools: toolList,
                 includePartialMessages: true,  // Enable partial events
                 stderr: (msg) => console.error('[CLAUDE STDERR]', String(msg).trim())
@@ -242,7 +221,7 @@ class ClaudeSDKBridge {
                 console.error('[BRIDGE] Resuming session:', this.sdkSessionId);
             }
 
-            // Only add MCP servers if explicitly enabled and created
+            // Only add MCP servers if server was successfully created
             if (this.mcpServer) {
                 queryOptions.mcpServers = { "tui-control": this.mcpServer };
             }
