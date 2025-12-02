@@ -49,7 +49,7 @@ class ClaudeSDKBridge {
             }
         }
 
-        // Optional MCP server fallback
+        // Optional MCP server fallback (disabled unless explicitly enabled)
         if (this.enableMcpServer) {
             try {
                 console.error('🔧 Creating MCP server...');
@@ -215,14 +215,22 @@ class ClaudeSDKBridge {
             // Build allowed tools list (native preferred)
             const baseTools = this.sessionConfig.allowedTools || [];
             const nativeToolNames = this.enableNativeTools ? this.nativeToolNames : [];
-            const toolList = [...new Set([...baseTools, ...nativeToolNames])];
+            const toolList = this.enableNativeTools && nativeToolNames.length
+                ? [...new Set(nativeToolNames)]
+                : [...new Set(baseTools)];
             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+            if (this.enableNativeTools) {
+                console.error('[BRIDGE] Native tools enabled:', nativeToolNames);
+            } else {
+                console.error('[BRIDGE] Native tools disabled; using base tools only.');
+            }
 
             const queryOptions = {
                 systemPrompt: this.systemPrompt,
                 maxTurns: this.sessionConfig.maxTurns,
                 model: modelId,
-                tools: this.enableNativeTools ? this.nativeTools : undefined,
+                tools: this.enableNativeTools && this.nativeTools.length ? this.nativeTools : undefined,
                 allowedTools: toolList,
                 includePartialMessages: true,  // Enable partial events
                 stderr: (msg) => console.error('[CLAUDE STDERR]', String(msg).trim())
@@ -244,6 +252,7 @@ class ClaudeSDKBridge {
                 systemPrompt: this.systemPrompt ? this.systemPrompt.substring(0, 50) + '...' : undefined
             }));
             console.error('[BRIDGE] About to call SDK query() using', this.sdkSource, '...');
+            console.error('[BRIDGE] Allowed tools list:', toolList);
 
             // Helper to emit deltas and accumulate full response
             const pushDelta = (text) => {
