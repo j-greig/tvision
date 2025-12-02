@@ -168,6 +168,8 @@ private:
 
     void ensureEngineInitialized();
     void processUserInput(const std::string& input);
+    void fallbackToRegularQuery(const std::string& input,
+                                std::chrono::steady_clock::time_point start);
     void layoutMessagePaneChildren();
 
     // Logging

@@ -7,6 +7,7 @@
 
 #include "wibwob_view.h"
 #include "wibwob_engine.h"
+#include "llm/providers/claude_code_sdk_provider.h"  // For streaming
 
 #define Uses_TKeys
 #define Uses_TDrawBuffer
@@ -666,10 +667,58 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     // Log provider info
     logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
 
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
+    // Try SDK provider for streaming
+    auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(
+        engine->getCurrentProviderPtr());
+
+    if (sdkProvider && sdkProvider->isAvailable()) {
+        // Streaming path - show response incrementally
+        messageView->startStreamingMessage("Wib&Wob");
+
+        bool success = sdkProvider->sendStreamingQuery(input,
+            [this, start](const StreamChunk& chunk) {
+                if (chunk.type == StreamChunk::CONTENT_DELTA) {
+                    messageView->appendToStreamingMessage(chunk.content);
+                    inputView->setStatus("Streaming...");
+
+                } else if (chunk.type == StreamChunk::MESSAGE_COMPLETE) {
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start);
+
+                    messageView->finishStreamingMessage();
+                    inputView->setInputEnabled(true);
+                    inputView->setStatus("Ready (" + std::to_string(duration.count()) +
+                                        "ms) - Type a message and press Enter");
+                    logMessage("Wib&Wob", "[streaming complete]");
+                    select();
+
+                } else if (chunk.type == StreamChunk::ERROR_OCCURRED) {
+                    messageView->cancelStreamingMessage();
+                    messageView->addMessage("System", "Error: " + chunk.error_message, true);
+                    logMessage("System", "Streaming error: " + chunk.error_message, true);
+                    inputView->setInputEnabled(true);
+                    inputView->setStatus("Error - Try again");
+                    select();
+                }
+            });
+
+        if (!success) {
+            // Streaming failed to start, fall back
+            messageView->cancelStreamingMessage();
+            fallbackToRegularQuery(input, start);
+        }
+    } else {
+        // Non-streaming fallback
+        fallbackToRegularQuery(input, start);
+    }
+}
+
+void TWibWobWindow::fallbackToRegularQuery(const std::string& input,
+                                           std::chrono::steady_clock::time_point start) {
     engine->sendQuery(input, [this, start](const ClaudeResponse& response) {
-        auto end = std::chrono::high_resolution_clock::now();
+        auto end = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
         inputView->setInputEnabled(true);

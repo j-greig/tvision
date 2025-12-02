@@ -204,20 +204,40 @@ class ClaudeSDKBridge {
                 console.error('Message type:', message.type);
                 console.error('Message data:', JSON.stringify(message, null, 2));
                 console.error('=== END SDK MESSAGE DEBUG ===');
+
                 if (message.type === 'assistant') {
                     const content = message.message.content;
-                    
+
                     // Send streaming chunk
                     this.sendResponse('CONTENT_DELTA', {
                         sessionId: this.sessionId,
                         content: content,
                         isPartial: true
                     });
-                    
+
                     fullResponse += content;
+
+                } else if (message.type === 'result') {
+                    // Handle SDK result messages (errors and completion)
+                    if (message.result === 'error_max_turns') {
+                        this.sendResponse('ERROR_OCCURRED', {
+                            sessionId: this.sessionId,
+                            error: 'MAX_TURNS_EXCEEDED',
+                            message: 'Conversation turn limit reached'
+                        });
+                        return;
+                    } else if (message.result === 'error_during_execution') {
+                        this.sendResponse('ERROR_OCCURRED', {
+                            sessionId: this.sessionId,
+                            error: 'EXECUTION_ERROR',
+                            message: message.error?.message || 'Unknown execution error'
+                        });
+                        return;
+                    }
+                    // Normal completion handled after loop
                 }
             }
-            
+
             // Send completion
             this.sendResponse('MESSAGE_COMPLETE', {
                 sessionId: this.sessionId,
