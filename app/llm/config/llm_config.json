@@ -3,7 +3,7 @@
   "providers": {
     "claude_code_sdk": {
       "enabled": true,
-      "model": "claude-haiku-4-5",
+      "model": "claude-sonnet-4-5",
       "maxTurns": 50,
       "allowedTools": ["Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"],
       "nodeScriptPath": "app/llm/sdk_bridge/claude_sdk_bridge.js",
@@ -11,7 +11,7 @@
     },
     "anthropic_api": {
       "enabled": false,
-      "model": "claude-haiku-4-5",
+      "model": "claude-sonnet-4-5",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "8000",

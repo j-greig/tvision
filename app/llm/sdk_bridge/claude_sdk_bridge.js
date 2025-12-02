@@ -17,7 +17,8 @@ class ClaudeSDKBridge {
         this.sessionId = null;           // Our internal session ID
         this.sdkSessionId = null;        // SDK session ID for resume
         this.systemPrompt = null;        // Agent SDK uses 'systemPrompt' not 'customSystemPrompt'
-        this.allowedTools = ['Read', 'Write', 'Grep', 'Bash', 'LS', 'WebSearch', 'WebFetch'];
+        // this.allowedTools = ['Read', 'Write', 'Grep', 'Bash', 'LS', 'WebSearch', 'WebFetch'];
+        this.allowedTools = ['Read', 'Write', 'Grep', 'WebSearch', 'WebFetch'];
         this.maxTurns = 50;
         this.sdkSource = 'unknown';
         this.queryFn = null;

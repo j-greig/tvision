@@ -610,14 +610,14 @@ bool ClaudeCodeSDKProvider::configure(const std::string& config) {
     // sessionTimeout (quoted or numeric)
     sessionTimeout = parseIntField("sessionTimeout", sessionTimeout);
 
-    // model - extract short name (haiku/sonnet/opus) from full model name
+    // model - map to full 4.5 IDs
     std::string modelStr = parseStringField("model", "claude-haiku-4-5");
     if (modelStr.find("opus") != std::string::npos) {
-        configuredModel = "opus";
+        configuredModel = "claude-opus-4-5";
     } else if (modelStr.find("sonnet") != std::string::npos) {
-        configuredModel = "sonnet";
+        configuredModel = "claude-sonnet-4-5";
     } else {
-        configuredModel = "haiku";  // Default
+        configuredModel = "claude-haiku-4-5";  // Default
     }
     fprintf(stderr, "[SDK] Configured model: %s (from %s)\n", configuredModel.c_str(), modelStr.c_str());
 
