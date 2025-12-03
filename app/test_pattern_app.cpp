@@ -1398,9 +1398,9 @@ void TTestPatternApp::newWibWobTestWindowC()
 void TTestPatternApp::openAnimationFile()
 {
     char fileName[MAXPATH];
-    strcpy(fileName, "primers/*.txt");
-    
-    TFileDialog* dialog = new TFileDialog("primers/*.txt", "Open Text/Animation File", "~N~ame", fdOpenButton, 100);
+    strcpy(fileName, "app/primers/*.txt");
+
+    TFileDialog* dialog = new TFileDialog("app/primers/*.txt", "Open Text/Animation File", "~N~ame", fdOpenButton, 100);
     if (executeDialog(dialog, fileName) != cmCancel)
     {
         windowNumber++;
@@ -1461,9 +1461,9 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const T
 void TTestPatternApp::openTransparentTextFile()
 {
     char fileName[MAXPATH];
-    strcpy(fileName, "primers/*.txt");
+    strcpy(fileName, "app/primers/*.txt");
 
-    TFileDialog* dialog = new TFileDialog("primers/*.txt", "Open Text File (Transparent BG)", "~N~ame", fdOpenButton, 100);
+    TFileDialog* dialog = new TFileDialog("app/primers/*.txt", "Open Text File (Transparent BG)", "~N~ame", fdOpenButton, 100);
     if (executeDialog(dialog, fileName) != cmCancel)
     {
         windowNumber++;
