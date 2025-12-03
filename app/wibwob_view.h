@@ -179,6 +179,10 @@ private:
     std::string getTimestamp() const;
     std::string getCurrentTime() const;
 
+    // TTS
+    void speakResponse(const std::string& text);
+    std::string filterTextForSpeech(const std::string& text);
+
     // Export
     bool exportChat(const std::string& filename = "") const;
 };

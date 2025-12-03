@@ -27,6 +27,8 @@
 #include <random>
 #include <sys/stat.h>
 #include <iterator>
+#include <thread>
+#include <thread>
 
 /*---------------------------------------------------------*/
 /*  TWibWobMessageView Implementation                      */
@@ -711,6 +713,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
                 std::chrono::steady_clock::now() - start);
 
             messageView->finishStreamingMessage();
+            speakResponse(chunk.content);
             inputView->setInputEnabled(true);
             inputView->setStatus("Ready (" + std::to_string(duration.count()) +
                                 "ms) - Type a message and press Enter");
@@ -890,6 +893,107 @@ std::string TWibWobWindow::getCurrentTime() const {
     std::ostringstream oss;
     oss << std::put_time(local, "%H:%M:%S");
     return oss.str();
+}
+
+// ---------- TTS helpers ----------
+namespace {
+    const bool kTtsEnabled = true;
+    const int kTtsRate = 205; // 0 = default rate
+    const char* kVoiceWib = "Sandy";
+    const char* kVoiceWob = "Grandpa";
+
+    std::string escapeForShell(const std::string& text) {
+        // Escape single quotes for sh: 'foo' -> 'foo'\''bar'
+        std::string out;
+        out.reserve(text.size() + 8);
+        for (char c : text) {
+            if (c == '\'') {
+                out += "'\"'\"'";
+            } else {
+                out.push_back(c);
+            }
+        }
+        return out;
+    }
+}
+
+std::string TWibWobWindow::filterTextForSpeech(const std::string& text) {
+    std::istringstream iss(text);
+    std::string line;
+    std::ostringstream out;
+    bool inFence = false;
+
+    while (std::getline(iss, line)) {
+        std::string trimmed = line;
+        while (!trimmed.empty() && std::isspace((unsigned char)trimmed.front())) trimmed.erase(trimmed.begin());
+        while (!trimmed.empty() && std::isspace((unsigned char)trimmed.back())) trimmed.pop_back();
+
+        if (trimmed.rfind("```", 0) == 0 || trimmed.rfind("---", 0) == 0) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence) continue;
+
+        if (line.size() > 120) continue;
+        int alphaNum = 0;
+        for (char c : line) {
+            if (std::isalnum((unsigned char)c)) alphaNum++;
+        }
+        if (!line.empty() && (alphaNum < (int)(line.size() * 0.3))) continue;
+
+        if (!line.empty()) {
+            out << line << "\n";
+        }
+    }
+    return out.str();
+}
+
+void TWibWobWindow::speakResponse(const std::string& text) {
+    if (!kTtsEnabled) return;
+    std::string filtered = filterTextForSpeech(text);
+    if (filtered.empty()) return;
+
+    const std::string wibTag = "つ◕‿◕‿⚆༽つ";
+    const std::string wobTag = "つ⚆‿◕‿◕༽つ";
+
+    std::istringstream iss(filtered);
+    std::string line;
+    std::vector<std::pair<std::string, std::string>> segments;
+
+    while (std::getline(iss, line)) {
+        std::string voice = kVoiceWob;
+        std::string content = line;
+        if (line.find(wibTag) != std::string::npos) {
+            voice = kVoiceWib;
+            auto pos = content.find(wibTag);
+            if (pos != std::string::npos) content.erase(pos, wibTag.size());
+        } else if (line.find(wobTag) != std::string::npos) {
+            voice = kVoiceWob;
+            auto pos = content.find(wobTag);
+            if (pos != std::string::npos) content.erase(pos, wobTag.size());
+        }
+        while (!content.empty() && std::isspace((unsigned char)content.front())) content.erase(content.begin());
+        while (!content.empty() && std::isspace((unsigned char)content.back())) content.pop_back();
+        if (!content.empty()) {
+            segments.push_back({voice, content});
+        }
+    }
+
+    if (segments.empty()) return;
+
+    std::thread([segments]() {
+        for (const auto& seg : segments) {
+            std::string escaped = escapeForShell(seg.second);
+            std::ostringstream cmd;
+            cmd << "say -v \"" << seg.first << "\" ";
+            if (kTtsRate > 0) cmd << "-r " << kTtsRate << " ";
+            cmd << "'" << escaped << "'";
+            // Run sequentially inside this background thread (no overlap between Wib/Wob lines)
+            std::system(cmd.str().c_str());
+            // Small gap between lines to avoid rushing
+            std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        }
+    }).detach();
 }
 
 TFrame* TWibWobWindow::initFrame(TRect r) {
