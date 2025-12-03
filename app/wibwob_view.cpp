@@ -647,8 +647,25 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         std::string helpText = "Available commands:\n"
                               "/clear - Clear chat history\n"
                               "/model - Show current provider and model\n"
+                              "/export [filename] - Export chat to text file\n"
                               "/help - Show this help message";
         messageView->addMessage("System", helpText);
+        return;
+    }
+
+    // Handle /export command with optional filename
+    if (input == "/export" || input.substr(0, 8) == "/export ") {
+        std::string filename;
+        if (input.length() > 8) {
+            filename = input.substr(8);
+            // Trim leading/trailing whitespace
+            size_t start = filename.find_first_not_of(" \t");
+            size_t end = filename.find_last_not_of(" \t");
+            if (start != std::string::npos) {
+                filename = filename.substr(start, end - start + 1);
+            }
+        }
+        exportChat(filename);
         return;
     }
 
@@ -897,6 +914,75 @@ void TWibWobWindow::layoutMessagePaneChildren() {
         msgRect.b.x -= 1;
         messageView->changeBounds(msgRect);
     }
+}
+
+bool TWibWobWindow::exportChat(const std::string& filename) const {
+    if (!messageView) {
+        return false;
+    }
+
+    const auto& messages = messageView->getMessages();
+    if (messages.empty()) {
+        const_cast<TWibWobMessageView*>(messageView)->addMessage("System", "Nothing to export - chat is empty");
+        return false;
+    }
+
+    // Generate filename if not provided
+    std::string outPath = filename;
+    if (outPath.empty()) {
+        mkdir("exports", 0755);
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::ostringstream ss;
+        ss << "exports/chat_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".txt";
+        outPath = ss.str();
+    }
+
+    std::ofstream outFile(outPath);
+    if (!outFile.is_open()) {
+        const_cast<TWibWobMessageView*>(messageView)->addMessage("System", "Failed to create file: " + outPath, true);
+        return false;
+    }
+
+    // Write header
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    outFile << "=== Wib&Wob Chat Export ===" << std::endl;
+    outFile << "Exported: " << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << std::endl;
+    outFile << "Messages: " << messages.size() << std::endl;
+    outFile << "===========================" << std::endl << std::endl;
+
+    // Write each message in clean format
+    for (const auto& msg : messages) {
+        // Skip streaming messages that never completed
+        if (msg.is_streaming && !msg.is_complete) {
+            continue;
+        }
+
+        outFile << "[" << msg.timestamp << "] " << msg.sender << ":";
+
+        // Handle multi-line content - indent continuation lines
+        std::istringstream contentStream(msg.content);
+        std::string line;
+        bool firstLine = true;
+        while (std::getline(contentStream, line)) {
+            if (firstLine) {
+                outFile << " " << line << std::endl;
+                firstLine = false;
+            } else {
+                outFile << "    " << line << std::endl;
+            }
+        }
+        if (firstLine) {
+            outFile << std::endl;
+        }
+        outFile << std::endl;
+    }
+
+    outFile.close();
+
+    const_cast<TWibWobMessageView*>(messageView)->addMessage("System", "Chat exported to: " + outPath);
+    return true;
 }
 
 TWindow* createWibWobWindow(const TRect& bounds, const std::string& title) {

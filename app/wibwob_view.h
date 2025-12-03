@@ -178,6 +178,9 @@ private:
     std::string generateSessionId() const;
     std::string getTimestamp() const;
     std::string getCurrentTime() const;
+
+    // Export
+    bool exportChat(const std::string& filename = "") const;
 };
 
 TWindow* createWibWobWindow(const TRect& bounds, const std::string& title);
