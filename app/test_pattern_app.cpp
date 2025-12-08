@@ -1284,7 +1284,7 @@ void TTestPatternApp::newDonutWindow()
     );
     
     // Create and insert window with donut.txt file (no title for minimalist aesthetic)
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "donut.txt");
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "app/donut.txt");
     deskTop->insert(window);
     registerWindow(window);
 }
