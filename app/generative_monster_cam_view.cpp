@@ -188,7 +188,7 @@ void TGenerativeMonsterCamView::draw(){
         if (minimalSprite) {
     // Minimal 3-line face; track both X and Y
     static const char* S0 = u8"    👁️═👁️  ";
-    static const char* S1 = u8"∿∿∿👃∿∿∿";
+    static const char* S1 = u8"  ∿👃∿  ";
     static const char* S2_LIPS = u8"    👄    ";   // Lips (mouth closed)
     static const char* S2_TONGUE = u8"    👅    "; // Tongue (mouth open)
     // Compose sprite lines depending on blink and mouth state
