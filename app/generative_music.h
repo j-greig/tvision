@@ -49,6 +49,7 @@ public:
     void setScale(const std::vector<float>& frequencies);
     void setEvolveSpeed(float speed);  // 0.0 = static, 1.0 = fast changes
     void setReverb(float amount);       // Reverb depth (0-1)
+    void setGlobalPan(float pan);       // Spatial panning (-1.0 left to +1.0 right)
 
     // Get current frequency bands for visualization
     void getFrequencyBands(float bands[8]) const;

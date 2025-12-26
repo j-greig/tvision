@@ -147,6 +147,17 @@ void GenerativeMusicEngine::setReverb(float amount)
     reverbAmount = std::max(0.0f, std::min(1.0f, amount));
 }
 
+void GenerativeMusicEngine::setGlobalPan(float pan)
+{
+    // Clamp to valid range
+    float clampedPan = std::max(-1.0f, std::min(1.0f, pan));
+
+    // Update all voices' pan
+    for (auto& voice : voices) {
+        voice.pan = clampedPan;
+    }
+}
+
 float GenerativeMusicEngine::randomScaleFrequency()
 {
     if (scaleSize == 0) return 440.0f;

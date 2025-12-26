@@ -48,6 +48,7 @@ public:
     virtual void draw() override;
     virtual void handleEvent(TEvent& event) override;
     virtual void setState(ushort aState, Boolean enable) override;
+    virtual void changeBounds(const TRect& bounds) override;
 
     // Audio control methods
     bool loadAudio(const std::string& filePath);
@@ -88,6 +89,9 @@ protected:
     void drawSpectrum();
     void drawWaveform();
     void drawInfo();
+
+    // Spatial audio
+    void updateSpatialPan();
 
     // Color mapping based on frequency
     TColorRGB getBandColor(int bandIndex, float intensity) const;

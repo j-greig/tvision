@@ -13,6 +13,8 @@
 
 #define Uses_TEvent
 #define Uses_TProgram
+#define Uses_TWindow
+#define Uses_TDeskTop
 #include <tvision/tv.h>
 
 /*---------------------------------------------------------*/
@@ -55,6 +57,9 @@ TAudioReactorView::TAudioReactorView(const TRect& bounds, const std::string& lay
     for (int i = 0; i < 8; i++) {
         freqBands[i] = 0.5f;  // 50% height to start
     }
+
+    // Set initial spatial pan based on window position
+    updateSpatialPan();
 
     // Timer will be started when view becomes exposed (setState override)
 }
@@ -102,6 +107,48 @@ void TAudioReactorView::setState(ushort aState, Boolean enable)
             stopTimer();
         }
     }
+}
+
+void TAudioReactorView::changeBounds(const TRect& bounds)
+{
+    TView::changeBounds(bounds);
+    // Update spatial panning when window moves
+    updateSpatialPan();
+}
+
+void TAudioReactorView::updateSpatialPan()
+{
+    if (!genMusic) return;
+
+    // Get parent window to find position on screen
+    TWindow* parentWindow = dynamic_cast<TWindow*>(owner);
+    if (!parentWindow) return;
+
+    // Get window bounds on desktop
+    TRect windowBounds = parentWindow->getBounds();
+
+    // Get desktop width
+    TProgram* app = TProgram::application;
+    if (!app || !app->deskTop) return;
+
+    int screenWidth = app->deskTop->size.x;
+
+    // Calculate window center X position
+    int windowCenterX = windowBounds.a.x + (windowBounds.b.x - windowBounds.a.x) / 2;
+    float screenCenterX = screenWidth / 2.0f;
+
+    // Normalize to [-1, +1] range
+    // Left edge (x=0) → -1.0 (hard left)
+    // Center (x=screenWidth/2) → 0.0 (center)
+    // Right edge (x=screenWidth) → +1.0 (hard right)
+    float panPosition = (windowCenterX - screenCenterX) / screenCenterX;
+    panPosition = std::max(-1.0f, std::min(1.0f, panPosition));
+
+    // Apply pan to all voices
+    genMusic->setGlobalPan(panPosition);
+
+    fprintf(stderr, "[AUDIO] %s window at x=%d, pan=%.2f\n",
+            engineLayer.c_str(), windowCenterX, panPosition);
 }
 
 void TAudioReactorView::handleEvent(TEvent& event)
@@ -256,8 +303,14 @@ void TAudioReactorView::drawSpectrum()
 
                 if (yFromBottom < barHeight) {
                     // Inside the bar - use shade characters for vertical gradient
-                    // Full white at bottom, fading at top
+                    // Bass: Full white at bottom, fading at top
+                    // Melody: Inverted - fading at bottom, full white at top
                     float positionInBar = (float)yFromBottom / barHeight;
+
+                    // Invert gradient for melody layer
+                    if (engineLayer == "melody") {
+                        positionInBar = 1.0f - positionInBar;
+                    }
 
                     // Select shade character based on position (bottom to top)
                     char shadeChar;
