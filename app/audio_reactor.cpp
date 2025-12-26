@@ -231,41 +231,9 @@ void TAudioReactorView::broadcastAudioEvent()
 
 TColorRGB TAudioReactorView::getBandColor(int bandIndex, float intensity) const
 {
-    // Color gradient from bass (red) to treble (blue)
-    // Low frequencies: Red -> Orange
-    // Mid frequencies: Yellow -> Green
-    // High frequencies: Cyan -> Blue
-
-    float t = (float)bandIndex / 7.0f;
-
-    TColorRGB lowColor, highColor;
-
-    if (t < 0.33f) {
-        // Bass: Red to Orange
-        lowColor = TColorRGB(0xFF, 0x00, 0x00);
-        highColor = TColorRGB(0xFF, 0x88, 0x00);
-    } else if (t < 0.66f) {
-        // Mid: Yellow to Green
-        lowColor = TColorRGB(0xFF, 0xFF, 0x00);
-        highColor = TColorRGB(0x00, 0xFF, 0x00);
-    } else {
-        // Treble: Cyan to Blue
-        lowColor = TColorRGB(0x00, 0xFF, 0xFF);
-        highColor = TColorRGB(0x00, 0x00, 0xFF);
-    }
-
-    // Interpolate based on band position
-    float localT = (t - (int)(t / 0.33f) * 0.33f) / 0.33f;
-    uint8_t r = (uint8_t)(lowColor.r + (highColor.r - lowColor.r) * localT);
-    uint8_t g = (uint8_t)(lowColor.g + (highColor.g - lowColor.g) * localT);
-    uint8_t b = (uint8_t)(lowColor.b + (highColor.b - lowColor.b) * localT);
-
-    // Apply intensity
-    r = (uint8_t)(r * intensity);
-    g = (uint8_t)(g * intensity);
-    b = (uint8_t)(b * intensity);
-
-    return TColorRGB(r, g, b);
+    // Monochrome: white with varying intensity
+    uint8_t value = (uint8_t)(0xFF * intensity);
+    return TColorRGB(value, value, value);
 }
 
 void TAudioReactorView::draw()
@@ -309,14 +277,35 @@ void TAudioReactorView::drawSpectrum()
                 int yFromBottom = H - 1 - y;
 
                 if (yFromBottom < barHeight) {
-                    // Inside the bar - draw with color
-                    float intensity = (barHeight > 0) ?
-                        0.5f + 0.5f * ((float)(barHeight - yFromBottom) / barHeight) : 0.5f;
+                    // Inside the bar - use shade characters for vertical gradient
+                    // Full white at bottom, fading at top
+                    float positionInBar = (float)yFromBottom / barHeight;
+
+                    // Select shade character based on position (bottom to top)
+                    char shadeChar;
+                    float intensity;
+
+                    if (positionInBar < 0.25f) {
+                        // Bottom 25% - full block, brightest
+                        shadeChar = '\xDB';  // █ Full block
+                        intensity = 1.0f;
+                    } else if (positionInBar < 0.50f) {
+                        // 25-50% - dark shade
+                        shadeChar = '\xB2';  // ▓ Dark shade
+                        intensity = 0.9f;
+                    } else if (positionInBar < 0.75f) {
+                        // 50-75% - medium shade
+                        shadeChar = '\xB1';  // ▒ Medium shade
+                        intensity = 0.8f;
+                    } else {
+                        // Top 25% - light shade
+                        shadeChar = '\xB0';  // ░ Light shade
+                        intensity = 0.7f;
+                    }
+
                     TColorRGB color = getBandColor(bandIndex, intensity);
                     TColorAttr attr(color, color);
-
-                    // Use full block character
-                    b.moveChar(x, '\xDB', attr, 1);
+                    b.moveChar(x, shadeChar, attr, 1);
                 } else {
                     // Above the bar - draw background
                     TColorRGB bg(0x10, 0x10, 0x10);
