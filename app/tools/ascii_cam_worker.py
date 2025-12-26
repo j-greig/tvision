@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = ["opencv-python>=4.8", "numpy>=1.24"]
+# ///
 """
 ASCII Art Webcam Worker
 

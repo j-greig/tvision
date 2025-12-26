@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = ["opencv-python>=4.8", "mediapipe>=0.10.0", "numpy>=1.24"]
+# ///
 """
 Webcam → Unix socket streamer for Monster Cam using MediaPipe Face Mesh.
 
@@ -22,6 +25,8 @@ import signal
 import argparse
 import numpy as np
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
 SOCK_PATH = "/tmp/face_monster_cam.sock"
 
@@ -68,15 +73,29 @@ def main():
     os.chmod(args.sock, 0o666)
     print(f"[face_worker] listening at {args.sock}")
 
-    # Initialize MediaPipe Face Mesh
-    mp_face_mesh = mp.solutions.face_mesh
-    face_mesh = mp_face_mesh.FaceMesh(
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
+    # Initialize MediaPipe Face Landmarker (v0.10+ API)
+    # Download model if not present
+    model_path = os.path.expanduser("~/.mediapipe/face_landmarker.task")
+    if not os.path.exists(model_path):
+        import urllib.request
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        print(f"[face_worker] downloading face landmarker model to {model_path}...")
+        urllib.request.urlretrieve(
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            model_path
+        )
+        print("[face_worker] model downloaded")
+
+    base_options = python.BaseOptions(model_asset_path=model_path)
+    options = vision.FaceLandmarkerOptions(
+        base_options=base_options,
+        num_faces=1,
+        min_face_detection_confidence=0.5,
+        min_face_presence_confidence=0.5,
         min_tracking_confidence=0.5
     )
-    print("[face_worker] MediaPipe Face Mesh initialized")
+    face_landmarker = vision.FaceLandmarker.create_from_options(options)
+    print("[face_worker] MediaPipe Face Landmarker initialized")
 
     cap = open_camera(args.device, 320, 240, fps=max(1, args.fps))
     if cap is None:
@@ -142,8 +161,9 @@ def main():
                     # Convert BGR to RGB for MediaPipe
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-                    # Process with MediaPipe
-                    results = face_mesh.process(rgb_frame)
+                    # Process with MediaPipe (new v0.10+ API)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+                    results = face_landmarker.detect(mp_image)
 
                     # Convert to grayscale and resize
                     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -152,9 +172,9 @@ def main():
                     has_face = False
                     bbox = (0, 0, 0, 0)
 
-                    if results.multi_face_landmarks:
-                        # Get first face landmarks
-                        landmarks = results.multi_face_landmarks[0].landmark
+                    if results.face_landmarks:
+                        # Get first face landmarks (new v0.10+ API)
+                        landmarks = results.face_landmarks[0]
                         h, w = gray.shape
 
                         # Calculate bounding box from landmarks
@@ -255,6 +275,26 @@ def main():
 
                         if has_face:
                             face_hits += 1
+
+                    # Verbose logging for blink/mouth state changes
+                    if args.verbose and has_face:
+                        # Track previous states for edge detection
+                        if not hasattr(main, 'prev_blink'):
+                            main.prev_blink = False
+                            main.prev_mouth = False
+
+                        if blink and not main.prev_blink:
+                            print(f"[face_worker] 👁️ BLINK START (EAR={avg_ear:.3f} < {EAR_THRESHOLD})")
+                        elif not blink and main.prev_blink:
+                            print(f"[face_worker] 👁️ BLINK END (EAR={avg_ear:.3f})")
+
+                        if mouth_open and not main.prev_mouth:
+                            print(f"[face_worker] 👅 MOUTH OPEN (MAR={mar:.3f} > {MAR_THRESHOLD})")
+                        elif not mouth_open and main.prev_mouth:
+                            print(f"[face_worker] 👄 MOUTH CLOSED (MAR={mar:.3f})")
+
+                        main.prev_blink = blink
+                        main.prev_mouth = mouth_open
 
                     # Reset state on face detection transitions
                     if has_face != prev_has_face:

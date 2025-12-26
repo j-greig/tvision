@@ -61,42 +61,28 @@ Notes:
 
 ## Build & Run
 
-1) Python worker
+**See [../WEBCAM-FEATURES.md](../WEBCAM-FEATURES.md) for complete setup guide.**
+
+**Quick start:**
 
 ```bash
-pip install -r tools/requirements.txt
-python tools/face_worker.py
+# 1) Start worker (from project root, uses uv for automatic dependencies)
+uv run app/tools/face_worker.py --device 1 -v
 
-# If you have OBS Virtual Camera or multiple cameras:
-python tools/face_worker.py --device 1  # Use camera device 1 instead of 0
-# Or set via environment variable:
-FM_DEVICE=1 python tools/face_worker.py
-
-# To list available cameras:
-python -c "
-import cv2
-for i in range(10):
-    cap = cv2.VideoCapture(i)
-    if cap.isOpened():
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f'Device {i}: {w}x{h}')
-        cap.release()
-    else:
-        break
-"
-
-# Logs show: listening path, camera open, cascades loaded, client connected, ~10s status lines with face=yes/no and blink
-```
-
-2) TUI app
-
-```bash
-mkdir -p build
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+# 2) Build and run TUI (in another terminal)
 cmake --build build -j
 ./build/test_pattern
-# In the app: View → Monster Cam (Emoji). HUD is on by default.
+# Menu: View → Monster Cam (Emoji) (hotkey: C)
+```
+
+**Worker output:**
+```
+[face_worker] listening at /tmp/face_monster_cam.sock
+[face_worker] downloading face landmarker model... (first run only)
+[face_worker] MediaPipe Face Landmarker initialized
+[face_worker] webcam opened: dev=1 size=320x240
+[face_worker] client connected
+[face_worker] fps=12.5 face=yes center=(40,22) bbox=[10,8,60,28] blink=False mouth=False
 ```
 
 ## Controls (Monster Cam)

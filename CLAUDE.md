@@ -228,6 +228,36 @@ cmake --build ./build
 
 **Note**: Building standalone from `app/` causes CMake circular dependency errors. Always build from project root.
 
+### Webcam Features
+
+Two real-time webcam visualization modes. See [app/WEBCAM-FEATURES.md](app/WEBCAM-FEATURES.md) for full details.
+
+**ASCII Webcam (Recommended - Simple Setup):**
+```bash
+# Start worker (uses uv for automatic dependency management)
+uv run app/tools/ascii_cam_worker.py --device 1
+
+# In TUI: View → ASCII Webcam (hotkey: W)
+```
+- Real-time ASCII art conversion (` .:-=+*#%@`)
+- Auto-scales with window size
+- Dependencies: opencv, numpy (auto-installed by uv)
+- Socket: `/tmp/ascii_cam.sock`
+
+**Monster Cam (Emoji Sprite with Face Tracking):**
+```bash
+# Start worker (downloads MediaPipe model on first run)
+uv run app/tools/face_worker.py --device 1 -v
+
+# In TUI: View → Monster Cam (Emoji) (hotkey: C)
+```
+- 3-line emoji sprite: `👁️═👁️` / `∿👃∿` / `👄` or `👅`
+- Tracks face position, blinks, tongue
+- MediaPipe Face Mesh: 468 3D landmarks for detection
+- Socket: `/tmp/face_monster_cam.sock`
+
+**Troubleshooting:** If window shows "webcam:failed", ensure correct worker is running for the window type opened.
+
 ## Common Development Tasks
 
 ### Adding a New View Class
