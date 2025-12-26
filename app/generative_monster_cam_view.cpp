@@ -285,17 +285,11 @@ void TGenerativeMonsterCamView::draw(){
 
     // Field pattern removed.
 
-    // Draw debug HUD overlay on top-left
+    // Draw minimal HUD overlay on top-left
     if (debugHud){
-        char buf0[128]; char buf1[128]; char buf2[128]; char buf3[128];
-        std::snprintf(buf0, sizeof(buf0), "MonsterCam | sock:%s cam:%dx%d fps:%.1f",
-                      connectionStatus.c_str(), camW, camH, rxFps);
-        std::snprintf(buf1, sizeof(buf1), "face:%s blink:%s mouth:%s bbox:%d,%d %dx%d sm:(%.1f,%.1f) out:(%d,%d)",
-                      (hasFace?"yes":"no"), (blink?"yes":"no"), (mouthOpen?"open":"closed"), faceX, faceY, faceW, faceH, smVX, smVY, outVX, outVY);
-        std::snprintf(buf2, sizeof(buf2), "deadband col=%.1f row=%.1f", dbx, dby);
-        std::snprintf(buf3, sizeof(buf3), "keys: v=HUD +/- speed Space=pause r=reset");
-        const char* lines[4] = { buf0, buf1, buf2, buf3 };
-        for (int i=0;i<4 && i<H; ++i){ TDrawBuffer b; int col=0; ushort w = b.moveCStr(col, lines[i], ap, W - col); col += (w>0?w:0); if (col<W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,i,W,1,b); }
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "sock:%s", connectionStatus.c_str());
+        TDrawBuffer b; int col=0; ushort w = b.moveCStr(col, buf, ap, W - col); col += (w>0?w:0); if (col<W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,0,W,1,b);
     }
 }
 

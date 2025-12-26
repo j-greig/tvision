@@ -271,12 +271,12 @@ def main():
                                     eye_frames += 1
                                     noeye_frames = 0
                                     
-                                # Asymmetric hysteresis: fast blink trigger, slower recovery to prevent flicker
-                                # Need only 1 frame with no eyes to blink (immediate response)
-                                # Need 3 frames with eyes to clear (prevent false positives)
+                                # Minimal hysteresis: immediate trigger, fast recovery (strict cascade prevents flicker)
+                                # 1 frame with no eyes → blink (83ms at 12fps)
+                                # 2 frames with eyes → clear (167ms recovery)
                                 if noeye_frames >= 1:
                                     blink = True
-                                elif eye_frames >= 3:
+                                elif eye_frames >= 2:
                                     blink = False
                                 
                                 # Blink timeout - force reset if blinking too long
