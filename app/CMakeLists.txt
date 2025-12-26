@@ -27,6 +27,7 @@ set(TV_COMMON_SOURCES
     api_ipc.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
+    music_engine_manager.cpp
     llm/base/llm_config.cpp
     llm/base/llm_provider_factory.cpp
     llm/base/tool_executor.cpp

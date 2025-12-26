@@ -25,6 +25,22 @@ const std::vector<float> GenerativeMusicEngine::DORIAN_A = {
     220.00f, 246.94f, 261.63f, 293.66f, 329.63f, 369.99f, 392.00f   // A3-G4
 };
 
+// High-octave scales for melody layer (+1 octave)
+const std::vector<float> GenerativeMusicEngine::PENTATONIC_C_HIGH = {
+    261.63f, 293.66f, 329.63f, 392.00f, 440.00f,  // C4-A4
+    523.25f, 587.33f, 659.25f, 783.99f, 880.00f   // C5-A5
+};
+
+const std::vector<float> GenerativeMusicEngine::PENTATONIC_D_HIGH = {
+    293.66f, 329.63f, 369.99f, 440.00f, 493.88f,  // D4-B4
+    587.33f, 659.25f, 739.99f, 880.00f, 987.77f   // D5-B5
+};
+
+const std::vector<float> GenerativeMusicEngine::DORIAN_A_HIGH = {
+    220.00f, 246.94f, 261.63f, 293.66f, 329.63f, 369.99f, 392.00f,  // A3-G4
+    440.00f, 493.88f, 523.25f, 587.33f, 659.25f, 739.99f, 783.99f   // A4-G5
+};
+
 /*---------------------------------------------------------*/
 /* Voice Implementation                                    */
 /*---------------------------------------------------------*/

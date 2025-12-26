@@ -71,6 +71,8 @@
 #include "wibwob_scroll_test.h"
 // Audio-reactive spectrum visualizer
 #include "audio_reactor.h"
+#include "music_engine_manager.h"
+#include "generative_music.h"
 // Custom frame for windows without titles
 #include "notitle_frame.h"
 // Transparent background text view
@@ -148,6 +150,7 @@ const ushort cmMonsterVerse = 155;
 const ushort cmMonsterCam   = 156;
 const ushort cmASCIICam     = 157;
 const ushort cmAudioReactor = 158;
+const ushort cmAudioMelody = 159;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -520,8 +523,43 @@ public:
         TRect interior = getExtent();
         interior.grow(-1, -1);
 
-        // Create audio reactor view
-        audioView = new TAudioReactorView(interior);
+        // Create audio reactor view for BASS layer
+        audioView = new TAudioReactorView(interior, "bass");
+        insert(audioView);
+
+        // Auto-start demo playback
+        audioView->play();
+    }
+
+    TAudioReactorView* getAudioView() { return audioView; }
+
+    static TFrame* initFrame(TRect r)
+    {
+        return new TFrame(r);  // Use standard frame with title
+    }
+};
+
+/*---------------------------------------------------------*/
+/* TAudioMelodyWindow - Higher octave harmony layer       */
+/*---------------------------------------------------------*/
+class TAudioMelodyWindow : public TWindow
+{
+private:
+    TAudioReactorView* audioView;
+
+public:
+    TAudioMelodyWindow(const TRect& bounds, const char* aTitle) :
+        TWindow(bounds, aTitle, wnNoNumber),
+        TWindowInit(&TAudioMelodyWindow::initFrame)
+    {
+        options |= ofTileable;  // Enable cascade/tile functionality
+
+        // Get the interior bounds (excluding frame)
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+
+        // Create audio reactor view for MELODY layer (+1 octave)
+        audioView = new TAudioReactorView(interior, "melody");
         insert(audioView);
 
         // Auto-start demo playback
@@ -563,6 +601,7 @@ private:
     void newWibWobTestWindowB();
     void newWibWobTestWindowC();
     void newAudioReactorWindow();
+    void newAudioMelodyWindow();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
     void openAnimationFilePath(const std::string& path, const TRect& bounds);
@@ -882,6 +921,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
             }
             case cmAudioReactor:
                 newAudioReactorWindow();
+                clearEvent(event);
+                break;
+            case cmAudioMelody:
+                newAudioMelodyWindow();
                 clearEvent(event);
                 break;
             // DISABLED: ASCII Cam (file not in repo)
@@ -1461,6 +1504,55 @@ void TTestPatternApp::newAudioReactorWindow()
     window->select();
 }
 
+void TTestPatternApp::newAudioMelodyWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Audio Melody " << windowNumber;
+
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        62 + offset * 2,          // right (medium width for spectrum)
+        18 + offset               // bottom (medium height for spectrum)
+    );
+
+    // Create and insert audio melody window
+    TAudioMelodyWindow* window = new TAudioMelodyWindow(bounds, title.str().c_str());
+
+    // Auto-match bass scale (if bass layer exists)
+    auto& mgr = MusicEngineManager::getInstance();
+    std::vector<float> bassScale = mgr.getScale("bass");
+
+    if (!bassScale.empty()) {
+        std::vector<float> melodyScale;
+
+        // Detect bass scale and set melody to +1 octave version
+        if (bassScale == GenerativeMusicEngine::PENTATONIC_C) {
+            melodyScale = GenerativeMusicEngine::PENTATONIC_C_HIGH;
+        } else if (bassScale == GenerativeMusicEngine::PENTATONIC_D) {
+            melodyScale = GenerativeMusicEngine::PENTATONIC_D_HIGH;
+        } else if (bassScale == GenerativeMusicEngine::DORIAN_A) {
+            melodyScale = GenerativeMusicEngine::DORIAN_A_HIGH;
+        } else {
+            // Fallback: generic octave shift (+1 octave = 2x frequency)
+            for (float f : bassScale) {
+                melodyScale.push_back(f * 2.0f);
+            }
+        }
+
+        mgr.setScale("melody", melodyScale);
+        fprintf(stderr, "[APP] Melody window synced to bass scale (+1 octave)\n");
+    }
+
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
+}
+
 void TTestPatternApp::openAnimationFile()
 {
     char fileName[MAXPATH];
@@ -1717,7 +1809,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
-            *new TMenuItem("~A~udio Reactor (Spectrum)", cmAudioReactor, kbNoKey) +
+            *new TMenuItem("~A~udio Reactor (Bass)", cmAudioReactor, kbNoKey) +
+            *new TMenuItem("Audio ~M~elody (Harmony)", cmAudioMelody, kbNoKey) +
             // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +

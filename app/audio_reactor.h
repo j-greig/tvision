@@ -18,8 +18,9 @@
 #include <vector>
 #include <cmath>
 
-// Forward declare generative music engine
+// Forward declare generative music engine and manager
 class GenerativeMusicEngine;
+class MusicEngineManager;
 
 /*---------------------------------------------------------*/
 /* Audio Event Broadcasting                                */
@@ -41,7 +42,7 @@ struct AudioFrequencyEvent {
 class TAudioReactorView : public TView
 {
 public:
-    TAudioReactorView(const TRect& bounds);
+    TAudioReactorView(const TRect& bounds, const std::string& layer = "bass");
     virtual ~TAudioReactorView();
 
     virtual void draw() override;
@@ -63,13 +64,10 @@ protected:
     bool playing;
     bool loaded;
     std::string currentFile;
+    std::string engineLayer;  // "bass" or "melody"
 
-    // Generative music engine
+    // Generative music engine (managed by MusicEngineManager)
     GenerativeMusicEngine* genMusic;
-
-    // SDL2 audio device
-    SDL_AudioDeviceID audioDevice;
-    static TAudioReactorView* activeInstance;  // For audio callback
 
     // Timer for animation updates
     TTimerId timerId;
@@ -96,9 +94,6 @@ protected:
 
     // Simple mock FFT for POC (replaced with real analysis)
     void mockFFTAnalysis();
-
-    // SDL2 audio callback (static)
-    static void audioCallback(void* userdata, Uint8* stream, int len);
 
     // Process audio samples into frequency bands
     void processAudioSamples(const float* samples, int sampleCount);

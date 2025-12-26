@@ -53,14 +53,19 @@ public:
     // Get current frequency bands for visualization
     void getFrequencyBands(float bands[8]) const;
 
-private:
-    std::vector<Voice> voices;
-    std::mt19937 rng;
-
-    // Pentatonic scale in various keys
+    // Pentatonic scale in various keys (bass layer: 110-494 Hz)
     static const std::vector<float> PENTATONIC_C;
     static const std::vector<float> PENTATONIC_D;
     static const std::vector<float> DORIAN_A;
+
+    // High-octave scales for melody layer (+1 octave: 220-988 Hz)
+    static const std::vector<float> PENTATONIC_C_HIGH;
+    static const std::vector<float> PENTATONIC_D_HIGH;
+    static const std::vector<float> DORIAN_A_HIGH;
+
+private:
+    std::vector<Voice> voices;
+    std::mt19937 rng;
 
     // Simple reverb buffer
     std::vector<float> reverbBuffer;

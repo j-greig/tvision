@@ -7,6 +7,7 @@
 
 #include "audio_reactor.h"
 #include "generative_music.h"
+#include "music_engine_manager.h"
 #include <cstring>
 #include <algorithm>
 
@@ -18,56 +19,42 @@
 /* TAudioReactorView Implementation                       */
 /*---------------------------------------------------------*/
 
-TAudioReactorView* TAudioReactorView::activeInstance = nullptr;
-
-TAudioReactorView::TAudioReactorView(const TRect& bounds) :
+TAudioReactorView::TAudioReactorView(const TRect& bounds, const std::string& layer) :
     TView(bounds),
     playing(false),
     loaded(true),  // Always loaded (generative)
+    engineLayer(layer),
     timerId(0),
     updatePeriodMs(50),  // 20 FPS for spectrum updates
     phase(0),
-    genMusic(nullptr),
-    audioDevice(0)
+    genMusic(nullptr)
 {
     growMode = gfGrowHiX | gfGrowHiY;
     eventMask |= evBroadcast;
 
-    // Initialize SDL2 audio
-    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "[AUDIO] SDL_Init failed: %s\n", SDL_GetError());
-        return;
-    }
-
     // Create generative music engine
     genMusic = new GenerativeMusicEngine();
-    currentFile = "Generative Ambient";
 
-    // Set up SDL2 audio spec
-    SDL_AudioSpec want, have;
-    SDL_memset(&want, 0, sizeof(want));
-    want.freq = 44100;
-    want.format = AUDIO_F32;  // Float samples
-    want.channels = 2;
-    want.samples = 2048;
-    want.callback = audioCallback;
-    want.userdata = this;
-
-    audioDevice = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-    if (audioDevice == 0) {
-        fprintf(stderr, "[AUDIO] Failed to open audio device: %s\n", SDL_GetError());
+    // Set scale based on layer
+    if (layer == "bass") {
+        genMusic->setScale(GenerativeMusicEngine::PENTATONIC_C);
+        currentFile = "Generative Ambient (Bass)";
+    } else if (layer == "melody") {
+        genMusic->setScale(GenerativeMusicEngine::PENTATONIC_C_HIGH);
+        currentFile = "Generative Melody (Treble)";
     } else {
-        fprintf(stderr, "[AUDIO] Opened audio device: %d Hz, %d channels\n",
-                have.freq, have.channels);
+        genMusic->setScale(GenerativeMusicEngine::PENTATONIC_C);
+        currentFile = "Generative Ambient";
     }
+
+    // Register engine with manager (manager owns SDL device)
+    MusicEngineManager::getInstance().registerEngine(layer, genMusic);
+    fprintf(stderr, "[AUDIO] Created %s layer view\n", layer.c_str());
 
     // Initialize frequency bands to VISIBLE VALUES
     for (int i = 0; i < 8; i++) {
         freqBands[i] = 0.5f;  // 50% height to start
     }
-
-    // Set this as active instance for callbacks
-    activeInstance = this;
 
     // Timer will be started when view becomes exposed (setState override)
 }
@@ -76,22 +63,13 @@ TAudioReactorView::~TAudioReactorView()
 {
     stopTimer();
 
-    // Clean up SDL2 audio
-    if (audioDevice != 0) {
-        SDL_CloseAudioDevice(audioDevice);
-        audioDevice = 0;
-    }
+    // Deregister engine from manager BEFORE deleting
+    MusicEngineManager::getInstance().deregisterEngine(engineLayer);
 
     if (genMusic) {
         delete genMusic;
         genMusic = nullptr;
     }
-
-    if (activeInstance == this) {
-        activeInstance = nullptr;
-    }
-
-    SDL_Quit();
 }
 
 void TAudioReactorView::startTimer()
@@ -149,26 +127,26 @@ bool TAudioReactorView::loadAudio(const std::string& filePath)
 
 void TAudioReactorView::play()
 {
-    if (audioDevice != 0) {
-        SDL_PauseAudioDevice(audioDevice, 0);  // Unpause
-        playing = true;
-        fprintf(stderr, "[AUDIO] Playing generative music\n");
-    }
+    MusicEngineManager::getInstance().play();
+    playing = true;
+    fprintf(stderr, "[AUDIO] Playing %s layer\n", engineLayer.c_str());
 }
 
 void TAudioReactorView::pause()
 {
-    if (audioDevice != 0) {
-        SDL_PauseAudioDevice(audioDevice, playing ? 1 : 0);
-        playing = !playing;
+    auto& mgr = MusicEngineManager::getInstance();
+    if (mgr.isPlaying()) {
+        mgr.pause();
+        playing = false;
+    } else {
+        mgr.play();
+        playing = true;
     }
 }
 
 void TAudioReactorView::stop()
 {
-    if (audioDevice != 0) {
-        SDL_PauseAudioDevice(audioDevice, 1);  // Pause
-    }
+    MusicEngineManager::getInstance().pause();
     playing = false;
     phase = 0;
     std::memset(freqBands, 0, sizeof(freqBands));
@@ -356,24 +334,7 @@ void TAudioReactorView::drawInfo()
     writeLine(0, H - 1, W, 1, b);
 }
 
-void TAudioReactorView::audioCallback(void* userdata, Uint8* stream, int len)
-{
-    TAudioReactorView* view = static_cast<TAudioReactorView*>(userdata);
-    if (!view || !view->genMusic) {
-        // Fill with silence
-        SDL_memset(stream, 0, len);
-        return;
-    }
-
-    // Generate audio using generative engine
-    float* floatStream = (float*)stream;
-    int frames = len / (sizeof(float) * 2);  // Stereo float samples
-
-    view->genMusic->generate(floatStream, frames, 44100.0f);
-
-    // Update frequency bands for visualization
-    view->genMusic->getFrequencyBands(view->freqBands);
-}
+// Audio callback now handled by MusicEngineManager
 
 void TAudioReactorView::processAudioSamples(const float* samples, int sampleCount)
 {
