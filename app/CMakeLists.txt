@@ -13,6 +13,11 @@ endif()
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find SDL2 for audio support
+find_package(SDL2 REQUIRED)
+find_library(SDL2_MIXER_LIBRARY SDL2_mixer REQUIRED HINTS /opt/homebrew/lib)
+find_path(SDL2_MIXER_INCLUDE_DIR SDL_mixer.h PATH_SUFFIXES SDL2 HINTS /opt/homebrew/include)
+
 # Common sources used by multiple apps
 set(TV_COMMON_SOURCES
     test_pattern.cpp
@@ -55,8 +60,11 @@ add_executable(test_pattern
     transparent_text_view.cpp
     ansi_view.cpp
     wibwob_scroll_test.cpp
+    audio_reactor.cpp
+    generative_music.cpp
 )
-target_link_libraries(test_pattern PRIVATE tvision)
+target_link_libraries(test_pattern PRIVATE tvision ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARY})
+target_include_directories(test_pattern PRIVATE ${SDL2_INCLUDE_DIRS} ${SDL2_MIXER_INCLUDE_DIR} /opt/homebrew/include)
 
 # simple_tui (minimal reference app)
 add_executable(simple_tui

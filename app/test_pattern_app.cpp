@@ -69,6 +69,8 @@
 #include "wibwob_view.h"
 // Scrollbar fix prototypes (test versions)
 #include "wibwob_scroll_test.h"
+// Audio-reactive spectrum visualizer
+#include "audio_reactor.h"
 // Custom frame for windows without titles
 #include "notitle_frame.h"
 // Transparent background text view
@@ -145,6 +147,7 @@ const ushort cmMonsterPortal = 154;
 const ushort cmMonsterVerse = 155;
 const ushort cmMonsterCam   = 156;
 const ushort cmASCIICam     = 157;
+const ushort cmAudioReactor = 158;
 
 // Tools menu commands (future)
 const ushort cmAnsiEditor = 125;
@@ -499,6 +502,41 @@ public:
 };
 
 /*---------------------------------------------------------*/
+/* TAudioReactorWindow - Audio spectrum visualizer window */
+/*---------------------------------------------------------*/
+class TAudioReactorWindow : public TWindow
+{
+private:
+    TAudioReactorView* audioView;
+
+public:
+    TAudioReactorWindow(const TRect& bounds, const char* aTitle) :
+        TWindow(bounds, aTitle, wnNoNumber),
+        TWindowInit(&TAudioReactorWindow::initFrame)
+    {
+        options |= ofTileable;  // Enable cascade/tile functionality
+
+        // Get the interior bounds (excluding frame)
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+
+        // Create audio reactor view
+        audioView = new TAudioReactorView(interior);
+        insert(audioView);
+
+        // Auto-start demo playback
+        audioView->play();
+    }
+
+    TAudioReactorView* getAudioView() { return audioView; }
+
+    static TFrame* initFrame(TRect r)
+    {
+        return new TFrame(r);  // Use standard frame with title
+    }
+};
+
+/*---------------------------------------------------------*/
 /* TTestPatternApp - Main application class               */
 /*---------------------------------------------------------*/
 class TTestPatternApp : public TApplication
@@ -524,6 +562,7 @@ private:
     void newWibWobTestWindowA();
     void newWibWobTestWindowB();
     void newWibWobTestWindowC();
+    void newAudioReactorWindow();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
     void openAnimationFilePath(const std::string& path, const TRect& bounds);
@@ -841,6 +880,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmAudioReactor:
+                newAudioReactorWindow();
+                clearEvent(event);
+                break;
             // DISABLED: ASCII Cam (file not in repo)
             // case cmASCIICam: {
             //     TRect r = deskTop->getExtent();
@@ -1395,6 +1438,29 @@ void TTestPatternApp::newWibWobTestWindowC()
     window->select();
 }
 
+void TTestPatternApp::newAudioReactorWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Audio Reactor " << windowNumber;
+
+    // Calculate window position (cascade effect)
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top
+        62 + offset * 2,          // right (medium width for spectrum)
+        18 + offset               // bottom (medium height for spectrum)
+    );
+
+    // Create and insert audio reactor window
+    TAudioReactorWindow* window = new TAudioReactorWindow(bounds, title.str().c_str());
+    deskTop->insert(window);
+    registerWindow(window);
+    window->select();
+}
+
 void TTestPatternApp::openAnimationFile()
 {
     char fileName[MAXPATH];
@@ -1651,6 +1717,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
+            *new TMenuItem("~A~udio Reactor (Spectrum)", cmAudioReactor, kbNoKey) +
             // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
