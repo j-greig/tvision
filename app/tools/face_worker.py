@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Minimal webcam → Unix socket streamer for Monster Cam (Emoji).
+Webcam → Unix socket streamer for Monster Cam using MediaPipe Face Mesh.
 
 Protocol per frame:
  1) One ASCII JSON header line terminated by \n, e.g.:
-    {"w":80,"h":45,"ts":1694450000,"has_face":true,"bbox":[x,y,w,h]}
+    {"w":80,"h":45,"ts":1694450000,"has_face":true,"bbox":[x,y,w,h],"blink":false,"mouth_open":false}
  2) Followed by w*h raw bytes (grayscale luminance 0..255).
 
 Server path: /tmp/face_monster_cam.sock
 
-Dependencies: opencv-python (pip install -r tools/requirements.txt)
+Dependencies: opencv-python, mediapipe, numpy (pip install -r tools/requirements.txt)
 """
 
 import cv2
@@ -20,6 +20,8 @@ import json
 import socket
 import signal
 import argparse
+import numpy as np
+import mediapipe as mp
 
 SOCK_PATH = "/tmp/face_monster_cam.sock"
 
@@ -40,31 +42,20 @@ def open_camera(dev_index=0, width=320, height=240, fps=12):
     cap.set(cv2.CAP_PROP_FPS, fps)
     return cap
 
-def detect_face(gray, cascade):
-    try:
-        faces = cascade.detectMultiScale(gray, 1.2, 3, minSize=(30, 30))
-        if len(faces) > 0:
-            # pick the largest
-            x, y, w, h = max(faces, key=lambda r: r[2]*r[3])
-            return True, (int(x), int(y), int(w), int(h))
-    except Exception:
-        pass
-    return False, (0, 0, 0, 0)
-
 def main():
-    parser = argparse.ArgumentParser(description="Monster Cam face worker (webcam → Unix socket)")
+    parser = argparse.ArgumentParser(description="Monster Cam face worker (webcam → Unix socket) using MediaPipe")
     parser.add_argument("--sock", default=SOCK_PATH, help="Unix socket path")
     parser.add_argument("--device", type=int, default=int(os.environ.get("FM_DEVICE", "0")), help="Camera device index")
     parser.add_argument("--width", type=int, default=int(os.environ.get("FM_WIDTH", "80")), help="Output width (cols)")
     parser.add_argument("--height", type=int, default=int(os.environ.get("FM_HEIGHT", "45")), help="Output height (rows)")
     parser.add_argument("--fps", type=int, default=int(os.environ.get("FM_FPS", "12")), help="Output FPS")
-    parser.add_argument("--no-face", action="store_true", help="Disable face detection (speed)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase logging verbosity")
     parser.add_argument("--log-interval", type=float, default=10.0, help="Seconds between status logs")
     args = parser.parse_args()
 
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
+
     # Remove stale socket
     try:
         os.unlink(args.sock)
@@ -77,80 +68,15 @@ def main():
     os.chmod(args.sock, 0o666)
     print(f"[face_worker] listening at {args.sock}")
 
-    # Load face + eye + smile cascades (best effort)
-    face_cascade = None
-    eye_cascade = None
-    smile_cascade = None
-    if not args.no_face:
-        # Try multiple methods to find Haar cascade XML files
-        cascade_locations = []
-
-        # Method 1: cv2.data.haarcascades (OpenCV 4.x+)
-        if hasattr(cv2, 'data'):
-            cascade_locations.append(cv2.data.haarcascades)
-
-        # Method 2: OpenCV package installation directory
-        try:
-            import cv2 as cv_module
-            opencv_dir = os.path.dirname(cv_module.__file__)
-            cascade_locations.append(os.path.join(opencv_dir, 'data', 'haarcascades') + os.sep)
-        except:
-            pass
-
-        # Method 3: Common system paths
-        cascade_locations.extend([
-            '/usr/share/opencv4/haarcascades/',
-            '/usr/local/share/opencv4/haarcascades/',
-            '/opt/homebrew/share/opencv4/haarcascades/',
-        ])
-
-        # Try to load face cascade
-        for base_path in cascade_locations:
-            try:
-                cascade_path = base_path + 'haarcascade_frontalface_default.xml'
-                if os.path.exists(cascade_path):
-                    face_cascade = cv2.CascadeClassifier(cascade_path)
-                    if not face_cascade.empty():
-                        print(f"[face_worker] face cascade loaded: {cascade_path}")
-                        break
-            except Exception as e:
-                continue
-
-        if face_cascade is None or face_cascade.empty():
-            print(f"[face_worker] WARN: could not load face cascade (searched {len(cascade_locations)} locations)")
-            face_cascade = None
-
-        # Try to load eye cascade
-        for base_path in cascade_locations:
-            try:
-                eye_path = base_path + 'haarcascade_eye_tree_eyeglasses.xml'
-                if os.path.exists(eye_path):
-                    eye_cascade = cv2.CascadeClassifier(eye_path)
-                    if not eye_cascade.empty():
-                        print(f"[face_worker] eye cascade loaded: {eye_path}")
-                        break
-            except Exception as e:
-                continue
-
-        if eye_cascade is None or eye_cascade.empty():
-            print(f"[face_worker] WARN: could not load eye cascade (searched {len(cascade_locations)} locations)")
-            eye_cascade = None
-
-        # Try to load smile cascade for mouth detection
-        for base_path in cascade_locations:
-            try:
-                smile_path = base_path + 'haarcascade_smile.xml'
-                if os.path.exists(smile_path):
-                    smile_cascade = cv2.CascadeClassifier(smile_path)
-                    if not smile_cascade.empty():
-                        print(f"[face_worker] smile cascade loaded: {smile_path}")
-                        break
-            except Exception as e:
-                continue
-
-        if smile_cascade is None or smile_cascade.empty():
-            print(f"[face_worker] WARN: could not load smile cascade (searched {len(cascade_locations)} locations)")
-            smile_cascade = None
+    # Initialize MediaPipe Face Mesh
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+    print("[face_worker] MediaPipe Face Mesh initialized")
 
     cap = open_camera(args.device, 320, 240, fps=max(1, args.fps))
     if cap is None:
@@ -165,26 +91,34 @@ def main():
     target_h = int(args.height)
     frame_delay = max(1e-3, 1.0 / float(max(1, args.fps)))
 
+    # MediaPipe landmark indices (Face Mesh has 468 landmarks)
+    # Reference: https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
+    LEFT_EYE_INDICES = [362, 385, 387, 263, 373, 380]  # Left eye landmarks
+    RIGHT_EYE_INDICES = [33, 160, 158, 133, 153, 144]  # Right eye landmarks
+    MOUTH_INDICES = [61, 291, 0, 17, 84, 181, 78, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87]  # Mouth landmarks
+
     while True:
         conn, _ = srv.accept()
         conn.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1<<20)
         print("[face_worker] client connected")
+
         try:
             last = 0.0
             frames = 0
             face_hits = 0
             hud_last = time.time()
             prev_has_face = False
+
+            # Smoothing and state tracking
+            smooth_cx, smooth_cy = -1, -1
+            smooth_alpha = 0.3
             blink = False
-            noeye_frames = 0
-            eye_frames = 0
+            mouth_open = False
+            blink_frames = 0
+            noblink_frames = 0
             mouth_frames = 0
             nomouth_frames = 0
-            # Add smoothing for stable face coordinates
-            smooth_cx, smooth_cy = -1, -1
-            smooth_alpha = 0.3  # Higher = more responsive, lower = more stable
-            blink_timeout_frames = 30  # Max frames to stay blinking (2.5s at 12fps)
-            mouth_open = False
+
             while True:
                 now = time.time()
                 if now - last < frame_delay:
@@ -195,142 +129,145 @@ def main():
                 if cap is None:
                     # Synthetic fallback: gradient + noise
                     t = now
-                    import numpy as np
                     y = np.linspace(0, 1, target_h, dtype=np.float32)[:, None]
                     x = np.linspace(0, 1, target_w, dtype=np.float32)[None, :]
                     img = (127 + 127*(np.sin((x*10+t)*0.7) * np.cos((y*10-t)*0.6))).astype('uint8')
                     has_face = False
-                    bbox = (0,0,0,0)
+                    bbox = (0, 0, 0, 0)
                 else:
                     ok, frame = cap.read()
                     if not ok:
                         continue
+
+                    # Convert BGR to RGB for MediaPipe
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # Process with MediaPipe
+                    results = face_mesh.process(rgb_frame)
+
+                    # Convert to grayscale and resize
                     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    # Resize to target
                     gray = cv2.resize(gray, (target_w, target_h), interpolation=cv2.INTER_AREA)
+
                     has_face = False
-                    bbox = (0,0,0,0)
-                    if face_cascade is not None:
-                        # Use a small version for speed
-                        det = cv2.resize(gray, (160, 120), interpolation=cv2.INTER_AREA)
-                        hf, bb = detect_face(det, face_cascade)
-                        if hf:
-                            # Map bbox back to target size
-                            sx = target_w/160.0; sy = target_h/120.0
-                            x,y,w,h = bb
-                            # Raw coordinates
-                            raw_cx = int(x*sx) + int(w*sx)//2  
-                            raw_cy = int(y*sy) + int(h*sy)//2
-                            
-                            # Apply smoothing to reduce jitter
-                            if smooth_cx < 0 or smooth_cy < 0:
-                                # First detection - initialize
-                                smooth_cx, smooth_cy = raw_cx, raw_cy
-                            else:
-                                # Smooth using EMA filter
-                                smooth_cx = smooth_cx + smooth_alpha * (raw_cx - smooth_cx)
-                                smooth_cy = smooth_cy + smooth_alpha * (raw_cy - smooth_cy)
-                            
-                            # Use smoothed center to rebuild bbox
-                            smooth_w, smooth_h = int(w*sx), int(h*sy)
-                            smooth_x = int(smooth_cx - smooth_w//2)
-                            smooth_y = int(smooth_cy - smooth_h//2)
-                            bbox = (smooth_x, smooth_y, smooth_w, smooth_h)
-                            has_face = True
-                            # Blink detection via eyes in face ROI
-                            if eye_cascade is not None:
-                                fx, fy, fw, fh = bbox
-                                # Ensure bbox is within frame bounds
-                                fx = max(0, min(fx, target_w-1))
-                                fy = max(0, min(fy, target_h-1))
-                                fw = max(1, min(fw, target_w - fx))
-                                fh = max(1, min(fh, target_h - fy))
-                                
-                                # Upper half of face for eyes region
-                                ey = fy
-                                eh = max(1, min(int(fh * 0.6), target_h - ey))
-                                
-                                # Extract eye region safely
-                                if ey + eh <= target_h and fx + fw <= target_w:
-                                    eyroi = gray[ey:ey+eh, fx:fx+fw]
-                                    if eyroi.size > 0:  # Check if ROI is valid
-                                        # Stricter detection: higher scale factor and more neighbors to reduce false positives
-                                        eyes = eye_cascade.detectMultiScale(eyroi, 1.3, 5, minSize=(10, 8))
-                                        if len(eyes) == 0:
-                                            noeye_frames += 1
-                                            eye_frames = 0
-                                        else:
-                                            eye_frames += 1
-                                            noeye_frames = 0
-                                    else:
-                                        # Invalid ROI - assume eyes present to avoid stuck blink
-                                        eye_frames += 1
-                                        noeye_frames = 0
-                                else:
-                                    # Invalid bounds - assume eyes present
-                                    eye_frames += 1
-                                    noeye_frames = 0
-                                    
-                                # Minimal hysteresis: immediate trigger, fast recovery (strict cascade prevents flicker)
-                                # 1 frame with no eyes → blink (83ms at 12fps)
-                                # 2 frames with eyes → clear (167ms recovery)
-                                if noeye_frames >= 1:
-                                    blink = True
-                                elif eye_frames >= 2:
-                                    blink = False
-                                
-                                # Blink timeout - force reset if blinking too long
-                                if blink and noeye_frames > blink_timeout_frames:
-                                    blink = False
-                                    noeye_frames = 0
-                                    eye_frames = 0
+                    bbox = (0, 0, 0, 0)
 
-                                # Mouth/smile detection in lower half of face
-                                if smile_cascade is not None:
-                                    # Lower half of face for mouth region
-                                    my = fy + int(fh * 0.5)  # Start at 50% down
-                                    mh = max(1, min(int(fh * 0.5), target_h - my))  # Bottom 50%
+                    if results.multi_face_landmarks:
+                        # Get first face landmarks
+                        landmarks = results.multi_face_landmarks[0].landmark
+                        h, w = gray.shape
 
-                                    # Extract mouth region safely
-                                    if my + mh <= target_h and fx + fw <= target_w:
-                                        mroi = gray[my:my+mh, fx:fx+fw]
-                                        if mroi.size > 0:
-                                            # Detect smile/mouth open (lenient params to actually detect mouth opening)
-                                            smiles = smile_cascade.detectMultiScale(mroi, 1.5, 3, minSize=(10, 10))
-                                            if len(smiles) > 0:
-                                                mouth_frames += 1
-                                                nomouth_frames = 0
-                                            else:
-                                                nomouth_frames += 1
-                                                mouth_frames = 0
-                                        else:
-                                            nomouth_frames += 1
-                                            mouth_frames = 0
-                                    else:
-                                        nomouth_frames += 1
-                                        mouth_frames = 0
+                        # Calculate bounding box from landmarks
+                        x_coords = [int(lm.x * w) for lm in landmarks]
+                        y_coords = [int(lm.y * h) for lm in landmarks]
 
-                                    # Hysteresis for mouth: need 2 frames to open, 2 to close
-                                    if mouth_frames >= 2:
-                                        mouth_open = True
-                                    elif nomouth_frames >= 2:
-                                        mouth_open = False
-                # Reset blink and mouth state on face detection transitions
-                if has_face != prev_has_face:
-                    # Face status changed - reset all detection states
-                    blink = False
-                    noeye_frames = 0
-                    eye_frames = 0
-                    mouth_open = False
-                    mouth_frames = 0
-                    nomouth_frames = 0
-                    # Reset smoothing when face detection lost/regained
-                    if not has_face:
-                        smooth_cx, smooth_cy = -1, -1
-                        
-                if has_face:
-                    face_hits += 1
-                img = gray
+                        raw_x = min(x_coords)
+                        raw_y = min(y_coords)
+                        raw_w = max(x_coords) - raw_x
+                        raw_h = max(y_coords) - raw_y
+
+                        # Center coordinates
+                        raw_cx = raw_x + raw_w // 2
+                        raw_cy = raw_y + raw_h // 2
+
+                        # Apply smoothing
+                        if smooth_cx < 0 or smooth_cy < 0:
+                            smooth_cx, smooth_cy = raw_cx, raw_cy
+                        else:
+                            smooth_cx = smooth_cx + smooth_alpha * (raw_cx - smooth_cx)
+                            smooth_cy = smooth_cy + smooth_alpha * (raw_cy - smooth_cy)
+
+                        # Rebuild bbox from smoothed center
+                        smooth_x = int(smooth_cx - raw_w // 2)
+                        smooth_y = int(smooth_cy - raw_h // 2)
+                        bbox = (smooth_x, smooth_y, raw_w, raw_h)
+                        has_face = True
+
+                        # Blink detection using eye aspect ratio (EAR)
+                        def eye_aspect_ratio(eye_landmarks):
+                            """Calculate eye aspect ratio from landmarks"""
+                            # Vertical distances
+                            v1 = np.linalg.norm(np.array([eye_landmarks[1].x, eye_landmarks[1].y]) -
+                                               np.array([eye_landmarks[5].x, eye_landmarks[5].y]))
+                            v2 = np.linalg.norm(np.array([eye_landmarks[2].x, eye_landmarks[2].y]) -
+                                               np.array([eye_landmarks[4].x, eye_landmarks[4].y]))
+                            # Horizontal distance
+                            h = np.linalg.norm(np.array([eye_landmarks[0].x, eye_landmarks[0].y]) -
+                                              np.array([eye_landmarks[3].x, eye_landmarks[3].y]))
+
+                            ear = (v1 + v2) / (2.0 * h)
+                            return ear
+
+                        left_eye_lms = [landmarks[i] for i in LEFT_EYE_INDICES]
+                        right_eye_lms = [landmarks[i] for i in RIGHT_EYE_INDICES]
+
+                        left_ear = eye_aspect_ratio(left_eye_lms)
+                        right_ear = eye_aspect_ratio(right_eye_lms)
+                        avg_ear = (left_ear + right_ear) / 2.0
+
+                        # EAR threshold for blink (typically < 0.2 means closed)
+                        EAR_THRESHOLD = 0.21
+                        if avg_ear < EAR_THRESHOLD:
+                            blink_frames += 1
+                            noblink_frames = 0
+                        else:
+                            noblink_frames += 1
+                            blink_frames = 0
+
+                        # Hysteresis: 1 frame to blink, 2 frames to clear
+                        if blink_frames >= 1:
+                            blink = True
+                        elif noblink_frames >= 2:
+                            blink = False
+
+                        # Mouth detection using mouth aspect ratio (MAR)
+                        def mouth_aspect_ratio(mouth_landmarks):
+                            """Calculate mouth opening from landmarks"""
+                            # Vertical distances (top to bottom of mouth)
+                            v1 = np.linalg.norm(np.array([mouth_landmarks[13].x, mouth_landmarks[13].y]) -
+                                               np.array([mouth_landmarks[14].x, mouth_landmarks[14].y]))
+                            v2 = np.linalg.norm(np.array([mouth_landmarks[2].x, mouth_landmarks[2].y]) -
+                                               np.array([mouth_landmarks[16].x, mouth_landmarks[16].y]))
+                            # Horizontal distance (left to right of mouth)
+                            h = np.linalg.norm(np.array([mouth_landmarks[0].x, mouth_landmarks[0].y]) -
+                                              np.array([mouth_landmarks[10].x, mouth_landmarks[10].y]))
+
+                            mar = (v1 + v2) / (2.0 * h)
+                            return mar
+
+                        mouth_lms = [landmarks[i] for i in MOUTH_INDICES]
+                        mar = mouth_aspect_ratio(mouth_lms)
+
+                        # MAR threshold for mouth open (typically > 0.5 means open)
+                        MAR_THRESHOLD = 0.5
+                        if mar > MAR_THRESHOLD:
+                            mouth_frames += 1
+                            nomouth_frames = 0
+                        else:
+                            nomouth_frames += 1
+                            mouth_frames = 0
+
+                        # Hysteresis: 2 frames to open, 2 frames to close
+                        if mouth_frames >= 2:
+                            mouth_open = True
+                        elif nomouth_frames >= 2:
+                            mouth_open = False
+
+                        if has_face:
+                            face_hits += 1
+
+                    # Reset state on face detection transitions
+                    if has_face != prev_has_face:
+                        blink = False
+                        mouth_open = False
+                        blink_frames = 0
+                        noblink_frames = 0
+                        mouth_frames = 0
+                        nomouth_frames = 0
+                        if not has_face:
+                            smooth_cx, smooth_cy = -1, -1
+
+                    img = gray
 
                 hdr = {
                     "w": int(target_w),
@@ -345,6 +282,7 @@ def main():
                 conn.sendall(line)
                 conn.sendall(img.tobytes() if hasattr(img, 'tobytes') else bytes(img))
                 frames += 1
+
                 # Edge transition logs
                 if args.verbose:
                     if has_face and not prev_has_face:
@@ -352,7 +290,8 @@ def main():
                         print(f"[face_worker] face: appeared at (x={cx}, y={cy}) bbox={bbox}")
                     elif (not has_face) and prev_has_face:
                         print("[face_worker] face: lost")
-                # CRITICAL: Update prev_has_face EVERY frame, not just in verbose mode
+
+                # Update prev_has_face EVERY frame
                 prev_has_face = has_face
 
                 if (now - hud_last) >= max(0.5, args.log_interval):
@@ -366,10 +305,13 @@ def main():
                     frames = 0
                     face_hits = 0
                     hud_last = now
+
         except (BrokenPipeError, ConnectionResetError):
             print("[face_worker] client disconnected")
         except Exception as e:
             print(f"[face_worker] error: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
         finally:
             try:
                 conn.close()
