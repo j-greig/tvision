@@ -234,7 +234,8 @@ def main():
                                 if ey + eh <= target_h and fx + fw <= target_w:
                                     eyroi = gray[ey:ey+eh, fx:fx+fw]
                                     if eyroi.size > 0:  # Check if ROI is valid
-                                        eyes = eye_cascade.detectMultiScale(eyroi, 1.1, 3, minSize=(8, 6))
+                                        # Stricter detection: higher scale factor and more neighbors to reduce false positives
+                                        eyes = eye_cascade.detectMultiScale(eyroi, 1.3, 5, minSize=(10, 8))
                                         if len(eyes) == 0:
                                             noeye_frames += 1
                                             eye_frames = 0
