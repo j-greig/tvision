@@ -28,14 +28,15 @@ Per frame over the socket:
 1) One ASCII JSON header line, then newline. Example:
 
 ```json
-{"w":80,"h":45,"ts":1694450000,"has_face":true,"bbox":[x,y,w,h],"blink":false}
+{"w":80,"h":45,"ts":1694450000,"has_face":true,"bbox":[x,y,w,h],"blink":false,"mouth_open":false}
 ```
 
 - `w,h`: frame size used for the grayscale payload
 - `ts`: epoch seconds (info)
 - `has_face`: whether a face bbox is valid
 - `bbox`: face rectangle in the `w x h` resized frame coordinates
-- `blink`: best-effort blink flag using Haar eye detector (optional; present in current impl)
+- `blink`: blink flag using Haar eye detector (1-frame trigger, 3-frame recovery)
+- `mouth_open`: mouth/smile detection using Haar smile cascade (2-frame hysteresis both ways)
 
 2) Followed by `w*h` raw bytes (uint8 grayscale) for the resized frame.
 
@@ -43,12 +44,12 @@ Notes:
 - The TUI is tolerant to reading header and part of payload together; leftover bytes from the header read are now moved into the payload buffer (fix for partial reads).
 - If `has_face=false`, the TUI freezes at last drawn position (no re-centering drift).
 
--## TUI Rendering & Tracking Logic
+## TUI Rendering & Tracking Logic
 
 - Minimal sprite only:
-  - Line 1: `    👁️═👁️  ` (eyes hidden while blink=true)
+  - Line 1: `    👁️═👁️  ` (eyes hidden while blink=true → `      ═    `)
   - Line 2: `∿∿∿👃∿∿∿`
-  - Line 3: `    👅    `
+  - Line 3: `    👄    ` (lips) or `    👅    ` (tongue when mouth_open=true)
 - Mapping:
   - `targetVX = round((faceX + faceW/2) * (W / camW))`
   - `targetVY = clamp( round((faceY + faceH/2) * (H / camH)) - 1, 0, H-3 )` to fit the 3-line sprite
@@ -114,29 +115,38 @@ cmake --build build -j
 - Scaled deadband with window size; freeze on loss; both X and Y tracked.
 - Blink support: eye Haar cascade; `blink` toggles eye glyphs; HUD shows blink.
 
-### Recent Major Fixes (Sep 2024)
+### Recent Major Fixes (Dec 2024)
 
-- **Fixed OpenCV Installation**: Added virtual environment setup in `tools/venv/` with proper opencv-contrib-python dependencies
-- **Improved Socket Connection**: Enhanced error handling with retry logic, detailed connection status reporting ("connected"/"failed"/"socket_error"/"disconnected")
-- **Fixed Mirror Movement**: Corrected X-axis movement direction so face tracking feels natural (move right = sprite moves right)
-- **Eliminated Phantom Movement**: Implemented live data detection - sprite only moves when fresh face data arrives, no more autonomous movement from stale smoothing
-- **Stabilized Face Detection**: Added coordinate smoothing in Python worker (EMA alpha=0.3) to reduce jittery detection noise
-- **Fixed Stuck Blink**: Enhanced blink detection with bounds checking, timeout protection (30 frames), and proper state reset on face detection transitions
-- **Pure Black Background**: Changed background from dark grey `RGB(10,10,12)` to pure black `RGB(0,0,0)` to eliminate visible movement trails
+- **CRITICAL: Fixed prev_has_face update bug**: Variable only updated in verbose mode, breaking all face transition detection, smoothing resets, and blink state management - now updates every frame
+- **Fixed Blink Detection**: Changed hysteresis from 2-frame symmetric to 1-frame trigger / 3-frame recovery asymmetric for faster response
+- **Fixed Redraw Trails**: Full TDrawBuffer initialization prevents garbage data showing as eye trails when moving
+- **Added Mouth Detection**: Haarcascade_smile.xml for mouth open detection, shows tongue 👅 when open, lips 👄 when closed
+- **Fixed White Rectangle Bug**: Uninitialized left margin in TDrawBuffer caused white artifacts stretching from edge to center
+- **Fixed OpenCV Cascade Loading**: Multi-location search handles different OpenCV installation patterns (brew, system, venv)
+- **Improved Face Tracking**: Stabilized coordinate smoothing (EMA alpha=0.3) reduces jitter
+- **Fixed Mirror Movement**: Corrected X-axis direction so tracking feels natural
+- **Pure Black Background**: RGB(0,0,0) eliminates movement trails
 
 ## Known Issues / Limitations (Updated)
 
-- ~~Haar-based detection jitters at low res~~ **FIXED**: Now smoothed in Python worker
-- ~~Blink detection gets stuck~~ **FIXED**: Added timeout and transition resets  
+- ~~Haar-based detection jitters at low res~~ **FIXED**: Smoothed in Python worker
+- ~~Blink detection gets stuck~~ **FIXED**: Timeout and transition resets
+- ~~Blink hysteresis too slow~~ **FIXED**: Asymmetric 1/3 frame hysteresis
 - ~~Movement feels backwards~~ **FIXED**: X-axis mirroring corrected
-- ~~Sprite moves autonomously~~ **FIXED**: Live data detection implemented
+- ~~Sprite moves autonomously~~ **FIXED**: Live data detection
+- ~~prev_has_face never updates~~ **FIXED**: Moved outside verbose block
+- ~~White rectangle artifacts~~ **FIXED**: Full TDrawBuffer init
+- ~~Redraw eye trails~~ **FIXED**: Full buffer clearing
+- Smile cascade may produce false positives in certain lighting (very strict params help)
 - Unix socket path is hardcoded; Windows would need TCP or named pipes
 
 ## Debugging Tips
 
-- Worker should print: listening → webcam opened → client connected → periodic fps lines with `face=yes/no`, `center=(x,y)`, `norm=(cxn,cyn)`, `bbox`, `blink`.
-- In TUI HUD: verify `sock: connected`, `fps ~`, `face: yes`, `bbox:`, `out:(col,row)` remains stable when still.
+- Worker should print: listening → webcam opened → client connected → periodic fps lines with `face=yes/no`, `center=(x,y)`, `norm=(cxn,cyn)`, `bbox`, `blink`, `mouth`.
+- In TUI HUD: verify `sock: connected`, `fps ~`, `face: yes`, `blink:yes/no`, `mouth:open/closed`, `bbox:`, `out:(col,row)` remains stable when still.
 - Resize window; deadband scales; movement should feel proportional to size.
+- Blink quickly → eyes should disappear within 1 frame, reappear after 3 frames with eyes open
+- Open mouth wide or smile → tongue 👅 should appear, closed mouth → lips 👄
 
 ## Next Steps (optional enhancements)
 
