@@ -295,8 +295,8 @@ def main():
                                     if my + mh <= target_h and fx + fw <= target_w:
                                         mroi = gray[my:my+mh, fx:fx+fw]
                                         if mroi.size > 0:
-                                            # Detect smile/mouth open (less strict than eyes)
-                                            smiles = smile_cascade.detectMultiScale(mroi, 1.8, 20, minSize=(15, 15))
+                                            # Detect smile/mouth open (lenient params to actually detect mouth opening)
+                                            smiles = smile_cascade.detectMultiScale(mroi, 1.5, 3, minSize=(10, 10))
                                             if len(smiles) > 0:
                                                 mouth_frames += 1
                                                 nomouth_frames = 0

@@ -288,7 +288,7 @@ void TGenerativeMonsterCamView::draw(){
     // Draw minimal HUD overlay on top-left
     if (debugHud){
         char buf[64];
-        std::snprintf(buf, sizeof(buf), "sock:%s", connectionStatus.c_str());
+        std::snprintf(buf, sizeof(buf), "webcam:%s", connectionStatus.c_str());
         TDrawBuffer b; int col=0; ushort w = b.moveCStr(col, buf, ap, W - col); col += (w>0?w:0); if (col<W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,0,W,1,b);
     }
 }
