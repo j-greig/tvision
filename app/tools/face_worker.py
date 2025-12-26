@@ -77,9 +77,10 @@ def main():
     os.chmod(args.sock, 0o666)
     print(f"[face_worker] listening at {args.sock}")
 
-    # Load face + eye cascades (best effort)
+    # Load face + eye + smile cascades (best effort)
     face_cascade = None
     eye_cascade = None
+    smile_cascade = None
     if not args.no_face:
         # Try multiple methods to find Haar cascade XML files
         cascade_locations = []
@@ -135,6 +136,22 @@ def main():
             print(f"[face_worker] WARN: could not load eye cascade (searched {len(cascade_locations)} locations)")
             eye_cascade = None
 
+        # Try to load smile cascade for mouth detection
+        for base_path in cascade_locations:
+            try:
+                smile_path = base_path + 'haarcascade_smile.xml'
+                if os.path.exists(smile_path):
+                    smile_cascade = cv2.CascadeClassifier(smile_path)
+                    if not smile_cascade.empty():
+                        print(f"[face_worker] smile cascade loaded: {smile_path}")
+                        break
+            except Exception as e:
+                continue
+
+        if smile_cascade is None or smile_cascade.empty():
+            print(f"[face_worker] WARN: could not load smile cascade (searched {len(cascade_locations)} locations)")
+            smile_cascade = None
+
     cap = open_camera(args.device, 320, 240, fps=max(1, args.fps))
     if cap is None:
         print("[face_worker] ERROR: cannot open webcam; using synthetic frames", file=sys.stderr)
@@ -161,10 +178,13 @@ def main():
             blink = False
             noeye_frames = 0
             eye_frames = 0
+            mouth_frames = 0
+            nomouth_frames = 0
             # Add smoothing for stable face coordinates
             smooth_cx, smooth_cy = -1, -1
             smooth_alpha = 0.3  # Higher = more responsive, lower = more stable
             blink_timeout_frames = 30  # Max frames to stay blinking (2.5s at 12fps)
+            mouth_open = False
             while True:
                 now = time.time()
                 if now - last < frame_delay:
@@ -251,11 +271,12 @@ def main():
                                     eye_frames += 1
                                     noeye_frames = 0
                                     
-                                # Hysteresis: need 2 consecutive frames no eyes to set blink,
-                                # and 2 with eyes to clear it.
-                                if noeye_frames >= 2:
+                                # Asymmetric hysteresis: fast blink trigger, slower recovery to prevent flicker
+                                # Need only 1 frame with no eyes to blink (immediate response)
+                                # Need 3 frames with eyes to clear (prevent false positives)
+                                if noeye_frames >= 1:
                                     blink = True
-                                elif eye_frames >= 2:
+                                elif eye_frames >= 3:
                                     blink = False
                                 
                                 # Blink timeout - force reset if blinking too long
@@ -263,12 +284,46 @@ def main():
                                     blink = False
                                     noeye_frames = 0
                                     eye_frames = 0
-                # Reset blink state on face detection transitions  
+
+                                # Mouth/smile detection in lower half of face
+                                if smile_cascade is not None:
+                                    # Lower half of face for mouth region
+                                    my = fy + int(fh * 0.5)  # Start at 50% down
+                                    mh = max(1, min(int(fh * 0.5), target_h - my))  # Bottom 50%
+
+                                    # Extract mouth region safely
+                                    if my + mh <= target_h and fx + fw <= target_w:
+                                        mroi = gray[my:my+mh, fx:fx+fw]
+                                        if mroi.size > 0:
+                                            # Detect smile/mouth open (less strict than eyes)
+                                            smiles = smile_cascade.detectMultiScale(mroi, 1.8, 20, minSize=(15, 15))
+                                            if len(smiles) > 0:
+                                                mouth_frames += 1
+                                                nomouth_frames = 0
+                                            else:
+                                                nomouth_frames += 1
+                                                mouth_frames = 0
+                                        else:
+                                            nomouth_frames += 1
+                                            mouth_frames = 0
+                                    else:
+                                        nomouth_frames += 1
+                                        mouth_frames = 0
+
+                                    # Hysteresis for mouth: need 2 frames to open, 2 to close
+                                    if mouth_frames >= 2:
+                                        mouth_open = True
+                                    elif nomouth_frames >= 2:
+                                        mouth_open = False
+                # Reset blink and mouth state on face detection transitions
                 if has_face != prev_has_face:
-                    # Face status changed - reset blink detection
+                    # Face status changed - reset all detection states
                     blink = False
                     noeye_frames = 0
                     eye_frames = 0
+                    mouth_open = False
+                    mouth_frames = 0
+                    nomouth_frames = 0
                     # Reset smoothing when face detection lost/regained
                     if not has_face:
                         smooth_cx, smooth_cy = -1, -1
@@ -283,7 +338,8 @@ def main():
                     "ts": int(now),
                     "has_face": bool(has_face),
                     "bbox": [int(b) for b in bbox],
-                    "blink": bool(blink)
+                    "blink": bool(blink),
+                    "mouth_open": bool(mouth_open)
                 }
                 line = (json.dumps(hdr) + "\n").encode('ascii')
                 conn.sendall(line)
@@ -296,14 +352,15 @@ def main():
                         print(f"[face_worker] face: appeared at (x={cx}, y={cy}) bbox={bbox}")
                     elif (not has_face) and prev_has_face:
                         print("[face_worker] face: lost")
-                    prev_has_face = has_face
+                # CRITICAL: Update prev_has_face EVERY frame, not just in verbose mode
+                prev_has_face = has_face
 
                 if (now - hud_last) >= max(0.5, args.log_interval):
                     fps = frames / (now - hud_last)
                     if has_face:
                         cx = bbox[0] + bbox[2]//2; cy = bbox[1] + bbox[3]//2
                         ux = cx / float(target_w); uy = cy / float(target_h)
-                        print(f"[face_worker] fps={fps:.1f} face=yes center=({cx},{cy}) norm=({ux:.2f},{uy:.2f}) bbox={bbox} blink={blink}")
+                        print(f"[face_worker] fps={fps:.1f} face=yes center=({cx},{cy}) norm=({ux:.2f},{uy:.2f}) bbox={bbox} blink={blink} mouth={mouth_open}")
                     else:
                         print(f"[face_worker] fps={fps:.1f} face=no")
                     frames = 0

@@ -121,11 +121,11 @@ bool TGenerativeMonsterCamView::pollSocket(){
         if (pos != std::string::npos){
             std::string header = inHdr.substr(0, pos);
             inHdr.erase(0, pos+1);
-            // crude parse for w,h,has_face,bbox,blink
-            int w=0,h=0; hasFace=false; faceX=faceY=faceW=faceH=0; blink=false;
+            // crude parse for w,h,has_face,bbox,blink,mouth_open
+            int w=0,h=0; hasFace=false; faceX=faceY=faceW=faceH=0; blink=false; mouthOpen=false;
             auto findInt=[&](const char* key,int &out){ size_t k=header.find(key); if(k==std::string::npos) return; size_t c=header.find(':',k); if(c!=std::string::npos){ out=std::atoi(header.c_str()+c+1);} };
             auto findBool=[&](const char* key,bool &out){ size_t k=header.find(key); if(k==std::string::npos) return; size_t c=header.find(':',k); if(c!=std::string::npos){ out= (header.find("true",c)!=std::string::npos); } };
-            findInt("\"w\"", w); findInt("\"h\"", h); findBool("\"has_face\"", hasFace); findBool("\"blink\"", blink);
+            findInt("\"w\"", w); findInt("\"h\"", h); findBool("\"has_face\"", hasFace); findBool("\"blink\"", blink); findBool("\"mouth_open\"", mouthOpen);
             if (hasFace){
                 size_t b=header.find("\"bbox\""); if(b!=std::string::npos){ size_t lb=header.find('[',b); size_t rb=header.find(']',lb); if(lb!=std::string::npos && rb!=std::string::npos){ std::string arr=header.substr(lb+1, rb-lb-1); sscanf(arr.c_str(), "%d,%d,%d,%d", &faceX,&faceY,&faceW,&faceH); } }
                 // update last seen time for sticky tracking
@@ -189,10 +189,15 @@ void TGenerativeMonsterCamView::draw(){
     // Minimal 3-line face; track both X and Y
     static const char* S0 = u8"    👁️═👁️  ";
     static const char* S1 = u8"∿∿∿👃∿∿∿";
-    static const char* S2 = u8"    👄    ";  // Lips (tongue detection not implemented)
-    // Compose first line depending on blink; hide eyes when blink is true.
+    static const char* S2_LIPS = u8"    👄    ";   // Lips (mouth closed)
+    static const char* S2_TONGUE = u8"    👅    "; // Tongue (mouth open)
+    // Compose sprite lines depending on blink and mouth state
     const char* S0_BLINK = "      ═    ";
-    const char* SPR3[3] = { blink ? S0_BLINK : S0, S1, S2 };
+    const char* SPR3[3] = {
+        blink ? S0_BLINK : S0,  // Eyes or blink line
+        S1,                       // Nose
+        mouthOpen ? S2_TONGUE : S2_LIPS  // Tongue if mouth open, lips if closed
+    };
             int SH = 3; int SW = 0; for (int i=0;i<SH;++i) SW = std::max(SW, strwidth(SPR3[i]));
 
     // Compute target Vx,Vy from face center; clamp Vy so 3-line sprite fits
@@ -285,8 +290,8 @@ void TGenerativeMonsterCamView::draw(){
         char buf0[128]; char buf1[128]; char buf2[128]; char buf3[128];
         std::snprintf(buf0, sizeof(buf0), "MonsterCam | sock:%s cam:%dx%d fps:%.1f",
                       connectionStatus.c_str(), camW, camH, rxFps);
-        std::snprintf(buf1, sizeof(buf1), "face:%s blink:%s bbox:%d,%d %dx%d sm:(%.1f,%.1f) out:(%d,%d)",
-                      (hasFace?"yes":"no"), (blink?"yes":"no"), faceX, faceY, faceW, faceH, smVX, smVY, outVX, outVY);
+        std::snprintf(buf1, sizeof(buf1), "face:%s blink:%s mouth:%s bbox:%d,%d %dx%d sm:(%.1f,%.1f) out:(%d,%d)",
+                      (hasFace?"yes":"no"), (blink?"yes":"no"), (mouthOpen?"open":"closed"), faceX, faceY, faceW, faceH, smVX, smVY, outVX, outVY);
         std::snprintf(buf2, sizeof(buf2), "deadband col=%.1f row=%.1f", dbx, dby);
         std::snprintf(buf3, sizeof(buf3), "keys: v=HUD +/- speed Space=pause r=reset");
         const char* lines[4] = { buf0, buf1, buf2, buf3 };

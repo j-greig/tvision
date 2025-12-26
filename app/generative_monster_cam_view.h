@@ -50,6 +50,7 @@ private:
     bool hasFace {false};
     int faceX {0}, faceY {0}, faceW {0}, faceH {0};
     bool blink {false};
+    bool mouthOpen {false};
 
     // Socket state
     int sockFd {-1};
