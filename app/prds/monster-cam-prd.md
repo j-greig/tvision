@@ -65,6 +65,26 @@ Notes:
 ```bash
 pip install -r tools/requirements.txt
 python tools/face_worker.py
+
+# If you have OBS Virtual Camera or multiple cameras:
+python tools/face_worker.py --device 1  # Use camera device 1 instead of 0
+# Or set via environment variable:
+FM_DEVICE=1 python tools/face_worker.py
+
+# To list available cameras:
+python -c "
+import cv2
+for i in range(10):
+    cap = cv2.VideoCapture(i)
+    if cap.isOpened():
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f'Device {i}: {w}x{h}')
+        cap.release()
+    else:
+        break
+"
+
 # Logs show: listening path, camera open, cascades loaded, client connected, ~10s status lines with face=yes/no and blink
 ```
 

@@ -189,7 +189,7 @@ void TGenerativeMonsterCamView::draw(){
     // Minimal 3-line face; track both X and Y
     static const char* S0 = u8"    👁️═👁️  ";
     static const char* S1 = u8"∿∿∿👃∿∿∿";
-    static const char* S2 = u8"    👅    ";
+    static const char* S2 = u8"    👄    ";  // Lips (tongue detection not implemented)
     // Compose first line depending on blink; hide eyes when blink is true.
     const char* S0_BLINK = "      ═    ";
     const char* SPR3[3] = { blink ? S0_BLINK : S0, S1, S2 };
@@ -224,7 +224,7 @@ void TGenerativeMonsterCamView::draw(){
     outVX = qx; outVY = qy;
     int baseX = std::max(0, std::min(W - SW, qx - SW/2));
     int baseY = qy;
-            for (int i=0;i<SH;++i){ int y = baseY + i; if (y<0||y>=H) continue; TDrawBuffer b; int col = baseX; ushort w = b.moveCStr(col, SPR3[i], ap, W - col); col += (w>0?w:0); if (col < W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,y,W,1,b); }
+            for (int i=0;i<SH;++i){ int y = baseY + i; if (y<0||y>=H) continue; TDrawBuffer b; if (baseX > 0) b.moveChar(0, ' ', ca, baseX); int col = baseX; ushort w = b.moveCStr(col, SPR3[i], ap, W - col); col += (w>0?w:0); if (col < W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,y,W,1,b); }
         } else {
             // Big monster sprite (original)
             static const char* SPR[] = {
@@ -273,7 +273,7 @@ void TGenerativeMonsterCamView::draw(){
             int vy = std::max(0, std::min(H-1, (int)std::round(smVY)));
             int baseX = std::max(0, std::min(W - SW, vx - SW/2));
             int baseY = std::max(0, std::min(H - SH, vy - SH/2));
-            for (int i=0;i<SH;++i){ int y = baseY + i; if (y<0||y>=H) continue; TDrawBuffer b; int col = baseX; ushort w = b.moveCStr(col, SPR[i], ap, W - col); col += (w>0?w:0); if (col < W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,y,W,1,b); }
+            for (int i=0;i<SH;++i){ int y = baseY + i; if (y<0||y>=H) continue; TDrawBuffer b; if (baseX > 0) b.moveChar(0, ' ', ca, baseX); int col = baseX; ushort w = b.moveCStr(col, SPR[i], ap, W - col); col += (w>0?w:0); if (col < W) b.moveChar(col, ' ', ca, (ushort)(W-col)); writeLine(0,y,W,1,b); }
         }
         // Draw debug HUD on top if enabled continues below
     }
