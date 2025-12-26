@@ -81,19 +81,58 @@ def main():
     face_cascade = None
     eye_cascade = None
     if not args.no_face:
+        # Try multiple methods to find Haar cascade XML files
+        cascade_locations = []
+
+        # Method 1: cv2.data.haarcascades (OpenCV 4.x+)
+        if hasattr(cv2, 'data'):
+            cascade_locations.append(cv2.data.haarcascades)
+
+        # Method 2: OpenCV package installation directory
         try:
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            face_cascade = cv2.CascadeClassifier(cascade_path)
-            print(f"[face_worker] face cascade loaded: {cascade_path}")
-        except Exception as e:
-            print(f"[face_worker] WARN: could not load face cascade: {e}")
+            import cv2 as cv_module
+            opencv_dir = os.path.dirname(cv_module.__file__)
+            cascade_locations.append(os.path.join(opencv_dir, 'data', 'haarcascades') + os.sep)
+        except:
+            pass
+
+        # Method 3: Common system paths
+        cascade_locations.extend([
+            '/usr/share/opencv4/haarcascades/',
+            '/usr/local/share/opencv4/haarcascades/',
+            '/opt/homebrew/share/opencv4/haarcascades/',
+        ])
+
+        # Try to load face cascade
+        for base_path in cascade_locations:
+            try:
+                cascade_path = base_path + 'haarcascade_frontalface_default.xml'
+                if os.path.exists(cascade_path):
+                    face_cascade = cv2.CascadeClassifier(cascade_path)
+                    if not face_cascade.empty():
+                        print(f"[face_worker] face cascade loaded: {cascade_path}")
+                        break
+            except Exception as e:
+                continue
+
+        if face_cascade is None or face_cascade.empty():
+            print(f"[face_worker] WARN: could not load face cascade (searched {len(cascade_locations)} locations)")
             face_cascade = None
-        try:
-            eye_path = cv2.data.haarcascades + 'haarcascade_eye_tree_eyeglasses.xml'
-            eye_cascade = cv2.CascadeClassifier(eye_path)
-            print(f"[face_worker] eye cascade loaded: {eye_path}")
-        except Exception as e:
-            print(f"[face_worker] WARN: could not load eye cascade: {e}")
+
+        # Try to load eye cascade
+        for base_path in cascade_locations:
+            try:
+                eye_path = base_path + 'haarcascade_eye_tree_eyeglasses.xml'
+                if os.path.exists(eye_path):
+                    eye_cascade = cv2.CascadeClassifier(eye_path)
+                    if not eye_cascade.empty():
+                        print(f"[face_worker] eye cascade loaded: {eye_path}")
+                        break
+            except Exception as e:
+                continue
+
+        if eye_cascade is None or eye_cascade.empty():
+            print(f"[face_worker] WARN: could not load eye cascade (searched {len(cascade_locations)} locations)")
             eye_cascade = None
 
     cap = open_camera(args.device, 320, 240, fps=max(1, args.fps))
