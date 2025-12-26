@@ -46,9 +46,10 @@ private:
     // ASCII gradient (10 levels, dark to light)
     std::string gradient {" .:-=+*#%@"};
 
-    // Latest ASCII frame
+    // Latest ASCII frame (double-buffered to prevent flashing)
     int camW {0}, camH {0};
     std::vector<std::string> asciiLines;
+    std::vector<std::string> tempLines;  // Incoming frame buffer
 
     // Socket state
     int sockFd {-1};

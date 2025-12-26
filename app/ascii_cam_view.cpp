@@ -149,8 +149,8 @@ bool TAsciiCamView::pollSocket(){
             if (w>0 && h>0){
                 camW = w;
                 camH = h;
-                asciiLines.clear();
-                asciiLines.reserve(h);
+                tempLines.clear();
+                tempLines.reserve(h);
                 needBytes = h; // Expecting h lines
             }
             return true;
@@ -169,18 +169,20 @@ bool TAsciiCamView::pollSocket(){
 
         inHdr.append(buf, buf+n);
 
-        // Extract complete lines
+        // Extract complete lines into temp buffer
         while (needBytes > 0) {
             auto pos = inHdr.find('\n');
             if (pos == std::string::npos) break;
 
             std::string line = inHdr.substr(0, pos);
             inHdr.erase(0, pos+1);
-            asciiLines.push_back(line);
+            tempLines.push_back(line);
             needBytes--;
         }
 
+        // Only swap to display buffer when frame is complete
         if (needBytes == 0) {
+            asciiLines.swap(tempLines);
             ++framesRx;
             ++framesSinceTick;
             return true;
@@ -242,24 +244,16 @@ void TAsciiCamView::draw(){
         writeLine(0, y, W, 1, b);
     }
 
-    // Draw HUD if enabled
+    // Draw HUD if enabled (single line)
     if (debugHud) {
         TColorAttr hudAttr(TColorRGB(255,255,0), TColorRGB(0,0,0));
         char buf[256];
-
-        // Line 0: Connection status and FPS
-        std::snprintf(buf, sizeof(buf), "webcam:%s | fps:%.1f", connectionStatus.c_str(), rxFps);
+        std::snprintf(buf, sizeof(buf), "webcam:%s fps:%.1f %dx%d→%dx%d",
+                      connectionStatus.c_str(), rxFps, camW, camH, W, H);
         TDrawBuffer b0;
         b0.moveChar(0, ' ', black, W);
         b0.moveCStr(1, buf, hudAttr, W-1);
         writeLine(0, 0, W, 1, b0);
-
-        // Line 1: Resolution info
-        std::snprintf(buf, sizeof(buf), "ascii:%dx%d | window:%dx%d", camW, camH, W, H);
-        TDrawBuffer b1;
-        b1.moveChar(0, ' ', black, W);
-        b1.moveCStr(1, buf, hudAttr, W-1);
-        if (H > 1) writeLine(0, 1, W, 1, b1);
     }
 }
 
@@ -297,9 +291,9 @@ TWindow* createAsciiCamWindow(const TRect &bounds){
     TRect client = bounds;
     client.grow(-1,-1);
     auto* view = new TAsciiCamView(client, 80);
+    // Standard window with all features (resizable, zoomable, closeable)
     auto* win = new TWindow(bounds, "ASCII Webcam", wnNoNumber);
     win->insert(view);
-    win->flags &= ~wfClose;
-    win->growMode = gfGrowAll | gfGrowRel;
+    win->options |= ofTileable;
     return win;
 }
