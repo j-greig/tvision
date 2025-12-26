@@ -62,7 +62,7 @@
 // Generative art: Monster Cam (Emoji)
 #include "generative_monster_cam_view.h"
 // Generative art: ASCII Cam
-// DISABLED: #include "generative_ascii_cam_view.h"
+#include "ascii_cam_view.h"
 // API-controllable text editor
 #include "text_editor_view.h"
 // Wib&Wob AI chat interface
@@ -927,14 +927,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 newAudioMelodyWindow();
                 clearEvent(event);
                 break;
-            // DISABLED: ASCII Cam (file not in repo)
-            // case cmASCIICam: {
-            //     TRect r = deskTop->getExtent();
-            //     r.grow(-2, -1);
-            //     deskTop->insert(createGenerativeASCIICamWindow(r));
-            //     clearEvent(event);
-            //     break;
-            // }
+            case cmASCIICam: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                deskTop->insert(createAsciiCamWindow(r));
+                clearEvent(event);
+                break;
+            }
             case cmScoreBgColor: {
                 // Try to find an Animated Score view in the current window.
                 auto findScore = [](TView *p, void *out) -> Boolean {
@@ -1811,7 +1810,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
             *new TMenuItem("~A~udio Reactor (Bass)", cmAudioReactor, kbNoKey) +
             *new TMenuItem("Audio ~M~elody (Harmony)", cmAudioMelody, kbNoKey) +
-            // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
+            *new TMenuItem("ASCII ~W~ebcam", cmASCIICam, kbNoKey) +
             *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
