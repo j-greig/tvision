@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2025-11-05T15:55:05",
+  "screen": { "width": 118, "height": 60 },
+  "globals": { "patternMode": "continuous" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 18, "y": 54, "w": 16, "h": 7 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w2",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 2, "y": 54, "w": 16, "h": 7 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w3",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 18, "y": 42, "w": 16, "h": 10 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w4",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 2, "y": 42, "w": 16, "h": 10 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w5",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 18, "y": 31, "w": 16, "h": 10 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w6",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 2, "y": 31, "w": 16, "h": 10 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w7",
+      "type": "custom",
+      "title": "Text Editor",
+      "bounds": { "x": 30, "y": 31, "w": 83, "h": 27 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w8",
+      "type": "gradient",
+      "title": "",
+      "bounds": { "x": 2, "y": 29, "w": 100, "h": 6 },
+      "zoomed": false,
+      "props": {"gradientType": "horizontal"}
+    },
+    {
+      "id": "w9",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 70, "y": 4, "w": 32, "h": 24 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w10",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 36, "y": 4, "w": 32, "h": 24 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w11",
+      "type": "custom",
+      "title": "",
+      "bounds": { "x": 2, "y": 4, "w": 32, "h": 24 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w12",
+      "type": "gradient",
+      "title": "",
+      "bounds": { "x": 2, "y": 1, "w": 100, "h": 6 },
+      "zoomed": false,
+      "props": {"gradientType": "horizontal"}
+    }
+  ],
+  "focusedIndex": 0
+}

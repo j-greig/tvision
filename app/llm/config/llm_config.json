@@ -1,0 +1,24 @@
+{
+  "activeProvider": "anthropic_api",
+  "providers": {
+    "anthropic_api": {
+      "enabled": true,
+      "model": "claude-haiku-4-5",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "maxTokens": "8000",
+      "temperature": "1.0"
+    },
+    "claude_code": {
+      "enabled": true,
+      "command": "claude",
+      "args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.json", "--output-format", "json"]
+    },
+    "openrouter": {
+      "enabled": true,
+      "model": "anthropic/claude-3-haiku",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "apiKeyEnv": "OPENROUTER_API_KEY"
+    }
+  }
+}

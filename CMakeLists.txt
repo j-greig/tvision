@@ -168,9 +168,15 @@ option(TV_BUILD_TESTS "Build and run tests" OFF)
 
 add_subdirectory(source)
 
-# Examples
+# Main Application (wibwob-dos)
 
-add_subdirectory(examples)
+add_subdirectory(app)
+
+# Legacy Examples (optional)
+
+if (TV_BUILD_EXAMPLES)
+    add_subdirectory(workings/examples)
+endif()
 
 # Test
 

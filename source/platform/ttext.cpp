@@ -9,6 +9,8 @@
 #include <internal/winwidth.h>
 #include <internal/utf8.h>
 #include <wchar.h>
+#include <cstdio>
+#include <cstdlib>
 
 namespace ttext
 {
@@ -116,6 +118,101 @@ static mbstat_r mbstat(TStringView text) noexcept
 
 } // namespace ttext
 
+// ---- Emoji/Grapheme cluster (MVP) ----------------------------------------
+namespace ttext {
+
+static inline bool inRange(uint32_t cp, uint32_t a, uint32_t b) noexcept
+{ return cp >= a && cp <= b; }
+
+static inline bool isVS16(uint32_t cp) noexcept
+{ return cp == 0xFE0F; }
+
+static inline bool isZWJ(uint32_t cp) noexcept
+{ return cp == 0x200D; }
+
+static inline bool isEmojiModifier(uint32_t cp) noexcept
+{ return inRange(cp, 0x1F3FB, 0x1F3FF); }
+
+static inline bool isRegionalIndicator(uint32_t cp) noexcept
+{ return inRange(cp, 0x1F1E6, 0x1F1FF); }
+
+static inline bool isKeycapBase(uint32_t cp) noexcept
+{ return cp == '#' || cp == '*' || inRange(cp, '0', '9'); }
+
+// Simplified Extended_Pictographic heuristic: cover common emoji blocks.
+static inline bool isExtendedPictographic(uint32_t cp) noexcept
+{
+    return inRange(cp, 0x1F300, 0x1FAFF) ||
+           inRange(cp, 0x2600, 0x26FF)   ||
+           inRange(cp, 0x2700, 0x27BF)   ||
+           inRange(cp, 0x1F900, 0x1F9FF);
+}
+
+// Returns {lengthBytes, widthColumns}. lengthBytes=0 if not a recognized emoji cluster.
+static inline mbstat_r emojiClusterStat(TStringView text) noexcept
+{
+    if (text.size() == 0)
+        return {0, 0};
+    uint32_t wc = 0; int baseLen = mbtowc(wc, text);
+    if (baseLen <= 0)
+        return {0, 0};
+    size_t i = baseLen;
+
+    // Regional indicator pair (flag): two RIs => width 2 cluster.
+    if (isRegionalIndicator(wc)) {
+        uint32_t wc2 = 0; int len2 = (i < text.size()) ? mbtowc(wc2, text.substr(i)) : -1;
+        if (len2 > 0 && isRegionalIndicator(wc2))
+            return { int(baseLen + len2), 2 };
+        return {0, 0};
+    }
+
+    // Keycap sequence: [#*0-9] (VS16)? U+20E3
+    if (isKeycapBase(wc)) {
+        uint32_t next = 0; int nlen = (i < text.size()) ? mbtowc(next, text.substr(i)) : -1;
+        if (nlen > 0 && isVS16(next)) { i += nlen; nlen = (i < text.size()) ? mbtowc(next, text.substr(i)) : -1; }
+        if (nlen > 0 && next == 0x20E3) // COMBINING ENCLOSING KEYCAP
+            return { int(i + nlen), 2 };
+        return {0, 0};
+    }
+
+    // Extended pictographic clusters with optional VS16/modifier and ZWJ joins.
+    if (isExtendedPictographic(wc)) {
+        uint32_t cp = 0; int len = (i < text.size()) ? mbtowc(cp, text.substr(i)) : -1;
+        if (len > 0 && isVS16(cp)) { i += len; len = (i < text.size()) ? mbtowc(cp, text.substr(i)) : -1; }
+        if (len > 0 && isEmojiModifier(cp)) { i += len; len = (i < text.size()) ? mbtowc(cp, text.substr(i)) : -1; }
+        while (len > 0 && isZWJ(cp)) {
+            i += len; // consume ZWJ
+            uint32_t nextBase = 0; int blen = (i < text.size()) ? mbtowc(nextBase, text.substr(i)) : -1;
+            if (blen <= 0 || !isExtendedPictographic(nextBase))
+                break;
+            i += blen;
+            uint32_t t = 0; int tlen = (i < text.size()) ? mbtowc(t, text.substr(i)) : -1;
+            if (tlen > 0 && isVS16(t)) { i += tlen; tlen = (i < text.size()) ? mbtowc(t, text.substr(i)) : -1; }
+            if (tlen > 0 && isEmojiModifier(t)) { i += tlen; }
+            len = (i < text.size()) ? mbtowc(cp, text.substr(i)) : -1;
+        }
+        return { int(i), 2 };
+    }
+
+    return {0, 0};
+}
+
+} // namespace ttext
+
+// Policy: TV_EMOJI_WIDTH = off | auto | force2 (default: auto)
+static int emojiPolicy() noexcept
+{
+    enum { OFF, AUTO, FORCE2 };
+    static int policy = []{
+        const char *p = std::getenv("TV_EMOJI_WIDTH");
+        if (!p) return AUTO;
+        if (!std::strcmp(p, "off") || !std::strcmp(p, "OFF")) return OFF;
+        if (!std::strcmp(p, "force2") || !std::strcmp(p, "FORCE2") || !std::strcmp(p, "2")) return FORCE2;
+        return AUTO;
+    }();
+    return policy;
+}
+
 namespace tvision
 {
 
@@ -193,6 +290,16 @@ TText::Lw TText::nextImpl(TStringView text) noexcept
 {
     if (text.size())
     {
+        int policy = emojiPolicy();
+        if (policy != 0) {
+            if (auto em = ttext::emojiClusterStat(text); em.length > 0)
+                return { size_t(em.length), size_t(em.width) };
+            if (policy == 2) {
+                uint32_t wc = 0; int baseLen = ttext::mblen(text);
+                if (baseLen > 0 && ttext::mbtowc(wc, text) > 0 && ttext::isExtendedPictographic(wc))
+                    return { size_t(baseLen), 2 };
+            }
+        }
         auto mb = ttext::mbstat(text);
         if (mb.length <= 1)
             return {1, 1};
@@ -302,6 +409,70 @@ TText::Lw TText::drawOneImpl( TSpan<TScreenCell> cells, size_t i,
     using namespace ttext;
     if (j < text.size())
     {
+        int policy = emojiPolicy();
+        if (policy != 0) if (auto em = emojiClusterStat(text.substr(j)); em.length > 0) {
+            static bool debug = !!getenv("TV_EMOJI_DEBUG");
+            if (i < cells.size())
+            {
+                // Base codepoint drawn as wide.
+                int baseLen = mblen(text.substr(j));
+                if (baseLen < 1) baseLen = 1;
+                cells[i]._ch.moveMultiByteChar({&text[j], (size_t) baseLen}, /*wide*/ true);
+
+                // Append zero-width parts of the cluster (e.g., VS16, modifiers),
+                // but skip ZWJ and subsequent base pictographs which would exceed cell limits
+                // and can render inconsistently across terminals.
+                size_t k = j + baseLen;
+                while ((int)(k - j) < em.length && k < text.size()) {
+                    uint32_t cp = 0; int len = mbtowc(cp, text.substr(k));
+                    if (len <= 0) break;
+                    if (cp == 0x200D) { // ZWJ: skip and do not append
+                        k += len; // still consume within cluster
+                        // Next codepoint is a base; we will consume but not append.
+                    } else if (cp == 0xFE0F || isEmojiModifier(cp)) {
+                        // Safe to append as zero-width bytes; fits within 15 bytes budget in most cases.
+                        cells[i]._ch.appendZeroWidthChar({&text[k], (size_t) len});
+                        k += len;
+                    } else {
+                        // Any other codepoint within the cluster: consume without appending.
+                        k += len;
+                    }
+                }
+
+                bool drawTrail = (i + 1 < cells.size());
+                if (drawTrail)
+                    cells[i + 1]._ch.moveWideCharTrail();
+                if (debug) {
+                    // Dump basic diagnostics for the cluster being drawn.
+                    std::fprintf(stderr, "[TV_EMOJI_DEBUG] cell=%zu len=%d width=2 bytes=", i, em.length);
+                    for (int b = 0; b < em.length; ++b) {
+                        unsigned char uc = (unsigned char)text[j + b];
+                        std::fprintf(stderr, "%s%02X", b?" ":"", uc);
+                    }
+                    // Print first codepoint
+                    uint32_t first = 0; int fl = mbtowc(first, text.substr(j));
+                    if (fl > 0)
+                        std::fprintf(stderr, " cp=U+%04X\n", (unsigned)first);
+                    else
+                        std::fprintf(stderr, " cp=?\n");
+                }
+                return {(size_t) em.length, size_t(1 + drawTrail)};
+            }
+            return { (size_t) em.length, 0 };
+        }
+        if (policy == 2) {
+            uint32_t wc = 0; int baseLen = mblen(text.substr(j));
+            if (baseLen > 0 && mbtowc(wc, text.substr(j)) > 0 && isExtendedPictographic(wc)) {
+                if (i < cells.size()) {
+                    cells[i]._ch.moveMultiByteChar({&text[j], (size_t) baseLen}, /*wide*/ true);
+                    bool drawTrail = (i + 1 < cells.size());
+                    if (drawTrail)
+                        cells[i + 1]._ch.moveWideCharTrail();
+                    return { (size_t) baseLen, size_t(1 + drawTrail) };
+                }
+                return { (size_t) baseLen, 0 };
+            }
+        }
         auto mb = mbstat(text.substr(j));
         if (mb.length <= 1)
         {

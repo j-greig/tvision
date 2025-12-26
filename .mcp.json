@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "tui-control": {
+      "type": "http",
+      "url": "http://127.0.0.1:8089/mcp",
+      "description": "TUI application control via MCP - programmatic window management for Turbo Vision applications"
+    },
+    "symbient-brain": {
+      "command": "/Users/james/Repos/wibandwob-mailbox/.venv/bin/python",
+      "args": [
+        "/Users/james/Repos/wibandwob-mailbox/src/symbient_mcp/server.py"
+      ],
+      "env": {
+        "MAILBOX_SECRET": "6c1c7845cd594285d0da7a9f1c116131cc846018cd1e7eeb72cc30e18f265613",
+        "MAILBOX_URL": "https://symbient-mailbox.zilla.workers.dev/events"
+      }
+    }
+  }
+}

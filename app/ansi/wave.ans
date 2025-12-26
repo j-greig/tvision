@@ -1,0 +1,14 @@
+\x1b[0m\n
+\x1b[0mGenerating a simple color wave:\n
+\x1b[41m        \x1b[0m\n
+\x1b[41m      \x1b[0m\x1b[43m██\x1b[0m\n
+\x1b[41m    \x1b[0m\x1b[43m████\x1b[0m\x1b[42m██\x1b[0m\n
+\x1b[41m  \x1b[0m\x1b[43m██████\x1b[0m\x1b[42m████\x1b[0m\n
+\x1b[43m████████\x1b[0m\x1b[42m██████\x1b[0m\x1b[46m██\x1b[0m\n
+\x1b[43m████████\x1b[0m\x1b[42m██████\x1b[0m\x1b[46m████\x1b[0m\n
+\x1b[42m████████\x1b[0m\x1b[46m██████\x1b[0m\x1b[44m██\x1b[0m\n
+\x1b[42m████████\x1b[0m\x1b[46m██████\x1b[0m\x1b[44m████\x1b[0m\n
+\x1b[46m████████\x1b[0m\x1b[44m██████\x1b[0m\x1b[45m██\x1b[0m\n
+\x1b[46m████████\x1b[0m\x1b[44m██████\x1b[0m\x1b[45m████\x1b[0m\n
+\x1b[0m\n
+\x1b[90mNote: Intended for a color-capable viewer; current text viewer shows raw escape codes.\x1b[0m\n

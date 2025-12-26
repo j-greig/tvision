@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2025-09-10T21:23:15",
+  "screen": { "width": 169, "height": 51 },
+  "globals": { "patternMode": "continuous" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "gradient",
+      "title": "Diagonal Gradient 6",
+      "bounds": { "x": 136, "y": 1, "w": 25, "h": 13 },
+      "zoomed": false,
+      "props": {"gradientType": "diagonal"}
+    },
+    {
+      "id": "w2",
+      "type": "gradient",
+      "title": "Diagonal Gradient 5",
+      "bounds": { "x": 13, "y": 28, "w": 61, "h": 19 },
+      "zoomed": false,
+      "props": {"gradientType": "diagonal"}
+    },
+    {
+      "id": "w3",
+      "type": "gradient",
+      "title": "Diagonal Gradient 4",
+      "bounds": { "x": 55, "y": 4, "w": 106, "h": 45 },
+      "zoomed": false,
+      "props": {"gradientType": "diagonal"}
+    },
+    {
+      "id": "w4",
+      "type": "gradient",
+      "title": "Diagonal Gradient 3",
+      "bounds": { "x": 5, "y": 2, "w": 43, "h": 13 },
+      "zoomed": false,
+      "props": {"gradientType": "diagonal"}
+    },
+    {
+      "id": "w5",
+      "type": "gradient",
+      "title": "Diagonal Gradient 1",
+      "bounds": { "x": 1, "y": 1, "w": 73, "h": 35 },
+      "zoomed": false,
+      "props": {"gradientType": "diagonal"}
+    }
+  ],
+  "focusedIndex": 0
+}

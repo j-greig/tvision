@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2025-09-15T11:03:06",
+  "screen": { "width": 363, "height": 98 },
+  "globals": { "patternMode": "continuous" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "custom",
+      "title": "monster-wibwob-eyes-bat-death.txt - Text 18",
+      "bounds": { "x": 229, "y": 5, "w": 73, "h": 39 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w2",
+      "type": "custom",
+      "title": "monster-bone-eye.txt - Text 12",
+      "bounds": { "x": 149, "y": 46, "w": 63, "h": 49 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w3",
+      "type": "custom",
+      "title": "monster-emoji.txt - Text 15",
+      "bounds": { "x": 222, "y": 39, "w": 65, "h": 58 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w4",
+      "type": "custom",
+      "title": "monster-skull-emergence.txt - Text 13",
+      "bounds": { "x": 289, "y": 50, "w": 68, "h": 43 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w5",
+      "type": "custom",
+      "title": "monster-many-teeth.txt - Text 16",
+      "bounds": { "x": 71, "y": 19, "w": 61, "h": 43 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w6",
+      "type": "custom",
+      "title": "monster-angel-of-death.txt - Text 14",
+      "bounds": { "x": 11, "y": 44, "w": 77, "h": 51 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w7",
+      "type": "custom",
+      "title": "monster-death-flyer-portal.txt - Text 17",
+      "bounds": { "x": 297, "y": 2, "w": 60, "h": 38 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w8",
+      "type": "custom",
+      "title": "monster-bin-lurker.txt - Text 11",
+      "bounds": { "x": 116, "y": 3, "w": 84, "h": 49 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w9",
+      "type": "custom",
+      "title": "monster-hands-up-summoning.txt - Text 19",
+      "bounds": { "x": 93, "y": 68, "w": 68, "h": 32 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w10",
+      "type": "custom",
+      "title": "monster-squareform-batcave.txt - Text 10",
+      "bounds": { "x": 7, "y": 2, "w": 79, "h": 39 },
+      "zoomed": false,
+      "props": {}
+    }
+  ],
+  "focusedIndex": 0
+}
