@@ -14,6 +14,7 @@
 #define Uses_TKeys
 #include <tvision/tv.h>
 #include <vector>
+#include <map>
 #include <cstdint>
 
 // Forward declarations
@@ -27,7 +28,7 @@ extern "C" {
 // C-compatible input queue accessors (called by doomgeneric_tvision.c)
 extern "C" {
     int doomInputQueueEmpty(void);
-    unsigned char doomInputQueuePop(void);
+    uint16_t doomInputQueuePop(void);
 }
 
 //
@@ -70,9 +71,13 @@ private:
     // WAD file path
     const char* wadPath;
 
+    // Key state tracking: key -> frames since pressed (0 = not pressed)
+    std::map<unsigned char, int> keyPressedFrames;
+    static const int KEY_RELEASE_DELAY = 4;  // Release after 4 frames (~120ms at 30 FPS)
+
 public:
-    // Input queue (DOOM key codes) - public for getDoomInputQueue() accessor
-    std::vector<uint8_t> inputQueue;
+    // Input queue - stores (pressed << 8) | keyCode
+    std::vector<uint16_t> inputQueue;
 };
 
 // Factory function

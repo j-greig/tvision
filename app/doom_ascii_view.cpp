@@ -143,6 +143,22 @@ void TDoomAsciiView::advance()
     // Call DOOM tick (one frame iteration)
     D_DoomTick();
 
+    // Auto-release keys after delay
+    for (auto it = keyPressedFrames.begin(); it != keyPressedFrames.end(); ) {
+        if (it->second > 0) {
+            it->second++;  // Increment frame counter
+
+            if (it->second >= KEY_RELEASE_DELAY) {
+                // Generate release event
+                uint16_t data = (0 << 8) | it->first;  // pressed=0
+                inputQueue.push_back(data);
+                it = keyPressedFrames.erase(it);  // Remove from map
+                continue;
+            }
+        }
+        ++it;
+    }
+
     // Convert RGB buffer to ASCII
     convertFrameBuffer();
 }
@@ -260,11 +276,21 @@ void TDoomAsciiView::handleEvent(TEvent &ev)
 {
     TView::handleEvent(ev);
 
-    // Keyboard input - queue for DOOM
+    // Ensure view is selectable for keyboard focus
+    if (!(options & ofSelectable)) {
+        options |= ofSelectable;
+    }
+
+    // Keyboard input - queue press events and track state
     if (ev.what == evKeyDown) {
         unsigned char doomKey = mapTVKeyToDoom(ev.keyDown.keyCode);
         if (doomKey != 0) {
-            inputQueue.push_back(doomKey);
+            // Only queue press if key wasn't already down (no repeat)
+            if (keyPressedFrames[doomKey] == 0) {
+                uint16_t data = (1 << 8) | doomKey;  // pressed=1
+                inputQueue.push_back(data);
+                keyPressedFrames[doomKey] = 1;  // Mark as pressed
+            }
             clearEvent(ev);
         }
     }
@@ -365,14 +391,14 @@ int doomInputQueueEmpty(void)
     return g_activeDoomView->inputQueue.empty() ? 1 : 0;
 }
 
-unsigned char doomInputQueuePop(void)
+uint16_t doomInputQueuePop(void)
 {
     if (!g_activeDoomView || g_activeDoomView->inputQueue.empty())
         return 0;
 
-    unsigned char key = g_activeDoomView->inputQueue.front();
+    uint16_t data = g_activeDoomView->inputQueue.front();
     g_activeDoomView->inputQueue.erase(g_activeDoomView->inputQueue.begin());
-    return key;
+    return data;
 }
 
 } // extern "C"

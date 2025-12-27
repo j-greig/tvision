@@ -120,7 +120,7 @@ void DG_DrawFrame(void)
 //
 // External accessors from doom_ascii_view.cpp
 extern int doomInputQueueEmpty(void);
-extern unsigned char doomInputQueuePop(void);
+extern uint16_t doomInputQueuePop(void);
 
 int DG_GetKey(int* pressed, unsigned char* doomKey)
 {
@@ -130,9 +130,10 @@ int DG_GetKey(int* pressed, unsigned char* doomKey)
         return 0;
     }
 
-    // Dequeue key
-    *pressed = 1;
-    *doomKey = doomInputQueuePop();
+    // Dequeue and unpack: (pressed << 8) | keyCode
+    uint16_t data = doomInputQueuePop();
+    *pressed = data >> 8;      // Upper byte: 0=release, 1=press
+    *doomKey = data & 0xFF;    // Lower byte: key code
     return 1;
 }
 
