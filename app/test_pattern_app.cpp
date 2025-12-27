@@ -73,6 +73,8 @@
 #include "audio_reactor.h"
 #include "music_engine_manager.h"
 #include "generative_music.h"
+// DOOM ASCII renderer
+#include "doom_ascii_view.h"
 // Custom frame for windows without titles
 #include "notitle_frame.h"
 // Transparent background text view
@@ -162,6 +164,7 @@ const ushort cmSendToBack = 133;
 const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
 const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
 const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
+const ushort cmDoomAscii = 162;    // DOOM ASCII renderer
 const ushort cmRepaint = 161;      // Force repaint
 
 // Help menu commands
@@ -1042,6 +1045,31 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("Animation Studio coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmDoomAscii: {
+                // Get WAD path from environment or use default in app/doom/
+                const char* wadPath = getenv("DOOMWADDIR");
+                if (!wadPath || wadPath[0] == '\0') {
+                    // Default to WAD in app/doom directory
+                    wadPath = "app/doom/doom1.wad";
+                }
+
+                // Note: WAD validation is handled by D_DoomMain
+                // If WAD is missing or invalid, DOOM will call I_Error which exits
+                // TODO: Add file existence check here and show messageBox for better UX
+
+                // Create DOOM window - this calls DG_Init which loads the game
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* doomWindow = createDoomAsciiWindow(r, wadPath);
+                deskTop->insert(doomWindow);
+
+                // Register window if API is enabled
+                registerWindow(doomWindow);
+
+                doomWindow->select();
+                clearEvent(event);
+                break;
+            }
             case cmQuantumPrinter:
                 messageBox("🚀 QUANTUM PRINTER ACTIVATED! 🚀\n\nPrinting reality at 42Hz...", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -1856,6 +1884,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +
             *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
             newLine() +
+            *new TMenuItem("~D~oom ASCII", cmDoomAscii, kbNoKey) +
             *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
         *new TSubMenu("~H~elp", kbAltH) +
             *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey)

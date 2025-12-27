@@ -18,6 +18,9 @@ find_package(SDL2 REQUIRED)
 find_library(SDL2_MIXER_LIBRARY SDL2_mixer REQUIRED HINTS /opt/homebrew/lib)
 find_path(SDL2_MIXER_INCLUDE_DIR SDL_mixer.h PATH_SUFFIXES SDL2 HINTS /opt/homebrew/include)
 
+# Add DOOM ASCII library
+add_subdirectory(../third_party/doom-ascii doom-ascii)
+
 # Common sources used by multiple apps
 set(TV_COMMON_SOURCES
     test_pattern.cpp
@@ -63,9 +66,17 @@ add_executable(test_pattern
     wibwob_scroll_test.cpp
     audio_reactor.cpp
     generative_music.cpp
+    doom/doomgeneric_tvision.c
+    doom/doom_tick_wrapper.c
+    doom_ascii_view.cpp
 )
-target_link_libraries(test_pattern PRIVATE tvision ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARY})
-target_include_directories(test_pattern PRIVATE ${SDL2_INCLUDE_DIRS} ${SDL2_MIXER_INCLUDE_DIR} /opt/homebrew/include)
+target_link_libraries(test_pattern PRIVATE tvision doom_ascii_lib ${SDL2_LIBRARIES} ${SDL2_MIXER_LIBRARY})
+target_include_directories(test_pattern PRIVATE
+    ${SDL2_INCLUDE_DIRS}
+    ${SDL2_MIXER_INCLUDE_DIR}
+    /opt/homebrew/include
+    ../third_party/doom-ascii/src
+)
 
 # simple_tui (minimal reference app)
 add_executable(simple_tui
