@@ -84,7 +84,7 @@ extern std::string api_resize_window(TTestPatternApp& app, const std::string& id
 extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_get_canvas_size(TTestPatternApp& app);
-extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+extern std::string api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, bool wordWrap = false);
 extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
                                  const std::string& position);
@@ -139,15 +139,22 @@ void ApiIpcServer::poll() {
     if (fd < 0) {
         return; // EAGAIN expected in non-blocking mode
     }
-    // Read a single line command.
-    char buf[2048];
-    ssize_t n = ::read(fd, buf, sizeof(buf)-1);
-    if (n <= 0) {
+    // Read full command (may be large due to base64-encoded content).
+    std::string line;
+    {
+        char buf[8192];
+        for (;;) {
+            ssize_t n = ::read(fd, buf, sizeof(buf));
+            if (n <= 0) break;
+            line.append(buf, n);
+            // Commands are newline-terminated; stop when we have one.
+            if (line.find('\n') != std::string::npos) break;
+        }
+    }
+    if (line.empty()) {
         ::close(fd);
         return;
     }
-    buf[n] = 0;
-    std::string line(buf);
     // Simple trim
     while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
 
@@ -210,7 +217,9 @@ void ApiIpcServer::poll() {
             if (it != kv.end()) api_open_text_view_path(*app_, it->second, bounds);
             else resp = "err missing path\n";
         } else if (type == "text_editor") {
-            api_spawn_text_editor(*app_, bounds);
+            bool ww = kv.count("word_wrap") && (kv["word_wrap"] == "true" || kv["word_wrap"] == "1");
+            std::string winId = api_spawn_text_editor(*app_, bounds, ww);
+            if (!winId.empty()) resp = "id:" + winId + "\n";
         } else if (type == "dashboard") {
             std::string title = kv.count("title") ? kv["title"] : std::string("Dashboard");
             std::string winId = api_spawn_dashboard(*app_, bounds, title);

@@ -185,6 +185,60 @@ myView = new MyView(client, nullptr, vScrollBar);  // ✅ Pass scrollbar to TScr
 
 **Reference**: `app/ansi_view.cpp` (working TScroller), `source/tvision/twindow.cpp:197-210` (standardScrollBar)
 
+### Word Wrap (Draw-Time TText::scroll Pattern)
+
+**IMPORTANT**: TEditor has **no word wrap support** (confirmed by framework maintainer in [issue #18](https://github.com/magiblot/tvision/issues/18)). For word-wrapped text display, use the **draw-time wrap** pattern with `TText::scroll()`.
+
+**Wrong** (pre-computed wrappedLines vector - stale on resize, double storage):
+```cpp
+std::vector<std::string> wrappedLines;  // ❌ Goes stale on resize
+void rewrap() {  // ❌ Must be called on every resize + content change
+    wrappedLines.clear();
+    for (auto& line : lines) {
+        // manual byte-counting wrap ❌ breaks on Unicode
+    }
+}
+```
+
+**Correct** (draw-time wrap using TV's own Unicode-aware `TText::scroll()`):
+```cpp
+void draw() override {
+    std::string flat = joinAllLines();  // join lines with \n
+    TStringView s = flat;
+    int p = 0, l = (int)s.size();
+
+    while (p < l && y < H) {
+        int i = p;
+        int last = i + TText::scroll(s.substr(i), W, False);  // ✅ Unicode-aware width
+        int j;
+        do {  // walk word-by-word up to 'last'
+            j = p;
+            while (p < l && s[p] == ' ') ++p;
+            while (p < l && s[p] != ' ' && s[p] != '\n')
+                p += TText::next(s.substr(p));  // ✅ Unicode-safe advance
+        } while (p < l && p < last && s[p] != '\n');
+        if (p > last) p = (j > i) ? j : last;  // back up to word boundary
+
+        TDrawBuffer b;
+        b.moveChar(0, ' ', color, W);
+        b.moveStr(0, s.substr(i, p - i), color, (ushort)strwidth(s.substr(i, p-i)));
+        writeLine(0, y++, W, 1, b);
+
+        while (p < l && s[p] == ' ') ++p;  // skip trailing spaces
+        if (p < l && s[p] == '\n') ++p;     // skip newline
+    }
+}
+```
+
+**Why it matters**: This is the same algorithm used by `TStaticText::draw()` and `THelpTopic::wrapText()` internally. It handles Unicode width correctly, reflows automatically on resize (no stale cache), and uses TV's own `TText::scroll()` for column-width calculation.
+
+**Key functions**:
+- `TText::scroll(sv, cols, False)` - returns byte count that fits in `cols` display columns
+- `TText::next(sv)` - returns byte count of next character (Unicode-safe)
+- `strwidth(sv)` - returns display width of a string view
+
+**Reference**: `app/text_editor_view.cpp` (production), `app/wrap_test_app.cpp` (5-approach comparison test), `source/tvision/tstatict.cpp:44-104` (TStaticText original)
+
 ## Environment Variables
 
 - `TVISION_MAX_FPS` - Refresh rate limit (default 60)

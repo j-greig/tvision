@@ -629,7 +629,7 @@ private:
     friend std::string api_focus_window(TTestPatternApp&, const std::string&);
     friend std::string api_close_window(TTestPatternApp&, const std::string&);
     friend std::string api_get_canvas_size(TTestPatternApp&);
-    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_spawn_text_editor(TTestPatternApp&, const TRect* bounds, bool wordWrap);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
     friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&,
@@ -2529,7 +2529,7 @@ std::string api_get_canvas_size(TTestPatternApp& app) {
     return json.str();
 }
 
-void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
+std::string api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, bool wordWrap) {
     TRect r;
     if (bounds) {
         r = *bounds;
@@ -2538,7 +2538,17 @@ void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
         r.grow(-5, -3);
     }
     TWindow* window = createTextEditorWindow(r);
+    auto* edWin = dynamic_cast<TTextEditorWindow*>(window);
+    std::string winId;
+    if (edWin && edWin->getEditorView()) {
+        if (wordWrap)
+            edWin->getEditorView()->setWordWrap(true);
+        // Register a stable window ID
+        winId = app.registerWindow(dynamic_cast<TWindow*>(window));
+        edWin->getEditorView()->setWindowId(winId);
+    }
     TProgram::deskTop->insert(window);
+    return winId;
 }
 
 std::string api_send_text(TTestPatternApp& app, const std::string& id,
@@ -2553,16 +2563,27 @@ std::string api_send_text(TTestPatternApp& app, const std::string& id,
 
     // Find existing text editor windows
     fprintf(stderr, "[api_send_text] Searching for existing text editor...\n");
-    TView* view = app.deskTop->first();
     TTextEditorWindow* editorWindow = nullptr;
 
-    // Use nextView() to avoid infinite loop on circular linked list
-    for (TView* v = view; v; v = v->nextView()) {
-        TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(v);
-        if (candidate) {
-            editorWindow = candidate;
-            fprintf(stderr, "[api_send_text] Found existing text editor\n");
-            break; // Found a text editor
+    // First try to find by registered window ID
+    if (!autoSpawn) {
+        TWindow* regView = app.findWindowById(id);
+        if (regView) {
+            editorWindow = dynamic_cast<TTextEditorWindow*>(regView);
+            if (editorWindow)
+                fprintf(stderr, "[api_send_text] Found by registered ID: %s\n", id.c_str());
+        }
+    }
+
+    // Fallback: find first text editor on desktop
+    if (!editorWindow) {
+        for (TView* v = app.deskTop->first(); v; v = v->nextView()) {
+            TTextEditorWindow* candidate = dynamic_cast<TTextEditorWindow*>(v);
+            if (candidate) {
+                editorWindow = candidate;
+                fprintf(stderr, "[api_send_text] Found existing text editor (fallback)\n");
+                break;
+            }
         }
     }
 

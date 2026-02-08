@@ -14,6 +14,7 @@
 #define Uses_TColorAttr
 #define Uses_TDrawBuffer
 #define Uses_TKeys
+#define Uses_TText
 #include <tvision/tv.h>
 
 #include <cstring>
@@ -21,13 +22,14 @@
 #include <sstream>
 
 TTextEditorView::TTextEditorView(const TRect &bounds)
-    : TView(bounds), 
-      cursorLine(0), 
+    : TView(bounds),
+      cursorLine(0),
       cursorCol(0),
-      scrollTop(0), 
+      scrollTop(0),
       scrollLeft(0),
       readOnly(false),
       showCursor(true),
+      wordWrap(false),
       hScrollBar(nullptr),
       vScrollBar(nullptr)
 {
@@ -51,51 +53,95 @@ void TTextEditorView::draw() {
     int W = size.x, H = size.y;
     if (W <= 0 || H <= 0) return;
 
-    // Calculate visible range
-    size_t endLine = std::min(scrollTop + H, lines.size());
-    
-    for (int y = 0; y < H; ++y) {
-        size_t lineIndex = scrollTop + y;
-        TDrawBuffer b;
-        
-        if (lineIndex < lines.size()) {
-            const std::string& line = lines[lineIndex];
-            
-            // Calculate visible portion of line
-            size_t startCol = std::min(scrollLeft, line.length());
-            size_t endCol = std::min(scrollLeft + W, line.length());
-            
-            std::string visibleText = line.substr(startCol, endCol - startCol);
-            
-            // Draw the text
-            int col = 0;
-            if (!visibleText.empty()) {
-                ushort w = b.moveCStr(col, visibleText.c_str(), 
-                    TAttrPair{normalColor, normalColor}, W - col);
-                col += (w > 0 ? w : 0);
+    if (wordWrap) {
+        // V4 approach: draw-time word wrap using TText::scroll()
+        std::string flat = joinLines();
+        TStringView s = flat;
+        int l = (int)s.size();
+        int p = 0;
+        int displayLine = 0;
+        int y = 0;
+
+        while (p < l && y < H) {
+            // Empty line: emit blank row for each \n at current position
+            if (s[p] == '\n') {
+                if (displayLine >= (int)scrollTop) {
+                    TDrawBuffer b;
+                    b.moveChar(0, ' ', normalColor, W);
+                    writeLine(0, y++, W, 1, b);
+                }
+                ++p;
+                ++displayLine;
+                continue;
             }
-            
-            // Fill remainder with spaces
-            if (col < W) {
-                b.moveChar(col, ' ', normalColor, (ushort)(W - col));
+
+            int i = p;
+            int last = i + TText::scroll(s.substr(i), W, False);
+            int j;
+            do {
+                j = p;
+                while (p < l && s[p] == ' ') ++p;
+                while (p < l && s[p] != ' ' && s[p] != '\n')
+                    p += TText::next(s.substr(p));
+            } while (p < l && p < last && s[p] != '\n');
+            if (p > last) p = (j > i) ? j : last;
+
+            if (displayLine >= (int)scrollTop) {
+                TDrawBuffer b;
+                b.moveChar(0, ' ', normalColor, W);
+                TStringView seg = s.substr(i, p - i);
+                int width = strwidth(seg);
+                b.moveStr(0, seg, normalColor, (ushort)std::min(width, W));
+                writeLine(0, y++, W, 1, b);
             }
-        } else {
-            // Empty line
-            b.moveChar(0, ' ', normalColor, (ushort)W);
+
+            while (p < l && s[p] == ' ') ++p;
+            if (p < l && s[p] == '\n') ++p;
+            ++displayLine;
         }
-        
-        writeLine(0, y, W, 1, b);
-    }
-    
-    // Show cursor if focused and in visible area
-    if (showCursor && (state & sfFocused)) {
-        if (cursorLine >= scrollTop && cursorLine < scrollTop + H) {
-            int cursorX = (int)(cursorCol - scrollLeft);
-            int cursorY = (int)(cursorLine - scrollTop);
-            
-            if (cursorX >= 0 && cursorX < W && cursorY >= 0 && cursorY < H) {
-                setCursor(cursorX, cursorY);
-                showCursor = true;
+        // Fill remaining rows
+        while (y < H) {
+            TDrawBuffer b;
+            b.moveChar(0, ' ', normalColor, W);
+            writeLine(0, y++, W, 1, b);
+        }
+    } else {
+        // No wrap: horizontal scroll
+        for (int y = 0; y < H; ++y) {
+            size_t lineIndex = scrollTop + y;
+            TDrawBuffer b;
+
+            if (lineIndex < lines.size()) {
+                const std::string& line = lines[lineIndex];
+                size_t startCol = std::min(scrollLeft, line.length());
+                size_t endCol = std::min(scrollLeft + (size_t)W, line.length());
+                std::string visibleText = line.substr(startCol, endCol - startCol);
+
+                int col = 0;
+                if (!visibleText.empty()) {
+                    ushort w = b.moveCStr(col, visibleText.c_str(),
+                        TAttrPair{normalColor, normalColor}, W - col);
+                    col += (w > 0 ? w : 0);
+                }
+                if (col < W)
+                    b.moveChar(col, ' ', normalColor, (ushort)(W - col));
+            } else {
+                b.moveChar(0, ' ', normalColor, (ushort)W);
+            }
+
+            writeLine(0, y, W, 1, b);
+        }
+
+        // Show cursor if focused and in visible area
+        if (showCursor && (state & sfFocused)) {
+            if (cursorLine >= scrollTop && cursorLine < scrollTop + (size_t)H) {
+                int cursorX = (int)(cursorCol - scrollLeft);
+                int cursorY = (int)(cursorLine - scrollTop);
+
+                if (cursorX >= 0 && cursorX < W && cursorY >= 0 && cursorY < H) {
+                    setCursor(cursorX, cursorY);
+                    showCursor = true;
+                }
             }
         }
     }
@@ -245,8 +291,8 @@ void TTextEditorView::sendText(const std::string& content, const std::string& mo
             appendText(content);
         }
     }
-    
-    scrollToCursor();
+
+    scrollToEnd();
     drawView();
 }
 
@@ -354,15 +400,21 @@ void TTextEditorView::scrollToCursor() {
 }
 
 void TTextEditorView::scrollToEnd() {
-    if (lines.size() > size.y) {
-        scrollTop = lines.size() - size.y;
+    if (wordWrap) {
+        int total = countDisplayLines(size.x);
+        scrollTop = (total > size.y) ? (size_t)(total - size.y) : 0;
+        cursorLine = lines.size() - 1;
+        cursorCol = lines[cursorLine].length();
     } else {
-        scrollTop = 0;
+        if (lines.size() > (size_t)size.y) {
+            scrollTop = lines.size() - size.y;
+        } else {
+            scrollTop = 0;
+        }
+        cursorLine = lines.size() - 1;
+        cursorCol = lines[cursorLine].length();
+        scrollToCursor();
     }
-    
-    cursorLine = lines.size() - 1;
-    cursorCol = lines[cursorLine].length();
-    scrollToCursor();
 }
 
 void TTextEditorView::setState(ushort s, Boolean en) {
@@ -374,6 +426,52 @@ void TTextEditorView::setState(ushort s, Boolean en) {
 
 void TTextEditorView::changeBounds(const TRect& b) {
     TView::changeBounds(b);
+    drawView();
+}
+
+/*-- Word wrap support (V4: draw-time TText::scroll) ------*/
+
+std::string TTextEditorView::joinLines() const {
+    std::string result;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (i > 0) result += '\n';
+        result += lines[i];
+    }
+    return result;
+}
+
+int TTextEditorView::countDisplayLines(int W) const {
+    if (W <= 0) return 0;
+    std::string flat = joinLines();
+    TStringView s = flat;
+    int l = (int)s.size();
+    int p = 0;
+    int total = 0;
+    while (p < l) {
+        if (s[p] == '\n') {
+            ++p;
+            ++total;
+            continue;
+        }
+        int i = p;
+        int last = i + TText::scroll(s.substr(i), W, False);
+        int j;
+        do {
+            j = p;
+            while (p < l && s[p] == ' ') ++p;
+            while (p < l && s[p] != ' ' && s[p] != '\n')
+                p += TText::next(s.substr(p));
+        } while (p < l && p < last && s[p] != '\n');
+        if (p > last) p = (j > i) ? j : last;
+        while (p < l && s[p] == ' ') ++p;
+        if (p < l && s[p] == '\n') ++p;
+        ++total;
+    }
+    return total;
+}
+
+void TTextEditorView::setWordWrap(bool enabled) {
+    wordWrap = enabled;
     drawView();
 }
 

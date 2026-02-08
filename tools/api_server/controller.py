@@ -139,7 +139,11 @@ class Controller:
                     cmd_params["path"] = path
                     send_cmd("create_window", cmd_params)
             elif wtype == WindowType.text_editor:
-                send_cmd("create_window", cmd_params)
+                if props.get("word_wrap"):
+                    cmd_params["word_wrap"] = "true"
+                ipc_resp = send_cmd("create_window", cmd_params)
+                if isinstance(ipc_resp, str) and ipc_resp.startswith("id:"):
+                    props["_cpp_id"] = ipc_resp.split(":", 1)[1].strip()
             elif wtype == WindowType.dashboard:
                 if title:
                     cmd_params["title"] = title
@@ -153,8 +157,8 @@ class Controller:
         except Exception as e:
             print(f"[WARN] IPC create_window failed: {e}")
         async with self._lock:
-            # Dashboard windows use the C++ ID directly so IPC routing works
-            if wtype == WindowType.dashboard and props.get("_cpp_id"):
+            # Use C++ ID for window types that return one (dashboard, text_editor)
+            if wtype in (WindowType.dashboard, WindowType.text_editor) and props.get("_cpp_id"):
                 win_id = props["_cpp_id"]
             else:
                 win_id = new_id("win")

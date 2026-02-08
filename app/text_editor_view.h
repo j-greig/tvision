@@ -39,10 +39,14 @@ public:
     void sendFigletText(const std::string& text, const std::string& font = "standard", int width = 0, const std::string& mode = "append");
     void clearContent();
     const std::vector<std::string>& getLines() const { return lines; }
-    
+
     // Window ID for API targeting
     void setWindowId(const std::string& id) { windowId = id; }
     const std::string& getWindowId() const { return windowId; }
+
+    // Word wrap control
+    void setWordWrap(bool enabled);
+    bool getWordWrap() const { return wordWrap; }
 
 private:
     void insertText(const std::string& content, size_t lineIndex, size_t colIndex);
@@ -52,29 +56,32 @@ private:
     std::string runFiglet(const std::string& text, const std::string& font, int width);
     void scrollToCursor();
     void updateScrollBars();
+    int countDisplayLines(int width) const;
+    std::string joinLines() const;
 
     // Text content storage
     std::vector<std::string> lines;
-    
+
     // Cursor position
     size_t cursorLine;
     size_t cursorCol;
-    
+
     // Scroll position
     size_t scrollTop;
     size_t scrollLeft;
-    
+
     // Window identification for API
     std::string windowId;
-    
+
     // UI state
     bool readOnly;
     bool showCursor;
-    
+    bool wordWrap;
+
     // Scroll bars
     TScrollBar *hScrollBar;
     TScrollBar *vScrollBar;
-    
+
     // Colors
     TColorAttr normalColor;
     TColorAttr selectedColor;

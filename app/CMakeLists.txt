@@ -104,3 +104,9 @@ add_executable(ascii_dump
     tvision_ascii_view_poc.cpp
 )
 target_include_directories(ascii_dump PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+
+# wrap_test (word-wrap comparison: 5 approaches)
+add_executable(wrap_test
+    wrap_test_app.cpp
+)
+target_link_libraries(wrap_test PRIVATE tvision)

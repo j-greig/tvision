@@ -6,22 +6,28 @@
 #include <algorithm>
 
 // ─── Color Palette ────────────────────────────────────────────
-// Retro-future TUI dashboard colors using 24-bit RGB.
+// Classic Turbo Vision light theme — matches TV frame colors.
+// bg: light cyan/blue (168,168,210) to sit with default TV palette.
 
-static TColorAttr cBackground()   { return TColorAttr(TColorRGB(180, 180, 180), TColorRGB(20, 20, 30)); }
-static TColorAttr cLabel()        { return TColorAttr(TColorRGB(100, 220, 255), TColorRGB(20, 20, 30)); }
-static TColorAttr cProgressFill() { return TColorAttr(TColorRGB(40, 200, 80),   TColorRGB(20, 20, 30)); }
-static TColorAttr cProgressEmpty(){ return TColorAttr(TColorRGB(60, 60, 70),    TColorRGB(20, 20, 30)); }
-static TColorAttr cProgressText() { return TColorAttr(TColorRGB(180, 180, 180), TColorRGB(20, 20, 30)); }
-static TColorAttr cKvKey()        { return TColorAttr(TColorRGB(100, 200, 220), TColorRGB(20, 20, 30)); }
-static TColorAttr cKvValue()      { return TColorAttr(TColorRGB(240, 240, 240), TColorRGB(20, 20, 30)); }
-static TColorAttr cSeparator()    { return TColorAttr(TColorRGB(60, 60, 80),    TColorRGB(20, 20, 30)); }
-static TColorAttr cTableHeader()  { return TColorAttr(TColorRGB(255, 255, 255), TColorRGB(40, 60, 120)); }
-static TColorAttr cTableRowA()    { return TColorAttr(TColorRGB(200, 200, 200), TColorRGB(25, 25, 35)); }
-static TColorAttr cTableRowB()    { return TColorAttr(TColorRGB(200, 200, 200), TColorRGB(35, 35, 50)); }
-static TColorAttr cStatusRun()    { return TColorAttr(TColorRGB(40, 220, 80),   TColorRGB(20, 20, 30)); }
-static TColorAttr cStatusIdle()   { return TColorAttr(TColorRGB(220, 200, 40),  TColorRGB(20, 20, 30)); }
-static TColorAttr cStatusErr()    { return TColorAttr(TColorRGB(220, 60, 60),   TColorRGB(20, 20, 30)); }
+static const TColorRGB bgMain(168, 184, 210);   // Soft blue-grey
+static const TColorRGB bgAltA(158, 174, 200);   // Table row A
+static const TColorRGB bgAltB(148, 164, 190);   // Table row B
+static const TColorRGB bgHeader(80, 100, 150);   // Table header
+
+static TColorAttr cBackground()   { return TColorAttr(TColorRGB(30, 30, 50),    bgMain); }
+static TColorAttr cLabel()        { return TColorAttr(TColorRGB(20, 20, 100),    bgMain); }
+static TColorAttr cProgressFill() { return TColorAttr(TColorRGB(20, 140, 40),    bgMain); }
+static TColorAttr cProgressEmpty(){ return TColorAttr(TColorRGB(140, 150, 170),  bgMain); }
+static TColorAttr cProgressText() { return TColorAttr(TColorRGB(30, 30, 60),     bgMain); }
+static TColorAttr cKvKey()        { return TColorAttr(TColorRGB(20, 50, 120),    bgMain); }
+static TColorAttr cKvValue()      { return TColorAttr(TColorRGB(10, 10, 30),     bgMain); }
+static TColorAttr cSeparator()    { return TColorAttr(TColorRGB(130, 145, 170),  bgMain); }
+static TColorAttr cTableHeader()  { return TColorAttr(TColorRGB(255, 255, 255),  bgHeader); }
+static TColorAttr cTableRowA()    { return TColorAttr(TColorRGB(20, 20, 40),     bgAltA); }
+static TColorAttr cTableRowB()    { return TColorAttr(TColorRGB(20, 20, 40),     bgAltB); }
+static TColorAttr cStatusRun()    { return TColorAttr(TColorRGB(20, 140, 40),    bgMain); }
+static TColorAttr cStatusIdle()   { return TColorAttr(TColorRGB(160, 140, 20),   bgMain); }
+static TColorAttr cStatusErr()    { return TColorAttr(TColorRGB(180, 30, 30),    bgMain); }
 
 // ─── Helpers ──────────────────────────────────────────────────
 
