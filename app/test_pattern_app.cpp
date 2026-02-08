@@ -76,9 +76,11 @@
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
+#include "dashboard_view.h"
 #include <sstream>
 #include <fstream>
 #include <string>
+#include <set>
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -630,8 +632,11 @@ private:
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
-    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
+    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&,
                                        const std::string&, int, const std::string&);
+    friend std::string api_spawn_dashboard(TTestPatternApp&, const TRect* bounds, const std::string& title);
+    friend std::string api_send_dashboard_content(TTestPatternApp&, const std::string& id,
+                                                   const std::string& content);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -1945,13 +1950,31 @@ void api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(); }
 
 std::string api_get_state(TTestPatternApp& app) {
-    // Rebuild window registry to sync with current desktop state
-    app.winToId.clear();
-    app.idToWin.clear();
-    
+    // Prune stale entries (closed windows) but preserve existing ID assignments
+    std::set<TWindow*> currentWindows;
+    TView *scan = app.deskTop->first();
+    if (scan) {
+        TView *v = scan;
+        do {
+            TWindow *w = dynamic_cast<TWindow*>(v);
+            if (w) currentWindows.insert(w);
+            v = v->next;
+        } while (v != scan);
+    }
+    // Remove entries for windows no longer on desktop
+    auto it = app.winToId.begin();
+    while (it != app.winToId.end()) {
+        if (currentWindows.find(it->first) == currentWindows.end()) {
+            app.idToWin.erase(it->second);
+            it = app.winToId.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     std::stringstream json;
     json << "{\"windows\":[";
-    
+
     bool first = true;
     TView *start = app.deskTop->first();
     if (start) {
@@ -2586,7 +2609,34 @@ std::string api_send_text(TTestPatternApp& app, const std::string& id,
     return "err no text editor available";
 }
 
-std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text, 
+// ─── Dashboard API Functions ──────────────────────────────────
+
+std::string api_spawn_dashboard(TTestPatternApp& app, const TRect* bounds, const std::string& title) {
+    TRect r;
+    if (bounds) {
+        r = *bounds;
+    } else {
+        r = app.deskTop->getBounds();
+        r.grow(-5, -3);
+    }
+    TDashboardWindow* window = new TDashboardWindow(r, title.c_str());
+    app.deskTop->insert(window);
+    return app.registerWindow(window);
+}
+
+std::string api_send_dashboard_content(TTestPatternApp& app, const std::string& id,
+                                        const std::string& content) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "err window not found";
+
+    TDashboardWindow* dashWin = dynamic_cast<TDashboardWindow*>(w);
+    if (!dashWin) return "err window is not a dashboard";
+
+    dashWin->setContent(content);
+    return "ok";
+}
+
+std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
                            const std::string& font, int width, const std::string& mode) {
     // Special case: if id is "auto" or no text editor exists, create one
     bool autoSpawn = (id == "auto" || id == "text_editor");

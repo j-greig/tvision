@@ -47,33 +47,53 @@ class Controller:
         return self._state
 
     async def _sync_state(self) -> None:
-        """Sync in-memory state with the real C++ app via IPC"""
+        """Sync in-memory state with the real C++ app via IPC.
+
+        Merges C++ state with Python metadata. Dashboard windows preserve
+        their type and props (including _cpp_id) across syncs.
+        """
         try:
             resp = send_cmd("get_state")
             if resp and resp.strip():
                 # Parse JSON response
                 state_data = json.loads(resp.strip())
-                
+
                 async with self._lock:
+                    # Preserve metadata for windows we know about
+                    # (dashboard type, _cpp_id, etc.)
+                    known_meta = {}
+                    for w in self._state.windows:
+                        known_meta[w.id] = (w.type, dict(w.props))
+
+                    if known_meta:
+                        print(f"[DEBUG] _sync_state: preserving metadata for {list(known_meta.keys())}")
+
                     # Update windows list with real IDs from C++
                     new_windows = []
                     for win_data in state_data.get("windows", []):
+                        wid = win_data["id"]
+                        # Preserve type/props if we already know this window
+                        wtype, wprops = known_meta.get(wid, (WindowType.test_pattern, {}))
+                        if wid in known_meta:
+                            print(f"[DEBUG] _sync_state: {wid} → preserved type={wtype.value}")
+                        else:
+                            print(f"[DEBUG] _sync_state: {wid} → default test_pattern (not in known_meta)")
                         win = Window(
-                            id=win_data["id"],
-                            type=WindowType.test_pattern,  # Default for now
+                            id=wid,
+                            type=wtype,
                             title=win_data["title"],
                             rect=Rect(
                                 x=win_data["x"],
-                                y=win_data["y"], 
+                                y=win_data["y"],
                                 w=win_data["width"],
                                 h=win_data["height"]
                             ),
                             z=0,  # C++ doesn't provide z-order
                             focused=False,  # Will be determined later
-                            props={}
+                            props=wprops
                         )
                         new_windows.append(win)
-                    
+
                     self._state.windows = new_windows
                     
             # Get canvas size separately
@@ -120,10 +140,24 @@ class Controller:
                     send_cmd("create_window", cmd_params)
             elif wtype == WindowType.text_editor:
                 send_cmd("create_window", cmd_params)
-        except Exception:
-            pass
+            elif wtype == WindowType.dashboard:
+                if title:
+                    cmd_params["title"] = title
+                ipc_resp = send_cmd("create_window", cmd_params)
+                # Dashboard creation returns the C++ window ID
+                if isinstance(ipc_resp, str) and ipc_resp.startswith("id:"):
+                    props["_cpp_id"] = ipc_resp.split(":", 1)[1].strip()
+                    print(f"[DEBUG] Dashboard created, C++ ID: {props['_cpp_id']}")
+                else:
+                    print(f"[WARN] Dashboard IPC response unexpected: {ipc_resp!r}")
+        except Exception as e:
+            print(f"[WARN] IPC create_window failed: {e}")
         async with self._lock:
-            win_id = new_id("win")
+            # Dashboard windows use the C++ ID directly so IPC routing works
+            if wtype == WindowType.dashboard and props.get("_cpp_id"):
+                win_id = props["_cpp_id"]
+            else:
+                win_id = new_id("win")
             if not rect:
                 rect = Rect(3 + len(self._state.windows) * 2, 2 + len(self._state.windows) * 1, 40, 12)
             t = title or wtype.value
@@ -276,19 +310,35 @@ class Controller:
         return win
 
     async def send_text(self, win_id: str, content: str, mode: str = "append", position: str = "end") -> Dict[str, Any]:
-        """Send text to a text editor window"""
+        """Send text to a text editor or dashboard window"""
         try:
             print(f"[DEBUG] send_text called: win_id={win_id}, content_len={len(content)}, mode={mode}, position={position}")
             print(f"[DEBUG] Content has {content.count(chr(10))} newlines")
 
-            # Forward to the live app via IPC
-            print(f"[DEBUG] Calling send_cmd...")
-            resp = send_cmd("send_text", {
-                "id": win_id,
-                "content": content,
-                "mode": mode,
-                "position": position
-            })
+            # Check if this is a dashboard window and route appropriately
+            is_dashboard = False
+            async with self._lock:
+                for w in self._state.windows:
+                    if w.id == win_id and w.type == WindowType.dashboard:
+                        is_dashboard = True
+                        break
+
+            if is_dashboard:
+                # Dashboard windows use C++ IDs directly, so win_id IS the C++ ID
+                print(f"[DEBUG] Routing to send_dashboard: id={win_id}")
+                resp = send_cmd("send_dashboard", {
+                    "id": win_id,
+                    "content": content,
+                })
+            else:
+                # Forward to the live app via IPC
+                print(f"[DEBUG] Calling send_cmd...")
+                resp = send_cmd("send_text", {
+                    "id": win_id,
+                    "content": content,
+                    "mode": mode,
+                    "position": position
+                })
             if isinstance(resp, str) and resp.lower().startswith("err"):
                 raise RuntimeError(resp)
             print(f"[DEBUG] send_cmd completed successfully")

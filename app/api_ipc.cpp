@@ -90,6 +90,9 @@ extern std::string api_send_text(TTestPatternApp& app, const std::string& id,
                                  const std::string& position);
 extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
                                    const std::string& font, int width, const std::string& mode);
+extern std::string api_spawn_dashboard(TTestPatternApp& app, const TRect* bounds, const std::string& title);
+extern std::string api_send_dashboard_content(TTestPatternApp& app, const std::string& id,
+                                               const std::string& content);
 
 ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
@@ -166,6 +169,13 @@ void ApiIpcServer::poll() {
         }
     }
 
+    // Decode any base64-encoded values (prefix "base64:...")
+    for (auto& pair : kv) {
+        if (pair.second.rfind("base64:", 0) == 0) {
+            pair.second = base64_decode(pair.second.substr(7));
+        }
+    }
+
     std::string resp = "ok\n";
     if (cmd == "create_window") {
         std::string type = kv["type"]; // test_pattern|gradient|frame_player|text_view
@@ -201,6 +211,10 @@ void ApiIpcServer::poll() {
             else resp = "err missing path\n";
         } else if (type == "text_editor") {
             api_spawn_text_editor(*app_, bounds);
+        } else if (type == "dashboard") {
+            std::string title = kv.count("title") ? kv["title"] : std::string("Dashboard");
+            std::string winId = api_spawn_dashboard(*app_, bounds, title);
+            resp = "id:" + winId + "\n";
         } else {
             resp = "err unknown type\n";
         }
@@ -268,24 +282,10 @@ void ApiIpcServer::poll() {
         if (id_it != kv.end() && content_it != kv.end()) {
             std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
             std::string position = (pos_it != kv.end()) ? pos_it->second : "end";
-
-            // Decode content if base64-encoded (prefix: "base64:")
-            std::string content = content_it->second;
-            fprintf(stderr, "[C++ IPC] send_text: id=%s, content_len=%zu, encoded=%s\n",
-                   id_it->second.c_str(), content.size(),
-                   (content.rfind("base64:", 0) == 0) ? "yes" : "no");
-
-            if (content.rfind("base64:", 0) == 0) {
-                // Extract base64 payload
-                std::string encoded = content.substr(7);
-                fprintf(stderr, "[C++ IPC] Decoding base64: %zu chars\n", encoded.size());
-                content = base64_decode(encoded);
-                fprintf(stderr, "[C++ IPC] Decoded to: %zu chars\n", content.size());
-            }
-
-            fprintf(stderr, "[C++ IPC] Calling api_send_text...\n");
+            std::string content = content_it->second;  // Already decoded by generic handler
+            fprintf(stderr, "[C++ IPC] send_text: id=%s, content_len=%zu\n",
+                   id_it->second.c_str(), content.size());
             resp = api_send_text(*app_, id_it->second, content, mode, position) + "\n";
-            fprintf(stderr, "[C++ IPC] api_send_text returned: %s", resp.c_str());
         } else {
             resp = "err missing id or content\n";
         }
@@ -303,6 +303,16 @@ void ApiIpcServer::poll() {
             resp = api_send_figlet(*app_, id_it->second, text_it->second, font, width, mode) + "\n";
         } else {
             resp = "err missing id or text\n";
+        }
+    } else if (cmd == "send_dashboard") {
+        auto id_it = kv.find("id");
+        auto content_it = kv.find("content");
+
+        if (id_it != kv.end() && content_it != kv.end()) {
+            std::string content = content_it->second;  // Already decoded by generic handler
+            resp = api_send_dashboard_content(*app_, id_it->second, content) + "\n";
+        } else {
+            resp = "err missing id or content\n";
         }
     } else if (cmd == "get_canvas_size") {
         resp = api_get_canvas_size(*app_) + "\n";

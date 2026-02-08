@@ -20,6 +20,7 @@ class WindowCreate(BaseModel):
         "text_view",
         "text_editor",
         "wallpaper",
+        "dashboard",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None

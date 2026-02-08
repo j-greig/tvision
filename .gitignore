@@ -17,6 +17,8 @@
 !prds/**/
 !tools/
 !tools/**/
+!specs/
+!specs/**/
 !.github/
 !.github/**/
 

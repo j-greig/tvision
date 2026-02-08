@@ -41,16 +41,14 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
     try:
         parts = [f"cmd:{cmd}"]
         for k, v in (kv or {}).items():
-            # Base64 encode values that might contain newlines or special chars
-            # Special handling for "content" parameter which often has multiline text
-            if k == "content" and ("\n" in v or "\r" in v or " " in v):
+            # Base64 encode values that contain newlines, spaces, or special chars
+            # The IPC protocol is space-delimited, so spaces in values break parsing
+            if ("\n" in v or "\r" in v or " " in v):
                 # Base64 encode and add marker prefix
                 encoded = base64.b64encode(v.encode("utf-8")).decode("ascii")
                 parts.append(f"{k}=base64:{encoded}")
             else:
-                # Escape spaces in other values
-                escaped = v.replace(" ", "%20").replace("\n", "%0A").replace("\r", "%0D")
-                parts.append(f"{k}={escaped}")
+                parts.append(f"{k}={v}")
         line = " ".join(parts) + "\n"
         s.sendall(line.encode("utf-8"))
         data = s.recv(4096)

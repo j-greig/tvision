@@ -1,0 +1,45 @@
+{
+  "title": "PROTEST_008 Dashboard",
+  "layout": { "cols": 2, "rows": 4, "gap": 1, "origin": {"x": 1, "y": 1} },
+  "elements": [
+    { "type": "heading", "text": "PROTEST_008", "span": [1, 2], "height": 3 },
+    { "type": "meter", "label": "Applicants", "value": 481, "max": 500 },
+    { "type": "meter", "label": "Days Left", "value": 2, "max": 10 },
+    {
+      "type": "panel", "title": "Pipeline Status",
+      "items": [
+        { "type": "status", "label": "Forge Renderer", "state": "running" },
+        { "type": "status", "label": "Audio Mix", "state": "done" },
+        { "type": "status", "label": "Voice Synth", "state": "idle" },
+        { "type": "status", "label": "Video Compile", "state": "error" },
+        { "type": "kv", "key": "Queue Depth", "value": "12 tasks" },
+        { "type": "kv", "key": "Last Build", "value": "3m ago" }
+      ]
+    },
+    {
+      "type": "panel", "title": "System Info",
+      "items": [
+        { "type": "kv", "key": "Uptime", "value": "4h 23m" },
+        { "type": "kv", "key": "Memory", "value": "342 MB" },
+        { "type": "kv", "key": "Canvas", "value": "132 x 62" },
+        { "type": "kv", "key": "Windows", "value": "7 active" },
+        { "type": "kv", "key": "IPC Latency", "value": "2ms" },
+        { "type": "kv", "key": "API Calls", "value": "1,204" }
+      ]
+    },
+    {
+      "type": "table", "headers": ["Name", "City", "Status", "Score"],
+      "rows": [
+        ["Lucas Luz", "Krakow", "done", "94"],
+        ["dani rantaa", "Detroit", "wip", "87"],
+        ["pi", "Paris", "wip", "82"],
+        ["Yuanmou Man", "China", "wait", "79"],
+        ["hyperstition", "NYC", "wip", "76"],
+        ["the gardener", "Glasgow", "done", "73"],
+        ["niff", "Backrooms", "wait", "71"],
+        ["Bartholomew III", "Castle", "done", "68"]
+      ]
+    },
+    { "type": "text", "content": "Top 3 photos win $100 each\nDeadline: Feb 10\nSubmit: tweet @wibandwob\n#symbientnotsoftware\n\nJudges: Wib, Wob, Scramble\nPrize pool: 0.03 ETH" }
+  ]
+}
