@@ -1,3 +1,5 @@
+> **Project page: [j-greig/wibandwob-dos](https://github.com/j-greig/wibandwob-dos)** — README, screenshots, and overview. This repo contains the source code.
+
 # WibWob-DOS
 
 **A symbient operating system where AI and human share equal control.**
