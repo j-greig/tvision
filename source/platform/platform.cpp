@@ -9,6 +9,7 @@
 #include <internal/ncursinp.h>
 #include <internal/sighandl.h>
 #include <internal/conctl.h>
+#include <internal/getenv.h>
 
 namespace tvision
 {
@@ -41,7 +42,8 @@ ConsoleAdapter &Platform::createConsole() noexcept
     if (con.isLinuxConsole())
         return LinuxConsoleAdapter::create(con, displayBuf, inputState, display, *new NcursesInput(con, display, inputState, false));
 #endif // __linux__
-    return UnixConsoleAdapter::create(con, displayBuf, inputState, display, *new NcursesInput(con, display, inputState, true));
+    bool useMouse = !getEnv<int>("TVISION_MOUSE_OFF", 0);
+    return UnixConsoleAdapter::create(con, displayBuf, inputState, display, *new NcursesInput(con, display, inputState, useMouse));
 #endif // _WIN32
 }
 
