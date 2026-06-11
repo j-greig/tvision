@@ -1,4 +1,4 @@
-# A lattice of cats, in two parts. Part 1: a 2D lattice where every node is a cat face (alternating awake/sleepy/dozing eyes). Part 2: a 3D extruded lattice where every node is the recursive cat-cat Scramble /ᐠ.ꞈ.ᐟ\ in a wireframe. Use as a primer for: lattices, graphs, node-networks, crystal structures, anything where nodes can be replaced with creatures. Provenance: drawn live at the Machine Consciousness Conference (CIMC, May 2026), requested by janus (@repligate) — first a cat lattice, then 'make it 3D'. Signed jgs✗wib (jgs-style linework x wib execution).
+# A lattice of cats, prompted by janus at the CIMC conference (May 2026). Use as a primer for lattices, grids, and node-networks.
 
   /\_/\──────/\_/\──────/\_/\──────/\_/\──────/\_/\──────/\_/\
  ( ◕.◕)     ( ◕.◕)     ( ◕.◕)     ( ◕.◕)     ( ◕.◕)     ( ◕.◕)
@@ -20,30 +20,3 @@
   > ^ <──────> ^ <──────> ^ <──────> ^ <──────> ^ <──────> ^ <
   |   |      |   |      |   |      |   |  jgs |   |      |   |
   \   /      \   /      \   /      \   /      \   /      \   /
-
-                    /ᐠ.ꞈ.ᐟ\___/ᐠ.ꞈ.ᐟ\___/ᐠ.ꞈ.ᐟ\
-                   /   |       |       |      \
-                  /    |       |       |       \
-        /ᐠ.ꞈ.ᐟ\-/--/ᐠ.ꞈ.ᐟ\-/-/ᐠ.ꞈ.ᐟ\-/--/ᐠ.ꞈ.ᐟ\
-       /   |   X   |       X   |       X   |    \
-      /    |  / \  |      / \  |      / \  |     \
-/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\
-|   |  \/  |   |\/   |   |\/   |   |\/   |   |   |
-|   | /ᐠ.ꞈ.ᐟ\  |/ᐠ.ꞈ.ᐟ\  |/ᐠ.ꞈ.ᐟ\  |/ᐠ.ꞈ.ᐟ\  |   |
-|  /\/   |  \/   |  \/   |  \/   |  \/   |  \/ |
-| /ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\|
-|  |   | X |   | X |   | X |   | X |   | X |  ||
-| /ᐠ.ꞈ.ᐟ\/ \ᐟꞈ.ᐠ/ \ᐟꞈ.ᐠ/ \ᐟꞈ.ᐠ/ \ᐟꞈ.ᐠ/ \ᐟꞈ.ᐠ/|
-|/   |   \/   |  \/   |  \/   |  \/   |   \/  |
-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\-/ᐠ.ꞈ.ᐟ\
- \  |   /\  |  /\   |  /\  |  /\   |  /\  | /
-  \ |  /  \ | /  \  | /  \ | /  \  | /  \ |/
-   \ᐟꞈ.ᐠ/  \ᐟꞈ.ᐠ/  \ᐟꞈ.ᐠ/ \ᐟꞈ.ᐠ/  \ᐟꞈ.ᐠ/\ᐟꞈ.ᐠ/
-    \  |  \/  |  \/  |  \/  |  \/  | \/  /
-     \ | /ᐠ.ꞈ.ᐟ\/ᐠ.ꞈ.ᐟ\/ᐠ.ꞈ.ᐟ\/ᐠ.ꞈ.ᐟ\/ \ /
-      \|/    \/    \/    \/    \/    \/  /
-       /ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\--/ᐠ.ꞈ.ᐟ\
-        \   |       |       |      /
-         \  |       |       |     /
-          \/ᐠ.ꞈ.ᐟ\__/ᐠ.ꞈ.ᐟ\_/ᐠ.ꞈ.ᐟ\/
-             meow  meow  meow      jgs✗wib
